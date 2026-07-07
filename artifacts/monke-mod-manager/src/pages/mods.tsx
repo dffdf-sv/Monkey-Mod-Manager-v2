@@ -183,7 +183,17 @@ export default function ModsPage() {
                           <Button 
                             variant={isInst ? "destructive" : "default"}
                             className={`w-full font-mono font-bold text-xs uppercase tracking-wider h-8 ${isInst ? 'bg-destructive/90 hover:bg-destructive' : 'bg-primary hover:bg-primary/90'}`}
-                            onClick={() => toggleInstalled(mod.name)}
+                            onClick={() => {
+                              if (!isInst && mod.download_url && mod.download_url !== 'https://github.com') {
+                                const a = document.createElement('a');
+                                a.href = mod.download_url;
+                                a.download = mod.name.replace(/\s+/g, '_') + '.dll';
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                              }
+                              toggleInstalled(mod.name);
+                            }}
                           >
                             {isInst ? (
                               <><Trash2 className="w-3 h-3 mr-1.5" /> Remove</>
