@@ -23,11 +23,7 @@ Built with [AvaloniaUI](https://avaloniaui.net/)!
 - **Better progress feedback**: Download progress bar during installations
 - **5 themes**: Light, Dark, Dark High Contrast, Sunrise, and Frost
 
-## Download
-| Platform | Link                                                                                            |
-| -------- | ----------------------------------------------------------------------------------------------- |
-| Windows  | https://github.com/arielthemonke/MonkeModManager/releases/latest/download/MonkeModManager.exe   |
-| Linux    | https://github.com/arielthemonke/MonkeModManager/releases/latest/download/MonkeModManager.Linux |
+
 
 ## Building from Source
 Requirements:
