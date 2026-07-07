@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Monke Mod Manager"
+version = "1.0.0"
+id = "artifacts/monke-mod-manager"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25617
+
+[services.development]
+run = "pnpm --filter @workspace/monke-mod-manager run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/monke-mod-manager", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/monke-mod-manager/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25617"
+BASE_PATH = "/"

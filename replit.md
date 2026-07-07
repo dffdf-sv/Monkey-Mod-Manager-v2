@@ -1,6 +1,6 @@
-# [Project name]
+# Monke Mod Manager
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A web-based mod manager for Gorilla Tag — browse, install, enable, and disable mods sourced from the GORILA-TAG-MODBASE repository.
 
 ## Run & Operate
 
@@ -22,15 +22,25 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- Frontend app: `artifacts/monke-mod-manager/src/`
+- State/context: `src/lib/store.tsx` — ModStoreProvider using localStorage
+- Mod fetching: `src/hooks/use-mods.ts` — fetches from GORILA-TAG-MODBASE GitHub
+- Pages: `src/pages/mods.tsx`, `settings.tsx`, `about.tsx`
+- Shell/layout: `src/components/shell.tsx`
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Pure frontend app — no backend, no API server calls. Mod list is fetched directly from the raw GitHub JSON URL.
+- Install/enable state persisted to localStorage (`monke-installed`, `monke-enabled`, `monke-theme`).
+- `toggleInstalled` captures `installed.includes(modName)` synchronously before both `setInstalled` + `setEnabled` calls to prevent stale-closure divergence.
+- Malformed mod entries are filtered out at fetch time before reaching the UI.
+- Dark mode first; toggled via `document.documentElement.classList` and persisted to localStorage.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- **Mods page**: Browse all mods from GORILA-TAG-MODBASE with search and category filter tabs. Install/uninstall with one click; installed mods get an enable/disable toggle. Dependency warnings shown inline.
+- **Settings page**: Theme toggle, mod source URL display, clear all mods.
+- **About page**: App info and links to both GitHub repos.
 
 ## User preferences
 
