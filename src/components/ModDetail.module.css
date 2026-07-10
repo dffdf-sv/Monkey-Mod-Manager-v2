@@ -219,3 +219,28 @@
   color: var(--warning);
   text-align: center;
 }
+
+.depMissing {
+  opacity: 0.5;
+  border-color: var(--text-muted);
+}
+
+.downloadLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.15s;
+}
+
+.downloadLink:hover {
+  background: var(--accent);
+  color: #fff;
+}

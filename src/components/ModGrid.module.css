@@ -39,6 +39,11 @@
   justify-content: center;
 }
 
+.emptyIcon {
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
 .errorText {
   font-size: 16px;
   font-weight: 600;
@@ -48,4 +53,21 @@
 .hint {
   font-size: 13px;
   color: var(--text-muted);
+}
+
+.clearBtn {
+  margin-top: 4px;
+  padding: 8px 18px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+
+.clearBtn:hover {
+  background: var(--accent);
+  color: #fff;
 }

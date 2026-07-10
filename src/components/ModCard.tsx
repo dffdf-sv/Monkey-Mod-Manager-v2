@@ -72,7 +72,12 @@ export default function ModCard({ mod, installed, onSelect, onToggleInstall }: P
             </>
           )}
         </button>
-        <button className={styles.detailBtn}>Details</button>
+        <button
+          className={styles.detailBtn}
+          onClick={(e) => { e.stopPropagation(); onSelect(); }}
+        >
+          Details
+        </button>
       </div>
     </div>
   );

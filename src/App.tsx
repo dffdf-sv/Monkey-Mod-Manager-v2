@@ -55,6 +55,11 @@ export default function App() {
     return list;
   }, [mods, installed, activeCategory, search, activeTab]);
 
+  function handleTab(tab: 'all' | 'installed') {
+    setActiveTab(tab);
+    setActiveCategory('All');
+  }
+
   function toggleInstall(mod: Mod) {
     setInstalled((prev) => {
       const next = new Set(prev);
@@ -82,7 +87,7 @@ export default function App() {
           activeCategory={activeCategory}
           onCategory={setActiveCategory}
           activeTab={activeTab}
-          onTab={setActiveTab}
+          onTab={handleTab}
           installedCount={installed.size}
         />
         <main className={styles.main}>
@@ -91,8 +96,11 @@ export default function App() {
             installed={installed}
             loading={loading}
             error={error}
+            search={search}
+            activeTab={activeTab}
             onSelect={setSelectedMod}
             onToggleInstall={toggleInstall}
+            onClearSearch={() => setSearch('')}
           />
         </main>
       </div>
