@@ -1,0 +1,221 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.panel {
+  width: 480px;
+  max-width: 100vw;
+  height: 100%;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  animation: slideIn 0.2s ease;
+  box-shadow: -8px 0 40px rgba(0,0,0,0.5);
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 24px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.version {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.installedBadge {
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--success-dim);
+  color: var(--success);
+  border: 1px solid var(--success);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.author {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.closeBtn {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+}
+
+.closeBtn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.section {}
+
+.sectionTitle {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.description {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.meta {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.metaItem {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metaLabel {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.metaValue {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.depList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.depCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+}
+
+.depName {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.depVersion {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.footer {
+  padding: 20px 24px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.installBtn {
+  width: 100%;
+  padding: 12px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+
+.installBtn:hover {
+  background: var(--accent-hover);
+}
+
+.uninstallBtn {
+  background: var(--error-dim);
+  color: var(--error);
+  border: 1px solid var(--error);
+}
+
+.uninstallBtn:hover {
+  background: var(--error);
+  color: #fff;
+}
+
+.depNote {
+  font-size: 12px;
+  color: var(--warning);
+  text-align: center;
+}

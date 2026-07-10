@@ -1,0 +1,184 @@
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-lg);
+  opacity: 0;
+  transition: opacity 0.18s;
+  background: radial-gradient(circle at 50% 0%, var(--accent-dim), transparent 70%);
+}
+
+.card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
+}
+
+.card:hover::before {
+  opacity: 1;
+}
+
+.installed {
+  border-color: var(--success);
+  background: linear-gradient(135deg, var(--bg-card), rgba(62,207,142,0.04));
+}
+
+.installed::before {
+  background: radial-gradient(circle at 50% 0%, var(--success-dim), transparent 70%);
+}
+
+.installed:hover {
+  border-color: var(--success);
+}
+
+.installed:hover::before {
+  opacity: 1;
+}
+
+.top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.info {
+  flex: 1;
+  min-width: 0;
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.version {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.author {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.category {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  border: 1px solid;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.3);
+  flex-shrink: 0;
+}
+
+.description {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  flex: 1;
+}
+
+.deps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.depsLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.dep {
+  font-size: 11px;
+  background: var(--warning-dim);
+  color: var(--warning);
+  border: 1px solid var(--warning);
+  padding: 1px 6px;
+  border-radius: 4px;
+  opacity: 0.8;
+}
+
+.footer {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.installBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  transition: background 0.15s;
+}
+
+.installBtn:hover {
+  background: var(--accent-hover);
+}
+
+.uninstallBtn {
+  background: var(--success-dim);
+  color: var(--success);
+  border: 1px solid var(--success);
+}
+
+.uninstallBtn:hover {
+  background: var(--error-dim);
+  color: var(--error);
+  border-color: var(--error);
+}
+
+.detailBtn {
+  padding: 7px 14px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+}
+
+.detailBtn:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
