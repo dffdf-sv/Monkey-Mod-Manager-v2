@@ -618,8 +618,7 @@ export default function App() {
 
   return <div className={"shell page-" + page.toLowerCase() + (sidebarCollapsed ? " sidebar-collapsed" : "")}>
     <aside className="sidebar">
-      <button type="button" className="sidebar-menu-toggle" onClick={() => setSidebarCollapsed((collapsed) => !collapsed)} aria-label={sidebarCollapsed ? "Expand sidebar menu" : "Collapse sidebar menu"} title={sidebarCollapsed ? "Expand menu" : "Collapse menu"}>☰<span>Menu</span></button>
-      <div className="brand"><div className="brand-logo"><img src="/image.jpg" alt="Monkey Mod Manager" /></div><div><b>MONKEY</b><small>MOD HUB <i>V2</i></small></div></div>
+      <div className="brand"><button type="button" className="brand-logo menu-logo-toggle" onClick={() => setSidebarCollapsed((collapsed) => !collapsed)} aria-label={sidebarCollapsed ? "Expand sidebar menu" : "Collapse sidebar menu"} title={sidebarCollapsed ? "Expand menu" : "Collapse menu"}><img src="/image.jpg" alt="Monkey Mod Manager" /><span className="menu-logo-glyph" aria-hidden="true">☰</span></button><div><b>MONKEY</b><small>MOD HUB <i>V2</i></small></div></div>
       <label className="side-label">WORKSPACE</label>
       <button className={'nav ' + (page === 'Overview' ? 'chosen' : '')} onClick={() => goToPage('Overview')}>⌂ <span>Overview</span></button>
       <button className={'nav ' + (page === 'Discover' ? 'chosen' : '')} onClick={() => goToPage('Discover')}>▦ <span>Discover mods</span></button>
@@ -652,7 +651,7 @@ export default function App() {
             {desktop && <button className="secondary" onClick={async () => { const folder = await window.monkeyModManager!.chooseGameFolder(); setGameFolder(folder); if (folder) {setDetectedMods(await window.monkeyModManager!.getDetectedMods());notify('Gorilla Tag folder saved.');} }}>📁 &nbsp; {gameFolder ? 'Change game folder' : 'Choose game folder'}</button>}
             <button className="secondary bepinex-button" onClick={() => void installBepInEx()}>⬇ &nbsp; Install BepInEx <small>{desktop ? 'Auto setup' : 'Official download'}</small></button>
           </div>
-          <div className="hero-art hero-art-photo"><img src={jungleArt} alt="Gorilla Tag Halloween update artwork" /><div className="hero-shade" /><div className="hero-logo-mark"><img src="/image.jpg" alt="Monkey Mod Hub logo" /></div></div>
+          <div className="hero-art hero-art-photo"><img src={jungleArt} alt="Gorilla Tag Halloween update artwork" /><div className="hero-shade" /></div>
         </section>
 
         <div className="stats">
