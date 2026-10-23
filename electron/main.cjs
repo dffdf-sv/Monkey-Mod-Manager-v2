@@ -1,4 +1,12 @@
 const { app, BrowserWindow, shell, dialog, ipcMain } = require('electron');
+app.setAsDefaultProtocolClient('monkeymodmanager');
+let mainWindow = null;
+let pendingAuthToken = null;
+function handleAuthDeepLink(value) {
+  try { const url = new URL(value); if (url.protocol !== 'monkeymodmanager:' || url.hostname !== 'auth') return; const token = url.searchParams.get('token'); if (!token || token.length > 4096) return; pendingAuthToken = token; if (mainWindow && !mainWindow.isDestroyed()) { mainWindow.webContents.send('auth:token', token); pendingAuthToken = null; } } catch {}
+}
+app.on('open-url', (event, value) => { event.preventDefault(); handleAuthDeepLink(value); });
+app.on('second-instance', (_event, argv) => { const link = argv.find((arg) => arg.startsWith('monkeymodmanager://')); if (link) handleAuthDeepLink(link); if (mainWindow) { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.focus(); } });
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const extractZip = require('extract-zip');
@@ -15,8 +23,12 @@ function createWindow() {
     title: 'Monkey Mod Manager', backgroundColor: '#0b0e12', autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true }
   });
+  mainWindow = win;
   win.webContents.setWindowOpenHandler(({ url }) => { if (url.startsWith('https://')) shell.openExternal(url); return { action: 'deny' }; });
+  win.webContents.on('did-finish-load', () => { if (pendingAuthToken) { win.webContents.send('auth:token', pendingAuthToken); pendingAuthToken = null; } });
+  win.on('closed', () => { if (mainWindow === win) mainWindow = null; });
   win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  return win;
 }
 function isGameFolder(folder) {
   if (!folder) return false;
@@ -253,6 +265,8 @@ ipcMain.handle('mod:install', async (_event, mod) => {
 });
 app.whenReady().then(() => {
   createWindow();
+  const link = process.argv.find((arg) => arg.startsWith('monkeymodmanager://'));
+  if (link) handleAuthDeepLink(link);
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
