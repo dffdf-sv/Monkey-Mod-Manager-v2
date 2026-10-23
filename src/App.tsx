@@ -47,7 +47,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All Mods');
-  const [page, setPage] = useState<'Discover' | 'Library' | 'Configs' | 'Profiles' | 'Editor' | 'Settings'>(() => (window.location.pathname === '/editor' || window.location.hash === '#/editor') ? 'Editor' : (window.location.pathname === '/settings' || window.location.hash === '#/settings') ? 'Settings' : 'Discover');
+  const [page, setPage] = useState<'Discover' | 'Library' | 'Configs' | 'Profiles' | 'Editor' | 'Settings'>(() => (window.location.pathname === '/editor' || window.location.hash === '#/editor') ? 'Editor' : (window.monkeyModManager?.isDesktop && (window.location.pathname === '/settings' || window.location.hash === '#/settings')) ? 'Settings' : 'Discover');
   const [saved, setSaved] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('mmm-saved') || '[]') as string[]; } catch { return []; } });
   const [theme, setTheme] = useState(() => localStorage.getItem('mmm-theme') || 'dark');
   const [detail, setDetail] = useState<Mod | null>(null);
