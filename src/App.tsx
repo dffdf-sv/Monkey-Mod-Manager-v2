@@ -64,7 +64,7 @@ export default function App() {
   const [adminError, setAdminError] = useState('');
   const [draft, setDraft] = useState<Draft>(blankDraft);
   const [gameFolder, setGameFolder] = useState<string | null>(null);
-  const [gamePlatform, setGamePlatform] = useState<'Steam'|'Meta'>('Steam');
+  const [gamePlatform, setGamePlatform] = useState<'Steam'|'Meta'>(() => localStorage.getItem('mmm-game-platform') === 'Meta' ? 'Meta' : 'Steam');
   const [hideInstallNotice, setHideInstallNotice] = useState(() => localStorage.getItem('mmm-hide-install-notice') === 'true');
   const [installedMods, setInstalledMods] = useState<Record<string, string>>({});
   const [checkingUpdates, setCheckingUpdates] = useState(false);
@@ -339,10 +339,7 @@ export default function App() {
         setInstalledMods(await window.monkeyModManager!.getInstalledMods());
         setDetectedMods(await window.monkeyModManager!.getDetectedMods());
       }
-      if (result.ok && !hideInstallNotice) {
-        const hide = window.confirm(result.message + '\\n\\nHide future install-complete messages?');
-        if (hide) { setHideInstallNotice(true); localStorage.setItem('mmm-hide-install-notice','true'); }
-      } else if (!result.ok || !hideInstallNotice) notify(result.message);
+      if (!result.ok || !hideInstallNotice) notify(result.message);
     } catch (error) { notify(error instanceof Error ? error.message : 'Could not install mod files from disk.'); }
   };
 
@@ -665,7 +662,7 @@ export default function App() {
             </div>
           </div>
           {configError && <div className="admin-error" role="alert">{configError}</div>}
-        </section> : <>
+        </section> : (page === 'Editor' || page === 'Settings') ? <></> : <>
         <div className="sectionhead"><div><label>THE COLLECTION</label><h2>{page === 'Discover' ? 'Explore community mods' : 'Your mods'} <span>{visibleMods.length}</span></h2><p>{page === 'Discover' ? 'Browse the current catalogue and open the source before installing.' : 'Your saved mods, ready when you are.'}</p></div><div className="catalogue-actions"><button className="secondary" onClick={() => void loadCatalog()} disabled={loading}>{loading ? 'Loading…' : '↻ Reload mods'}</button><button className="reset" onClick={() => { setQuery(''); setCategory('All Mods'); }}>⟳ Reset filters</button></div></div>
         <div className="toolbar"><label className="search">⌕ <input id="modsearch" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search mods, creators, categories…" />{query && <button onClick={() => setQuery('')}>×</button>}<kbd>Ctrl K</kbd></label><div className="pills">{categories.map((item) => <button key={item} className={category === item ? 'pillactive' : ''} onClick={() => setCategory(item)}>{item === 'All Mods' ? 'All' : item}</button>)}</div></div>
 
