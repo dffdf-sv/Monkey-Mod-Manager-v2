@@ -68,3 +68,5 @@ button:disabled{opacity:.55;cursor:wait}
 .config-panel label{display:grid;gap:5px;font-size:11px;color:var(--muted)}
 .config-panel input{width:100%;padding:10px;border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:8px}
 @media(max-width:760px){.account-button{font-size:10px;padding:8px}.detail-gallery{grid-template-columns:1fr 1fr}.detail-gallery img{height:105px}}
+
+.detected-tag{position:absolute;left:12px;bottom:12px;z-index:2;font-size:9px;font-weight:700;padding:6px 8px;border-radius:6px;color:#10200d;background:#c7f36b;border:1px solid #c7f36b}
