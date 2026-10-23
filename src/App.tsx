@@ -15,6 +15,7 @@ declare global {
       getGameFolder: () => Promise<string | null>;
       chooseGameFolder: () => Promise<string | null>;
       installMod: (mod: Mod) => Promise<{ ok: boolean; message: string; path?: string }>;
+      getInstalledMods: () => Promise<Record<string, string>>;
       installBepInEx: () => Promise<{ ok: boolean; message: string; path?: string }>;
     };
   }
@@ -45,6 +46,8 @@ export default function App() {
   const [adminError, setAdminError] = useState('');
   const [draft, setDraft] = useState<Draft>(blankDraft);
   const [gameFolder, setGameFolder] = useState<string | null>(null);
+  const [installedMods, setInstalledMods] = useState<Record<string, string>>({});
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
   const desktop = Boolean(window.monkeyModManager && window.monkeyModManager.isDesktop);
   const apiUrl = (path: string) => (desktop ? 'https://monkey-mod-hub.onrender.com' : '') + path;
 
@@ -76,7 +79,7 @@ export default function App() {
     window.addEventListener('keydown', handleShortcuts);
     return () => window.removeEventListener('keydown', handleShortcuts);
   }, []);
-  useEffect(() => { if (window.monkeyModManager) void window.monkeyModManager.getGameFolder().then(setGameFolder).catch(() => setGameFolder(null)); }, []);
+  useEffect(() => { if (window.monkeyModManager) { void window.monkeyModManager.getGameFolder().then(setGameFolder).catch(() => setGameFolder(null)); void window.monkeyModManager.getInstalledMods().then(setInstalledMods).catch(() => setInstalledMods({})); } }, []);
 
   const visibleMods = useMemo(() => mods.filter((mod) =>
     (page !== 'Library' || saved.includes(mod.id)) &&
@@ -99,8 +102,25 @@ export default function App() {
     }
     try {
       const result = await window.monkeyModManager!.installMod(mod);
+      if (result.ok) { const installed = await window.monkeyModManager!.getInstalledMods(); setInstalledMods(installed); }
       notify(result.ok ? mod.name + ' installed successfully' : result.message);
     } catch { notify('Install failed. Check the download link and selected Gorilla Tag folder.'); }
+  };
+
+  const checkForUpdates = async () => {
+    setCheckingUpdates(true);
+    try {
+      await loadCatalog();
+      if (desktop) {
+        const installed = await window.monkeyModManager!.getInstalledMods();
+        setInstalledMods(installed);
+        const updates = mods.filter((mod) => installed[mod.id] && installed[mod.id] !== mod.version);
+        notify(updates.length ? updates.length + ' mod update' + (updates.length === 1 ? '' : 's') + ' available.' : 'Update check complete. No updates found for tracked installs.');
+      } else {
+        notify('Catalogue refreshed. Installed-version checks are available in the desktop app.');
+      }
+    } catch { notify('Could not check for updates. Please try again.'); }
+    finally { setCheckingUpdates(false); }
   };
 
   const installBepInEx = async () => {
@@ -181,6 +201,7 @@ export default function App() {
           <div className="heroactions">
             <button className="primary" onClick={() => { setPage('Discover'); document.getElementById('modsearch')?.focus(); }}>⌕ &nbsp; Explore mods ↗</button>
             <button className="secondary" onClick={() => setPage('Library')}>▣ &nbsp; My library <b>{saved.length}</b></button>
+            <button className="secondary update-check" onClick={() => void checkForUpdates()} disabled={checkingUpdates}>↻ &nbsp; {checkingUpdates ? 'Checking…' : 'Check updates'}</button>
             {desktop && <button className="secondary" onClick={async () => { const folder = await window.monkeyModManager!.chooseGameFolder(); setGameFolder(folder); if (folder) notify('Gorilla Tag folder saved.'); }}>📁 &nbsp; {gameFolder ? 'Change game folder' : 'Choose game folder'}</button>}
             <button className="secondary bepinex-button" onClick={() => void installBepInEx()}>⬇ &nbsp; Install BepInEx <small>{desktop ? 'Auto setup' : 'Official download'}</small></button>
           </div>
@@ -223,7 +244,7 @@ export default function App() {
             <div className="card-title"><div><h3>{mod.name}</h3><p className="author">by <b>{mod.author}</b></p></div><button className={'bookmark ' + (saved.includes(mod.id) ? 'bookmarked' : '')} onClick={() => toggleSaved(mod)} aria-label={saved.includes(mod.id) ? 'Remove saved mod' : 'Save mod'}>{saved.includes(mod.id) ? '♥' : '♡'}</button></div>
             <p className="desc">{mod.description}</p>
             {mod.dependencies.length > 0 && <p className="dependencies"><span>Requires</span> {mod.dependencies.join(', ')}</p>}
-            <div className="cardfoot"><span className="version">v{mod.version}</span><button className="install" onClick={() => void installMod(mod)}>{desktop ? '↓ Install' : '↓ Download'}</button></div>
+            <div className="cardfoot"><span className="version">v{mod.version}</span><button className="install" onClick={() => void installMod(mod)}>{desktop ? (installedMods[mod.id] ? (installedMods[mod.id] === mod.version ? '✓ Installed' : '↻ Update') : '↓ Install') : '↓ Download'}</button></div>
             <div className="card-links">{mod.sourceUrl && <a href={mod.sourceUrl} target="_blank" rel="noreferrer">Source / releases ↗</a>}{adminUnlocked && <button className="delete-mod" disabled={adminBusy} onClick={() => void deleteMod(mod)}>Remove</button>}<button className="details" onClick={() => setDetail(mod)}>View details</button></div>
           </div>
         </article>)}</div> : <div className="empty"><div>▣</div><h3>{page === 'Library' ? 'Your library is a blank canvas' : 'No mods found'}</h3><p>{page === 'Library' ? 'Save mods from Discover to get started.' : 'Try a different search or category.'}</p><button className="primary" onClick={() => { setQuery(''); setCategory('All Mods'); setPage('Discover'); }}>Explore mods ↗</button></div>}
@@ -237,7 +258,7 @@ export default function App() {
       <span className="category">{detail.category}</span><h2>{detail.name}</h2><p className="author">by {detail.author} · v{detail.version}</p><p>{detail.description}</p>
       {detail.dependencies.length > 0 && <div className="warning">ⓘ <span><b>Required dependencies</b><small>{detail.dependencies.join(', ')}. Install prerequisites before this mod.</small></span></div>}
       <div className="modal-links">{detail.sourceUrl && <a href={detail.sourceUrl} target="_blank" rel="noreferrer">Open official source ↗</a>}<a href={detail.downloadUrl} target="_blank" rel="noreferrer">Open download link ↗</a></div>
-      <button className="primary wide" onClick={() => void installMod(detail)}>{desktop ? '↓ Install mod' : '↓ Download mod'}</button>
+      <button className="primary wide" onClick={() => void installMod(detail)}>{desktop ? (installedMods[detail.id] && installedMods[detail.id] !== detail.version ? '↻ Update mod' : installedMods[detail.id] === detail.version ? '✓ Reinstall mod' : '↓ Install mod') : '↓ Download mod'}</button>
       {!desktop && <p className="web-install-note">In a browser this downloads the file only. The desktop app can install it into your selected Gorilla Tag folder.</p>}
     </section></div>}
     {notice && <div className="toast">✓ &nbsp; {notice}</div>}
