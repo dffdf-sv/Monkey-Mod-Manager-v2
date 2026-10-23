@@ -26,6 +26,10 @@ declare global {
       writeConfigFile: (payload:{name:string;content:string}) => Promise<{ok:boolean;message:string;path?:string}>;
       saveModConfig: (payload: {modName:string;values:Record<string,string>}) => Promise<{ok:boolean;message:string;path?:string}>;
       installBepInEx: () => Promise<{ ok: boolean; message: string; path?: string }>;
+      hasBepInEx: () => Promise<boolean>;
+      installModFromDisk: () => Promise<{ok:boolean;message:string;paths?:string[]}>;
+      getGamePlatform: () => Promise<'Steam'|'Meta'>;
+      setGamePlatform: (platform:'Steam'|'Meta') => Promise<{ok:boolean;gameFolder:string|null;platform:'Steam'|'Meta'}>;
     };
   }
 }
@@ -43,7 +47,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All Mods');
-  const [page, setPage] = useState<'Discover' | 'Library' | 'Configs' | 'Profiles'>('Discover');
+  const [page, setPage] = useState<'Discover' | 'Library' | 'Configs' | 'Profiles' | 'Editor' | 'Settings'>(() => window.location.pathname === '/editor' ? 'Editor' : window.location.pathname === '/settings' ? 'Settings' : 'Discover');
   const [saved, setSaved] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('mmm-saved') || '[]') as string[]; } catch { return []; } });
   const [theme, setTheme] = useState(() => localStorage.getItem('mmm-theme') || 'dark');
   const [detail, setDetail] = useState<Mod | null>(null);
@@ -60,6 +64,8 @@ export default function App() {
   const [adminError, setAdminError] = useState('');
   const [draft, setDraft] = useState<Draft>(blankDraft);
   const [gameFolder, setGameFolder] = useState<string | null>(null);
+  const [gamePlatform, setGamePlatform] = useState<'Steam'|'Meta'>('Steam');
+  const [hideInstallNotice, setHideInstallNotice] = useState(() => localStorage.getItem('mmm-hide-install-notice') === 'true');
   const [installedMods, setInstalledMods] = useState<Record<string, string>>({});
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const [account, setAccount] = useState<{id:string;login:string;avatar:string}|null>(null);
@@ -178,7 +184,7 @@ export default function App() {
     window.addEventListener('keydown', handleShortcuts);
     return () => window.removeEventListener('keydown', handleShortcuts);
   }, []);
-  useEffect(() => { if (window.monkeyModManager) { void window.monkeyModManager.getGameFolder().then(setGameFolder).catch(() => setGameFolder(null)); void window.monkeyModManager.getInstalledMods().then(setInstalledMods).catch(() => setInstalledMods({})); void window.monkeyModManager.getDetectedMods().then(setDetectedMods).catch(() => setDetectedMods([])); } }, []);
+  useEffect(() => { if (window.monkeyModManager) { void window.monkeyModManager.getGameFolder().then(setGameFolder).catch(() => setGameFolder(null)); void window.monkeyModManager.getGamePlatform().then(setGamePlatform).catch(() => setGamePlatform('Steam')); void window.monkeyModManager.getInstalledMods().then(setInstalledMods).catch(() => setInstalledMods({})); void window.monkeyModManager.getDetectedMods().then(setDetectedMods).catch(() => setDetectedMods([])); } }, []);
   useEffect(() => {
     if (!desktop) return;
     let lastUpdateSignature = '';
@@ -283,6 +289,35 @@ export default function App() {
       }
     } catch { notify('Could not check for updates. Please try again.'); }
     finally { setCheckingUpdates(false); }
+  };
+
+  const installModFromDisk = async () => {
+    if (!desktop) { notify('Install from disk is available in the desktop app.'); return; }
+    try {
+      let hasBepInEx = await window.monkeyModManager!.hasBepInEx();
+      if (!hasBepInEx) {
+        const result = await window.monkeyModManager!.installBepInEx();
+        if (!result.ok) { notify(result.message); return; }
+        setGameFolder(result.path || gameFolder);
+      }
+      const result = await window.monkeyModManager!.installModFromDisk();
+      if (result.ok) {
+        setInstalledMods(await window.monkeyModManager!.getInstalledMods());
+        setDetectedMods(await window.monkeyModManager!.getDetectedMods());
+      }
+      if (result.ok && !hideInstallNotice) {
+        const hide = window.confirm(result.message + '\\n\\nHide future install-complete messages?');
+        if (hide) { setHideInstallNotice(true); localStorage.setItem('mmm-hide-install-notice','true'); }
+      } else if (!result.ok || !hideInstallNotice) notify(result.message);
+    } catch (error) { notify(error instanceof Error ? error.message : 'Could not install mod files from disk.'); }
+  };
+
+  const changeGamePlatform = async (platform:'Steam'|'Meta') => {
+    if (!desktop) { setGamePlatform(platform); localStorage.setItem('mmm-game-platform',platform); return; }
+    const result = await window.monkeyModManager!.setGamePlatform(platform);
+    setGamePlatform(result.platform); setGameFolder(result.gameFolder);
+    if (result.gameFolder) setDetectedMods(await window.monkeyModManager!.getDetectedMods());
+    notify(result.gameFolder ? platform + ' game folder selected.' : 'Selected ' + platform + '. Choose its Gorilla Tag folder below if it was not detected.');
   };
 
   const installBepInEx = async () => {
@@ -446,16 +481,28 @@ export default function App() {
     finally { setAdminBusy(false); }
   };
 
+  const goToPage = (next:'Discover'|'Library'|'Configs'|'Profiles'|'Editor'|'Settings') => {
+    setPage(next); setShowAdmin(next === 'Editor');
+    const route = next === 'Editor' ? '/editor' : next === 'Settings' ? '/settings' : '/';
+    if (window.location.pathname !== route) window.history.pushState({}, '', route);
+  };
+
+  useEffect(() => {
+    const onPop = () => { const p = window.location.pathname; setPage(p === '/editor' ? 'Editor' : p === '/settings' ? 'Settings' : 'Discover'); setShowAdmin(p === '/editor'); };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
   return <div className="shell">
     <aside className="sidebar">
       <div className="brand"><div className="brand-logo">🐒</div><div><b>MONKEY</b><small>MOD HUB <i>V2</i></small></div></div>
       <label className="side-label">WORKSPACE</label>
-      <button className={'nav ' + (page === 'Discover' ? 'chosen' : '')} onClick={() => setPage('Discover')}>▦ <span>Discover mods</span></button>
-      <button className={'nav ' + (page === 'Library' ? 'chosen' : '')} onClick={() => setPage('Library')}>▣ <span>Your mods</span><b className="count">{saved.length}</b></button>
-      <button className={'nav ' + (page === 'Profiles' ? 'chosen' : '')} onClick={() => {setPage('Profiles');setShowAdmin(false);}}>♙ <span>Account + profiles</span><b className="count">{accountData.profiles.length}</b></button>
-      {desktop && <button className={'nav ' + (page === 'Configs' ? 'chosen' : '')} onClick={() => { setPage('Configs'); setShowAdmin(false); void loadConfigFiles(); }}>⚙ <span>CFG editor</span></button>}
-      <button className={'nav ' + (showAdmin ? 'chosen' : '')} onClick={() => { if (!account) { notify('Sign in with GitHub to add and manage your own mods.'); return; } setShowAdmin((open) => !open); setEditingId(null); setDraft(blankDraft); }}>{showAdmin ? '×' : '＋'} <span>Mod editor</span></button>
-      <label className="side-label">CATEGORIES</label>
+      <button className={'nav ' + (page === 'Discover' ? 'chosen' : '')} onClick={() => goToPage('Discover')}>▦ <span>Discover mods</span></button>
+      <button className={'nav ' + (page === 'Library' ? 'chosen' : '')} onClick={() => goToPage('Library')}>▣ <span>Your mods</span><b className="count">{saved.length}</b></button>
+      <button className={'nav ' + (page === 'Profiles' ? 'chosen' : '')} onClick={() => goToPage('Profiles')}>♙ <span>Account + profiles</span><b className="count">{accountData.profiles.length}</b></button>
+      {desktop && <button className={'nav ' + (page === 'Configs' ? 'chosen' : '')} onClick={() => { goToPage('Configs'); void loadConfigFiles(); }}>⚙ <span>CFG editor</span></button>}
+      <button className={'nav ' + (page === 'Editor' ? 'chosen' : '')} onClick={() => { if (!account) { notify('Sign in with GitHub to add and manage your own mods.'); return; } setEditingId(null); setDraft(blankDraft); goToPage('Editor'); }}>{showAdmin ? '×' : '＋'} <span>Mod editor ↗</span></button>
+      <button className={'nav ' + (page === 'Settings' ? 'chosen' : '')} onClick={() => goToPage('Settings')}>⚙ <span>Settings</span></button>\n      <label className="side-label">CATEGORIES</label>
       {categories.map((item) => <button key={item} className={'nav catnav ' + (category === item ? 'chosen' : '')} onClick={() => setCategory(item)}><i className={'dot ' + item.toLowerCase().replace(' ', '-')} /><span>{item}</span></button>)}
       <div className="sidebottom">
         <div className="status"><i /><span><b>Mod base</b><small>{loading ? 'Loading catalogue…' : mods.length + ' listed mods'}</small></span></div>
@@ -465,15 +512,15 @@ export default function App() {
     </aside>
 
     <main className="main">
-      <header className="topbar"><span>Workspace <b>/</b> <strong>{showAdmin ? 'Mod editor' : page}</strong></span><div><span className="gamepill"><i /> Gorilla Tag</span><button className="roundbtn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☼' : '☾'}</button><button className="secondary account-button" onClick={()=>{if(account){localStorage.removeItem('mmm-auth-token');void apiFetch(apiUrl('/api/account/logout'),{method:'POST'}).finally(()=>{setAccount(null);notify('Signed out.');});}else if(accountConfigured){if(desktop){void window.monkeyModManager?.signInWithGitHub().catch(()=>notify('Could not open your default browser.'));}else{const popup=window.open(apiUrl('/auth/github'),'mmm-github-signin','popup,width=560,height=760');if(!popup)notify('Allow pop-ups to sign in with GitHub.');}}else{notify('GitHub account login needs OAuth settings in Render.');}}}>{account ? 'Sign out · '+account.login : 'Sign in with GitHub'}</button><span className="avatar">{account?.login?.slice(0,1).toUpperCase()||'M'}</span></div></header>
+      <header className="topbar"><span>Workspace <b>/</b> <strong>{page === 'Editor' ? 'Mod editor' : page}</strong></span><div><span className="gamepill"><i /> Gorilla Tag</span><button className="roundbtn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☼' : '☾'}</button><button className="secondary account-button" onClick={()=>{if(account){localStorage.removeItem('mmm-auth-token');void apiFetch(apiUrl('/api/account/logout'),{method:'POST'}).finally(()=>{setAccount(null);notify('Signed out.');});}else if(accountConfigured){if(desktop){void window.monkeyModManager?.signInWithGitHub().catch(()=>notify('Could not open your default browser.'));}else{const popup=window.open(apiUrl('/auth/github'),'mmm-github-signin','popup,width=560,height=760');if(!popup)notify('Allow pop-ups to sign in with GitHub.');}}else{notify('GitHub account login needs OAuth settings in Render.');}}}>{account ? 'Sign out · '+account.login : 'Sign in with GitHub'}</button><span className="avatar">{account?.login?.slice(0,1).toUpperCase()||'M'}</span></div></header>
       <div className="content">
         <section className="hero">
           <div className="eyebrow">✳ &nbsp; THE COMMUNITY MOD HUB</div>
           <h1>Find your next<br /><em>jungle upgrade.</em></h1>
           <p>A simple home for Gorilla Tag PC mods. Browse community tools, see what they do, and download or install from one place.</p>
           <div className="heroactions">
-            <button className="primary" onClick={() => { setPage('Discover'); document.getElementById('modsearch')?.focus(); }}>⌕ &nbsp; Explore mods ↗</button>
-            <button className="secondary" onClick={() => setPage('Library')}>▣ &nbsp; My library <b>{saved.length}</b></button>
+            <button className="primary" onClick={() => { goToPage('Discover'); document.getElementById('modsearch')?.focus(); }}>⌕ &nbsp; Explore mods ↗</button>
+            <button className="secondary" onClick={() => goToPage('Library')}>▣ &nbsp; My library <b>{saved.length}</b></button>
             <button className="secondary update-check" onClick={() => void checkForUpdates()} disabled={checkingUpdates}>↻ &nbsp; {checkingUpdates ? 'Checking…' : 'Check updates'}</button>
             {desktop && <button className="secondary" onClick={async () => { const folder = await window.monkeyModManager!.chooseGameFolder(); setGameFolder(folder); if (folder) {setDetectedMods(await window.monkeyModManager!.getDetectedMods());notify('Gorilla Tag folder saved.');} }}>📁 &nbsp; {gameFolder ? 'Change game folder' : 'Choose game folder'}</button>}
             <button className="secondary bepinex-button" onClick={() => void installBepInEx()}>⬇ &nbsp; Install BepInEx <small>{desktop ? 'Auto setup' : 'Official download'}</small></button>
@@ -487,11 +534,11 @@ export default function App() {
           <div><span className="staticon orange">↓</span><small>INSTALL OPTIONS</small><b>{desktop ? 'One-click' : 'Downloads'} <i>{desktop ? 'desktop' : 'web'}</i></b><label>{desktop ? (gameFolder ? 'Game folder selected · '+detectedMods.length+' detected' : 'Select game folder') : 'Open downloads safely'}</label></div>
         </div>
 
-        {showAdmin && <section className="admin-panel">
+        {(page === 'Editor' || showAdmin) && <section className="admin-panel editor-page">
           <div className="admin-heading"><div><h2>{editingId ? 'Edit mod' : 'Mod editor'}</h2><p>Publish a mod or manage your own entries in the catalogue.</p></div></div>
           {!adminUnlocked && !account ? <form className="admin-unlock" onSubmit={unlockAdmin}><label>Admin password<input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} autoComplete="current-password" placeholder="Admin password" required /></label><button className="primary" disabled={adminBusy}>{adminBusy ? 'Checking…' : 'Unlock admin tools'}</button></form> :
           <>
-            <div className="admin-manage-heading admin-form-toolbar"><div><h3>{editingId ? 'Edit mod listing' : 'Add a mod'}</h3><p>Fill in the product details below. All optional media fields are visible.</p></div><div className="admin-toolbar-actions"><button className="secondary" type="button" onClick={() => void loadCatalog()} disabled={loading}>↻ Reload</button><button className="secondary" type="button" onClick={() => document.getElementById('add-mod-from-disk')?.click()}>＋ Add mod from disk</button><input id="add-mod-from-disk" className="visually-hidden-file" type="file" accept=".dll,.zip,application/zip" onChange={(event) => { void uploadModFile(event.target.files?.[0]); event.currentTarget.value=''; }} /><button className="secondary" type="button" onClick={() => { setDraft(blankDraft); setEditingId(null); setAdminError(''); }}>＋ New mod</button></div></div>
+            <div className="admin-manage-heading admin-form-toolbar"><div><h3>{editingId ? 'Edit mod listing' : 'Add a mod'}</h3><p>Fill in the product details below. All optional media fields are visible.</p></div><div className="admin-toolbar-actions"><button className="secondary" type="button" onClick={() => void loadCatalog()} disabled={loading}>↻ Reload</button><button className="secondary" type="button" onClick={() => void installModFromDisk()}>＋ Install mod files from disk</button><button className="secondary" type="button" onClick={() => { setDraft(blankDraft); setEditingId(null); setAdminError(''); }}>＋ New mod</button></div></div>
             <form className="admin-form compact-admin-form add-mod-only-form" onSubmit={addMod}>
               <div className="github-import-box full">
                 <label className="github-import-toggle"><input type="checkbox" checked={useGitHubImport} onChange={(e) => { setUseGitHubImport(e.target.checked); if (!e.target.checked) setNotMyMod(false); }} /><span><b>Import a mod from GitHub</b></span></label>
@@ -542,7 +589,7 @@ export default function App() {
           {adminError && <div className="admin-error" role="alert">{adminError}</div>}
         </section>}
 
-        {page === 'Profiles' ? <section className="cfg-workspace">
+        {page === 'Settings' ? <section className="cfg-workspace settings-workspace"><div className="cfg-heading"><div><label>LOCAL INSTALLATION</label><h2>Game settings</h2><p>Choose which Gorilla Tag edition to manage and verify the install folder used by the desktop installer.</p></div></div><div className="settings-card"><label>Game edition<select value={gamePlatform} onChange={event => void changeGamePlatform(event.target.value as 'Steam'|'Meta')}><option value="Steam">Steam</option><option value="Meta">Meta / Oculus PC</option></select></label><div className="settings-path"><small>ACTIVE GORILLA TAG FOLDER</small><code>{gameFolder || 'No folder selected'}</code></div>{desktop && <button className="primary" onClick={async()=>{const folder=await window.monkeyModManager!.chooseGameFolder();setGameFolder(folder);if(folder){setDetectedMods(await window.monkeyModManager!.getDetectedMods());notify('Game folder saved.');}}}>Choose folder…</button>}<label className="settings-check"><input type="checkbox" checked={hideInstallNotice} onChange={event=>{setHideInstallNotice(event.target.checked);localStorage.setItem('mmm-hide-install-notice',String(event.target.checked));}} /> Hide install-complete prompts</label><p className="form-help">Steam and Meta installs can use different folders. If automatic detection misses your installation, select the exact folder containing Gorilla Tag.exe and Gorilla Tag_Data.</p></div></section> : page === 'Profiles' ? <section className="cfg-workspace">
           <div className="cfg-heading"><div><label>YOUR ACCOUNT</label><h2>Account & profiles</h2><p>Keep saved mods, installed-mod snapshots, and config files synced to your GitHub account in private cloud storage.</p></div><button className="secondary" disabled={!account || accountDataBusy} onClick={() => void refreshAccount()}>↻ Refresh account</button></div>
           {!account ? <div className="cfg-empty">Sign in with GitHub to save profiles, configs, and installed-mod lists to your account.</div> : <>
             <div className="product-meta-grid">
@@ -607,7 +654,7 @@ export default function App() {
       </div>
     </main>
 
-    {detail && <div className="backdrop product-page-backdrop" onClick={() => setDetail(null)}><section className="modal product-page-modal" role="dialog" aria-modal="true" aria-label={detail.name + ' product page'} onClick={(event) => event.stopPropagation()}><button className="modalclose" onClick={() => setDetail(null)}>×</button>
+    {detail && <div className="product-page-route"><section className="product-page-modal" role="region" aria-label={detail.name + ' product page'}><button className="modalclose" onClick={() => setDetail(null)}>×</button>
       <div className="detail-picture" style={detail.imageUrl ? { backgroundImage: 'linear-gradient(180deg, #07100611, #071006bb), url("' + detail.imageUrl + '")' } : undefined}>{!detail.imageUrl && <span>🐒</span>}</div>
       <div className="product-page-heading"><div><span className="category">{detail.category}</span><h2>{detail.name}</h2></div><span className="version">v{detail.version}</span></div><p className="author">by {detail.author} · v{detail.version}</p><p className="product-description">{detail.description}</p>
       {(detail.galleryUrls||[]).length>0 && <div className="detail-gallery">{(detail.galleryUrls||[]).map((url,i)=><img key={url+i} src={url} alt={detail.name+' screenshot '+(i+1)} />)}</div>}
