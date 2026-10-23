@@ -527,7 +527,7 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
-  return <div className="shell">
+  return <div className={"shell page-" + page.toLowerCase()}>
     <aside className="sidebar">
       <div className="brand"><div className="brand-logo">🐒</div><div><b>MONKEY</b><small>MOD HUB <i>V2</i></small></div></div>
       <label className="side-label">WORKSPACE</label>
