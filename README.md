@@ -1,62 +1,121 @@
 # Monkey Mod Manager
 
-A compact Gorilla Tag PC mod hub with a web catalogue, thumbnails, source links, browser downloads, a protected curator panel, and an Electron desktop installer.
+**Manage Gorilla Tag PC mods from one desktop app.** Browse the mod catalogue, install supported mod files into your Gorilla Tag folder, manage installed mods, edit configuration files, and check for app updates.
 
-## Run locally
+> Monkey Mod Manager is an independent community project. It is not affiliated with or endorsed by Another Axiom or Gorilla Tag.
 
-Use Node.js 20 or newer.
+## Download
 
-Terminal 1 — API for the Vite dev server:
-    npm install
-    npm run server:dev
+**[Download the latest release](https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/releases/latest)**
 
-Terminal 2 — frontend:
-    npm run dev
+Choose the installer for your operating system:
 
-Production:
-    npm install
-    npm run build
-    npm start
+- **Windows:** `Monkey-Mod-Manager-Setup-<version>-x64.exe`
+- **Linux:** `Monkey-Mod-Manager-<version>-x64.AppImage` or the `.deb` package for Debian/Ubuntu-based systems.
 
-## Deploy on Render
+Download installers from this repository's Releases page. Avoid unofficial mirrors. If no release is available yet, check the [GitHub Actions build page](https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/actions/workflows/desktop-build.yml) for build status.
 
-The repository contains render.yaml for a free Render web service. Create a new Blueprint from this repository, then set these two secret environment variables in the Render service:
+## Windows: getting started
 
-- ADMIN_PASSWORD: a strong password used by the curator page.
-- GITHUB_TOKEN: a fine-grained GitHub token restricted to dffdf-sv/GORILA-TAG-MODBASE, with Contents: Read and write permission.
+1. Download and run the Windows `.exe` installer from the Releases page.
+2. Follow the installer prompts. You can choose the install location.
+3. Open **Monkey Mod Manager** from the Start menu or desktop shortcut.
+4. Open **Settings** and confirm the correct Gorilla Tag edition is selected:
+   - **SteamVR** for the Steam PC version.
+   - **Meta** for the Meta Quest Link / Oculus PC version.
+5. Check the detected game folder. If it is wrong or empty, select **Choose folder…** and choose the folder containing Gorilla Tag.
+6. Browse the catalogue and install mods you want. Follow any dependency instructions shown by the app.
 
-The app reads modinfo.Json from the mod-base repository. Publishing or removing a mod through Admin · Add mods commits the metadata file back to that repository, so the catalogue survives Render restarts without relying on an ephemeral filesystem. Never put GITHUB_TOKEN in frontend code or in a committed file.
+The manager may ask to install BepInEx if it cannot find it in the selected game folder. Read the mod's own instructions before installing, and back up your game files first.
 
-The curator/creator form supports mod metadata, editing, a primary product image, a gallery of up to eight images, a preview video, dependencies and JSON configuration fields. Creator uploads are committed into `mods/<mod-name>/<kind>/` in the GitHub mod-base repository. Upload limits: images 8 MB each, MP4/WebM video 12 MB, and DLL/ZIP mod files 24 MB. Only upload files you have permission to distribute and have checked for safety.
+## What the desktop app can do
 
-### Render variable manager
-After the service is deployed, create a Render API key in your Render account settings and add these environment variables to the **Monkey Mod Hub web service** in the Render dashboard:
-- `RENDER_API_KEY`: the Render API key (keep it server-side; never put it in the frontend or desktop app).
-- `RENDER_SERVICE_ID`: this web service's ID, available from its Render service page/URL.
+- Browse the mod catalogue and open upstream source/download pages.
+- Install supported DLL mods and ZIP archives into the selected Gorilla Tag installation.
+- Detect installed mod files under `BepInEx/plugins`.
+- View and edit BepInEx `.cfg` files; an existing config is backed up before the app overwrites it.
+- Select the Steam or Meta PCVR installation and choose a folder manually.
+- Check for app and tracked mod updates.
+- Sign in with GitHub when using features that require an account.
+- Download desktop app updates through the built-in updater when a compatible update is published.
 
-Save and deploy the service after adding them. Unlock Admin · Add mods, then use **Manage variables** to set service variables such as `ADMIN_PASSWORD`. Existing variable values are never displayed by the app; choose a variable and enter its new value. Saving requests a Render deployment so the new value becomes active. This integration manages variables attached directly to the service, not variables inherited from environment groups. Treat the Render API key as a powerful secret.
+### Updating Monkey Mod Manager
 
+Open **Settings → Check app + mod updates**. Turn on **Automatically download and install app updates** if you want the app to download an available update and restart to install it. Otherwise, you can approve the download and choose when to restart.
 
+The built-in updater works with the packaged desktop application, not a development run. Close the app only when asked to restart for an update. Keep the app installed in its normal installer-managed location so the updater can replace it.
 
-### Creator accounts
-Creator sign-in uses GitHub OAuth; it does not store GitHub passwords. Create a GitHub OAuth App with homepage URL `https://monkey-mod-hub.onrender.com` and callback URL `https://monkey-mod-hub.onrender.com/auth/github/callback`. In Render set `GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`, and a long random `SESSION_SECRET`. The GitHub OAuth app only requests public profile access. The existing `GITHUB_TOKEN` remains server-side and must have Contents read/write access to `dffdf-sv/GORILA-TAG-MODBASE`. Each signed-in creator can edit/remove their own entries; the admin password can manage all entries.
+### Installing mods safely
 
-## Mod install behaviour
+- Install mods only from sources you trust and check the mod author's supported game and BepInEx versions.
+- Only use files you have permission to download and install. A mod may stop working after a Gorilla Tag update.
+- Some mods need dependencies or manual setup. Installing a file does not guarantee that the mod is compatible.
+- The web version cannot silently install files into a local game folder; use the desktop app for local installation.
+- Back up `BepInEx/config` and important game files before changing mods or configs.
 
-- Website: opens the upstream HTTPS download. Browsers cannot silently write into a local Gorilla Tag installation.
-- Desktop app: the manager attempts to auto-detect the Gorilla Tag Steam folder, and lets the user select it manually if needed. DLL files are copied into `BepInEx/plugins/<Mod Name>/`; ZIPs are extracted into that mod's own folder. The app detects DLLs/folders under `BepInEx/plugins`. The desktop-only **CFG editor** lists `.cfg` files in `BepInEx/config`, lets users view and edit them, and creates a `.bak` copy before overwriting an existing file. Configuration settings authored in the catalogue can be saved as a generated file under `BepInEx/config`; some mods require their own documented config format, so generated generic settings may not configure every mod automatically. Only HTTPS DLL/ZIP downloads are accepted, with a size limit. Dependencies are displayed but must be installed in the right order.
-- If a game folder has no BepInEx installation yet, install BepInEx first. Back up game files before installing mods.
+## Linux
 
-## Numbered desktop releases
+- **AppImage:** download the `.AppImage`, make it executable, then run it. For example:
 
-Open GitHub Actions and run **Build and publish desktop release**, entering a version such as `2.0.1`. The workflow builds the Windows x64 `.exe` installer and Linux x64 `.AppImage` and `.deb` packages, then publishes all three as downloadable assets on a numbered GitHub Release (for example, `v2.0.1`). It also runs automatically when a `v*` tag is pushed. Both platform builds must succeed before the release is published.
+  ```bash
+  chmod +x Monkey-Mod-Manager-*.AppImage
+  ./Monkey-Mod-Manager-*.AppImage
+  ```
 
-Download published installers from the repository's [Releases page](https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/releases). Workflow run artifacts are temporary build outputs; the numbered Release is the permanent download page.
+- **Debian/Ubuntu:** install the `.deb` package with your distribution's package installer.
 
-## Data source and disclaimer
+The built-in updater is supported by the AppImage build. For `.deb` installations, install newer packages from the Releases page if automatic updating is not available.
 
-The catalogue is backed by dffdf-sv/GORILA-TAG-MODBASE (modinfo.Json). The repository should contain one JSON array. No affiliation with or endorsement by Another Axiom is implied. Mod compatibility and safety are the responsibility of each mod's author; check the upstream release page before installing.
+## Troubleshooting
 
+**The app cannot find Gorilla Tag:** Open Settings, select the right platform, and use **Choose folder…**. Select the game directory itself, not the parent Steam library folder.
 
-### GitHub sign-in
-The desktop app opens GitHub sign-in in the operating system's default browser. After authorization, the callback sends a signed, expiring session to the installed app through the `monkeymodmanager://` protocol and attempts to close the browser tab. The website sign-in uses a popup and closes it after success where the browser allows it. The desktop app must be rebuilt and reinstalled for protocol registration to take effect.
+**A mod will not install or load:** Confirm that BepInEx is installed, check the mod's requirements, and make sure the file is intended for your game version. Some ZIP archives contain additional nested archives; only compatible plugin DLLs can be loaded by BepInEx.
+
+**The app updater reports an error:** Check your internet connection and the latest release assets. Updates require a published GitHub Release with the platform's updater metadata. If the update still fails, download the latest installer/package from the Releases page and install it over your current version.
+
+**The app will not launch:** Download a fresh installer from the official Releases page. If you report a bug, include your operating system, app version, the action you took, and the exact error message. Do not post access tokens, passwords, or other secrets.
+
+## Privacy and accounts
+
+GitHub sign-in uses GitHub's authorization flow; Monkey Mod Manager does not ask for or store your GitHub password. Never share your GitHub access token or put secrets in screenshots or issue reports.
+
+## Developers and build instructions
+
+Requirements: Node.js 22 or newer and npm.
+
+```bash
+npm install
+npm run dev
+```
+
+The development web server starts with Vite. To run the API locally as well, open another terminal and run:
+
+```bash
+npm run server:dev
+```
+
+To build the web UI and desktop app packages:
+
+```bash
+npm run build
+npm run dist:win    # Windows x64 installer (run on Windows)
+npm run dist:linux  # Linux AppImage and .deb (run on Linux)
+```
+
+The prebuild step generates `build/icon.png` and `build/icon.ico` from the existing logo at `public/image.jpg`, so the desktop window, Windows installer, and Linux package use the same branding.
+
+### GitHub Actions release workflow
+
+1. Open [Build and publish desktop release](https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/actions/workflows/desktop-build.yml).
+2. Select **Run workflow** and enter a new version such as `v2.0.2` using the `vMAJOR.MINOR.PATCH` format.
+3. The workflow prepares the GitHub Release, builds Windows and Linux packages, and publishes their installer files and updater metadata.
+4. Wait for both platform jobs to finish before distributing the release.
+
+A tag push beginning with `v` also triggers the workflow; the workflow validates that the tag is a three-part numeric version. Do not reuse a version that already has a published release.
+
+## Catalogue and web deployment
+
+The catalogue is backed by the `dffdf-sv/GORILA-TAG-MODBASE` repository. The web service can be deployed using `render.yaml`. Server-only environment variables such as `ADMIN_PASSWORD`, `GITHUB_TOKEN`, `RENDER_API_KEY`, and OAuth secrets must be configured in the hosting provider and must never be committed to source code or exposed in frontend code.
+
+For web curator setup and server environment details, see the deployment notes in the repository history or ask a maintainer. The desktop app can be used independently of the hosted curator tools.
