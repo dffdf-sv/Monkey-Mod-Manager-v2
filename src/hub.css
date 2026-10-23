@@ -288,3 +288,6 @@ button:disabled{opacity:.55;cursor:wait}
 
 .hero-logo-mark{position:absolute;z-index:3;right:22px;bottom:22px;width:clamp(76px,10vw,124px);aspect-ratio:1;border:1px solid rgba(255,255,255,.28);border-radius:24px;padding:7px;background:rgba(14,18,12,.72);box-shadow:0 12px 36px rgba(0,0,0,.35);backdrop-filter:blur(12px);overflow:hidden}.hero-logo-mark img{display:block;width:100%;height:100%;object-fit:cover;border-radius:17px}
 @media(max-width:800px){.hero-logo-mark{right:108px;bottom:18px;width:74px;border-radius:16px;padding:5px}.hero-logo-mark img{border-radius:11px}}
+
+/* Community feedback actions */
+.remove-rating{justify-self:start;padding:6px 10px!important;font-size:11px!important;color:var(--muted)!important;border-color:var(--line)!important}.remove-rating:hover{color:var(--text)!important;border-color:var(--accent)!important}.rating-action .remove-rating:disabled{opacity:.55;cursor:wait}
