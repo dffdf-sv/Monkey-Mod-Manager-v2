@@ -42,7 +42,12 @@ jobs:
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
         run: |
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            echo "Release $RELEASE_TAG already exists; build assets will be uploaded to it."
+            ASSET_COUNT=$(gh release view "$RELEASE_TAG" --json assets --jq '.assets | length')
+            if [[ "$ASSET_COUNT" -gt 0 ]]; then
+              echo "::error::Release $RELEASE_TAG already has assets. Choose a new version instead of overwriting a published release."
+              exit 1
+            fi
+            echo "Found an empty release from an earlier failed build; continuing."
           else
             gh release create "$RELEASE_TAG" --title "Monkey Mod Manager $RELEASE_TAG" --generate-notes --target main
           fi
