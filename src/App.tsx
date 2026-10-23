@@ -12,6 +12,8 @@ declare global {
   interface Window {
     monkeyModManager?: {
       isDesktop: boolean;
+      signInWithGitHub: () => Promise<{ok:boolean}>;
+      onAuthToken: (callback:(token:string)=>void) => () => void;
       getGameFolder: () => Promise<string | null>;
       chooseGameFolder: () => Promise<string | null>;
       installMod: (mod: Mod) => Promise<{ ok: boolean; message: string; path?: string }>;
@@ -72,11 +74,20 @@ export default function App() {
   const [showRenderSettings, setShowRenderSettings] = useState(false);
   const desktop = Boolean(window.monkeyModManager && window.monkeyModManager.isDesktop);
   const apiUrl = (path: string) => (desktop ? 'https://monkey-mod-hub.onrender.com' : '') + path;
+  const apiFetch = (url: string, init: RequestInit = {}) => {
+    const token = localStorage.getItem('mmm-auth-token') || '';
+    const headers = new Headers(init.headers || {});
+    if (token) headers.set('Authorization', 'Bearer ' + token);
+    return fetch(url, { ...init, headers, credentials: 'include' });
+  };
+  const refreshAccount = () => apiFetch(apiUrl('/api/account')).then((r) => r.json()).then((data) => {
+    setAccount(data.user || null); setAccountConfigured(Boolean(data.configured));
+  }).catch(() => {});
 
   const notify = (message: string) => { setNotice(message); window.setTimeout(() => setNotice(''), 3600); };
   const loadCatalog = async (): Promise<Mod[]> => {
     try {
-      const response = await fetch(apiUrl('/api/mods'));
+      const response = await apiFetch(apiUrl('/api/mods'));
       if (!response.ok) throw new Error('Catalog unavailable');
       const data = await response.json() as { mods?: Mod[] };
       if (Array.isArray(data.mods)) { setMods(data.mods); return data.mods; }
@@ -85,7 +96,17 @@ export default function App() {
     return mods;
   };
 
-  useEffect(() => { void loadCatalog(); void fetch(apiUrl('/api/account')).then(r=>r.json()).then(data=>{setAccount(data.user||null);setAccountConfigured(Boolean(data.configured));}).catch(()=>{}); }, []);
+  useEffect(() => {
+    void loadCatalog(); void refreshAccount();
+    const handleMessage = (event: MessageEvent) => { if (event.origin === 'https://monkey-mod-hub.onrender.com' && event.data?.type === 'mmm-github-auth-complete') void refreshAccount(); };
+    window.addEventListener('message', handleMessage);
+    const stopListening = window.monkeyModManager?.onAuthToken((token) => {
+      localStorage.setItem('mmm-auth-token', token);
+      void refreshAccount();
+      notify('Signed in with GitHub.');
+    });
+    return () => { window.removeEventListener('message', handleMessage); stopListening?.(); };
+  }, []);
   useEffect(() => { localStorage.setItem('mmm-saved', JSON.stringify(saved)); }, [saved]);
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem('mmm-theme', theme); }, [theme]);
   useEffect(() => {
@@ -334,7 +355,7 @@ export default function App() {
     </aside>
 
     <main className="main">
-      <header className="topbar"><span>Workspace <b>/</b> <strong>{showAdmin ? 'Mod curator' : page}</strong></span><div><span className="gamepill"><i /> Gorilla Tag</span><button className="roundbtn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☼' : '☾'}</button><button className="secondary account-button" onClick={()=>{if(account){void fetch(apiUrl('/api/account/logout'),{method:'POST'}).then(()=>{setAccount(null);notify('Signed out.');});}else if(accountConfigured){window.location.href=apiUrl('/auth/github');}else{notify('GitHub account login needs OAuth settings in Render.');}}}>{account ? 'Sign out · '+account.login : 'Sign in with GitHub'}</button><span className="avatar">{account?.login?.slice(0,1).toUpperCase()||'M'}</span></div></header>
+      <header className="topbar"><span>Workspace <b>/</b> <strong>{showAdmin ? 'Mod curator' : page}</strong></span><div><span className="gamepill"><i /> Gorilla Tag</span><button className="roundbtn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☼' : '☾'}</button><button className="secondary account-button" onClick={()=>{if(account){localStorage.removeItem('mmm-auth-token');void apiFetch(apiUrl('/api/account/logout'),{method:'POST'}).finally(()=>{setAccount(null);notify('Signed out.');});}else if(accountConfigured){if(desktop){void window.monkeyModManager?.signInWithGitHub().catch(()=>notify('Could not open your default browser.'));}else{const popup=window.open(apiUrl('/auth/github'),'mmm-github-signin','popup,width=560,height=760');if(!popup)notify('Allow pop-ups to sign in with GitHub.');}}else{notify('GitHub account login needs OAuth settings in Render.');}}}>{account ? 'Sign out · '+account.login : 'Sign in with GitHub'}</button><span className="avatar">{account?.login?.slice(0,1).toUpperCase()||'M'}</span></div></header>
       <div className="content">
         <section className="hero">
           <div className="eyebrow">✳ &nbsp; THE COMMUNITY MOD HUB</div>
