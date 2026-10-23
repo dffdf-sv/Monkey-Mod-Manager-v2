@@ -38,9 +38,11 @@ Creator sign-in uses GitHub OAuth; it does not store GitHub passwords. Create a 
 - Desktop app: the user explicitly selects their Gorilla Tag game folder. DLL files are copied into `BepInEx/plugins/<Mod Name>/`; ZIPs are extracted into that mod's own folder. The app detects DLLs/folders under `BepInEx/plugins`. Configuration settings authored in the catalogue can be saved as a generated file under `BepInEx/config`; some mods require their own documented config format, so generated generic settings may not configure every mod automatically. Only HTTPS DLL/ZIP downloads are accepted, with a size limit. Dependencies are displayed but must be installed in the right order.
 - If a game folder has no BepInEx installation yet, install BepInEx first. Back up game files before installing mods.
 
-## Desktop builds
+## Numbered desktop releases
 
-The GitHub Actions workflow builds a Windows x64 EXE installer and Linux x64 AppImage / DEB packages from Actions > Desktop builds > Run workflow or by pushing a v* tag. Build outputs are workflow artifacts; they are not created until the workflow completes successfully.
+Open GitHub Actions and run **Build and publish desktop release**, entering a version such as `2.0.1`. The workflow builds the Windows x64 `.exe` installer and Linux x64 `.AppImage` and `.deb` packages, then publishes all three as downloadable assets on a numbered GitHub Release (for example, `v2.0.1`). It also runs automatically when a `v*` tag is pushed. Both platform builds must succeed before the release is published.
+
+Download published installers from the repository's [Releases page](https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/releases). Workflow run artifacts are temporary build outputs; the numbered Release is the permanent download page.
 
 ## Data source and disclaimer
 
