@@ -256,8 +256,7 @@ const server = http.createServer(async (req, res) => {
     if ((url.pathname === '/api/mods' && req.method === 'POST') || (url.pathname.startsWith('/api/mods/') && ['PUT','DELETE'].includes(req.method))) {
       if (!checkRate(req)) return reply(res, 429, { error: 'Too many admin requests. Wait one minute.' });
       const user = sessionFor(req);
-      const isAdmin = adminAllowed(req).ok;
-      if (!user && !isAdmin) return reply(res, 401, { error: 'Sign in with GitHub to manage mods, or unlock admin tools.' });
+      if (!user) return reply(res, 401, { error: 'Sign in with GitHub to add and manage your own mods.' });
       let current;
       try { current = await readGithubContents(); }
       catch (error) { return reply(res, 503, { error: error instanceof Error ? error.message : 'Could not access the mod base.' }); }
