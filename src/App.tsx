@@ -4,7 +4,8 @@ import './hub.css';
 
 type Mod = {
   id: string; name: string; author: string; category: string; description: string;
-  version: string; downloadUrl: string; imageUrl?: string; sourceUrl?: string;
+  version: string; downloadUrl: string; imageUrl?: string; sourceUrl?: string; websiteUrl?: string; embedUrl?: string;
+  requirements?: string; supportedOS?: string[]; readme?: string; changelog?: string; additionalLinks?: Array<{label:string;url:string}>;
   dependencies: string[]; featured?: boolean; galleryUrls?: string[]; videoUrl?: string; configSettings?: Array<{label:string;key:string;defaultValue?:string}>; ownerId?: string;
 };
 type Draft = Omit<Mod, 'id' | 'featured' | 'ownerId'>;
@@ -34,7 +35,7 @@ const fallbackMods: Mod[] = [
   { id: 'ii-stupid', name: 'II stupid', author: 'iiDk-the-actual', category: 'Gameplay', description: 'A community mod menu with many gameplay options. Review its source and use gameplay-changing features only where they are permitted, such as compatible modded/private sessions.', version: '8.3.0', downloadUrl: 'https://sourceforge.net/projects/ii-s-stupid-menu.mirror/files/8.3.0/iis_Stupid_Menu.dll/download', imageUrl: 'https://images.gamebanana.com/img/ss/mods/sgi_sd_image_664cd6e384dd5.webp', sourceUrl: 'https://sourceforge.net/projects/ii-s-stupid-menu.mirror/files/8.3.0/', dependencies: ['Utilla'] }
 ];
 const categories = ['All Mods', 'Core', 'Utility', 'Cosmetic', 'Maps', 'Gameplay'];
-const blankDraft: Draft = { name: '', author: '', category: 'Utility', description: '', version: '1.0.0', downloadUrl: '', imageUrl: '', sourceUrl: '', dependencies: [], galleryUrls: [], videoUrl: '', configSettings: [] };
+const blankDraft: Draft = { name: '', author: '', category: 'Utility', description: '', version: '1.0.0', downloadUrl: '', imageUrl: '', sourceUrl: '', websiteUrl: '', embedUrl: '', requirements: '', supportedOS: ['Windows'], readme: '', changelog: '', additionalLinks: [], dependencies: [], galleryUrls: [], videoUrl: '', configSettings: [] };
 
 export default function App() {
   const [mods, setMods] = useState<Mod[]>(fallbackMods);
@@ -396,7 +397,14 @@ export default function App() {
               <label>Video URL (optional)<input type="url" pattern="https://.+" value={draft.videoUrl || ''} onChange={(e) => setDraft({ ...draft, videoUrl: e.target.value })} placeholder="https://…/preview.mp4" /></label>
               <label className="full">Host mod file (.dll/.zip, 24 MB max)<input type="file" accept=".dll,.zip,application/zip" onChange={(e)=>void uploadModFile(e.target.files?.[0])} /><small className="form-help">Select a mod file from disk to host it in the mod base. The hosted URL fills the direct download field.</small></label>
               <label>Source / release page<input type="url" pattern="https://.+" value={draft.sourceUrl || ''} onChange={(e) => setDraft({ ...draft, sourceUrl: e.target.value })} placeholder="https://github.com/creator/project" /></label>
-              <label>Dependencies (comma separated)<input value={draft.dependencies.join(', ')} onChange={(e) => setDraft({ ...draft, dependencies: e.target.value.split(',').map((name) => name.trim()).filter(Boolean) })} placeholder="Utilla, BepInEx" /></label>
+              <label>Official website (optional)<input type="url" pattern="https://.+" value={draft.websiteUrl || ''} onChange={(e) => setDraft({ ...draft, websiteUrl: e.target.value })} placeholder="https://mod-site.example" /></label>
+              <label>Supported operating systems (comma separated)<input value={(draft.supportedOS || []).join(', ')} onChange={(e) => setDraft({ ...draft, supportedOS: e.target.value.split(',').map((v) => v.trim()).filter(Boolean) })} placeholder="Windows, Linux, Steam Deck" /></label>
+              <label>Requirements (game / loader / runtime)<input value={draft.requirements || ''} onChange={(e) => setDraft({ ...draft, requirements: e.target.value })} placeholder="Gorilla Tag PCVR, BepInEx 5" /></label>
+              <label className="full">Embedded page URL (optional)<input type="url" pattern="https://.+" value={draft.embedUrl || ''} onChange={(e) => setDraft({ ...draft, embedUrl: e.target.value })} placeholder="https://www.youtube-nocookie.com/embed/VIDEO_ID or a page that permits embedding" /><small className="form-help">Some sites block iframe embeds; source links remain available in the product sidebar.</small></label>
+              <label className="full">README / installation notes<textarea value={draft.readme || ''} onChange={(e) => setDraft({ ...draft, readme: e.target.value })} rows={4} placeholder="Install steps, features, usage and compatibility notes" /></label>
+              <label className="full">Changelog<textarea value={draft.changelog || ''} onChange={(e) => setDraft({ ...draft, changelog: e.target.value })} rows={3} placeholder="Release notes for this version" /></label>
+              <label className="full">Extra sidebar links (one per line: Label | HTTPS URL)<textarea value={(draft.additionalLinks || []).map((link) => link.label + ' | ' + link.url).join('\\n')} onChange={(e) => setDraft({ ...draft, additionalLinks: e.target.value.split('\\n').map((line) => { const [label, ...parts] = line.split('|'); return {label: label.trim(), url: parts.join('|').trim()}; }).filter((link) => link.label && link.url) })} rows={3} placeholder="Discord | https://discord.gg/example&#10;Wiki | https://example.com/wiki" /></label>
+              <label className="full">Dependencies (comma separated)<input value={draft.dependencies.join(', ')} onChange={(e) => setDraft({ ...draft, dependencies: e.target.value.split(',').map((name) => name.trim()).filter(Boolean) })} placeholder="Utilla, BepInEx" /></label>
               <div className="admin-actions full"><button className="primary" disabled={adminBusy}>{adminBusy ? 'Saving…' : editingId ? 'Save changes' : '＋ Add mod'}</button><button type="button" className="secondary" onClick={() => {setDraft(blankDraft);setEditingId(null);setAdminError('');}}>Clear form</button>{account && <button type="button" className="admin-lock" onClick={() => {setShowAdmin(false);setAdminError('');}}>Close</button>}<button type="button" className="admin-lock" onClick={() => { setAdminUnlocked(false); setAdminPassword(''); }}>Lock admin</button></div>
               <p className="form-help full">Only submit files you have permission to distribute. Direct links and media URLs must use HTTPS.</p>
             </form>
@@ -463,25 +471,24 @@ export default function App() {
       <div className="product-page-heading"><div><span className="category">{detail.category}</span><h2>{detail.name}</h2></div><span className="version">v{detail.version}</span></div><p className="author">by {detail.author} · v{detail.version}</p><p className="product-description">{detail.description}</p>
       {(detail.galleryUrls||[]).length>0 && <div className="detail-gallery">{(detail.galleryUrls||[]).map((url,i)=><img key={url+i} src={url} alt={detail.name+' screenshot '+(i+1)} />)}</div>}
       {detail.videoUrl && <video className="mod-video" controls preload="metadata" src={detail.videoUrl} />}
-      <section className="config-panel"><h3>Mod configuration</h3>
-        {(detail.configSettings||[]).length>0 ? detail.configSettings!.map((item,i)=><label key={item.key||item.label||i}>{item.label||item.key}<input value={configValues[detail.id+':'+(item.key||i)]??item.defaultValue??''} onChange={e=>setConfigValues(current=>({...current,[detail.id+':'+(item.key||i)]:e.target.value}))} /></label>) : <p className="form-help">This mod has no published settings profile yet. Add its documented configuration keys below; setting names must match the mod's own documentation to affect the mod.</p>}
-        <label className="full">Advanced settings (JSON object)<textarea value={advancedConfig} onChange={e=>setAdvancedConfig(e.target.value)} rows={5} spellCheck={false} placeholder={'{\n  "ExampleSetting": "value"\n}'} /></label>
-        <button className="secondary" onClick={async()=>{
-          try {
-            const custom = JSON.parse(advancedConfig || '{}');
-            if (!custom || typeof custom !== 'object' || Array.isArray(custom)) throw new Error('Advanced settings must be a JSON object.');
-            const values:Record<string,string> = Object.fromEntries(Object.entries(custom).map(([key,value])=>[key,typeof value==='string'?value:JSON.stringify(value)]));
-            for (const item of detail.configSettings || []) values[item.key] = configValues[detail.id+':'+item.key] ?? item.defaultValue ?? '';
-            localStorage.setItem('mmm-config-'+detail.id,JSON.stringify(values));
-            if(desktop){const result=await window.monkeyModManager!.saveModConfig({modName:detail.name,values});notify(result.message);}
-            else notify('Configuration saved in this browser. Use the desktop app to write a config file.');
-          } catch(error) { notify(error instanceof Error ? error.message : 'Invalid configuration JSON.'); }
-        }}>Save settings</button>
-      </section>
-      {detail.dependencies.length > 0 && <div className="warning">ⓘ <span><b>Required dependencies</b><small>{detail.dependencies.join(', ')}. Install prerequisites before this mod.</small></span></div>}
-      <div className="modal-links">{detail.sourceUrl && <a href={detail.sourceUrl} target="_blank" rel="noreferrer">Open official source ↗</a>}<a href={detail.downloadUrl} target="_blank" rel="noreferrer">Open download link ↗</a></div>
-      <button className="primary wide" onClick={() => void installMod(detail)}>{desktop ? (installedMods[detail.id] && installedMods[detail.id] !== detail.version ? '↻ Install update' : installedMods[detail.id] === detail.version ? '✓ Reinstall mod' : '↓ Install mod') : '↓ Download mod'}</button>
-      {!desktop && <p className="web-install-note">In a browser this downloads the file only. The desktop app can install it into your selected Gorilla Tag folder.</p>}
+      <div className="product-page-layout">
+        <aside className="product-sidebar"><button className="product-side-action primary" onClick={() => void installMod(detail)}>{desktop ? (installedMods[detail.id] && installedMods[detail.id] !== detail.version ? '↻ Update mod' : installedMods[detail.id] === detail.version ? '✓ Reinstall mod' : '↓ Install mod') : '↓ Download mod'}</button>
+          <a href={detail.downloadUrl} target="_blank" rel="noreferrer">Direct download ↗</a>
+          {detail.sourceUrl && <a href={detail.sourceUrl} target="_blank" rel="noreferrer">Source / releases ↗</a>}
+          {detail.websiteUrl && <a href={detail.websiteUrl} target="_blank" rel="noreferrer">Official website ↗</a>}
+          {(detail.additionalLinks||[]).map((link,i)=><a key={link.url+i} href={link.url} target="_blank" rel="noreferrer">{link.label} ↗</a>)}
+          <div className="product-sidebar-facts"><b>Version</b><span>{detail.version}</span><b>Author</b><span>{detail.author}</span><b>Category</b><span>{detail.category}</span><b>Operating systems</b><span>{(detail.supportedOS||[]).length ? detail.supportedOS!.join(', ') : 'Not specified'}</span><b>Requirements</b><span>{detail.requirements || 'See README / source page'}</span></div>
+        </aside>
+        <div className="product-page-content">
+          <nav className="product-tabs"><a href="#mod-overview">Overview</a><a href="#mod-readme">README</a><a href="#mod-dependencies">Dependencies</a><a href="#mod-media">Media</a><a href="#mod-changelog">Changelog</a></nav>
+          <section id="mod-overview" className="product-info-section"><h3>About this mod</h3><p className="product-description">{detail.description}</p>{detail.requirements && <p><b>Requirements:</b> {detail.requirements}</p>}<div className="product-meta-grid"><div><small>VERSION</small><b>{detail.version}</b></div><div><small>AUTHOR</small><b>{detail.author}</b></div><div><small>CATEGORY</small><b>{detail.category}</b></div><div><small>PLATFORMS</small><b>{(detail.supportedOS||[]).join(', ') || 'Not specified'}</b></div></div></section>
+          <section id="mod-readme" className="product-info-section"><h3>README & installation</h3>{detail.readme ? <p className="product-longtext">{detail.readme}</p> : <p className="form-help">No README has been provided by the publisher. Check the source / release page for installation instructions.</p>}</section>
+          <section id="mod-dependencies" className="product-info-section"><h3>Dependencies</h3>{detail.dependencies.length ? <ul className="product-dependencies">{detail.dependencies.map((dep)=><li key={dep}>{dep}</li>)}</ul> : <p className="form-help">No dependencies listed.</p>}</section>
+          <section id="mod-media" className="product-info-section"><h3>Screenshots & media</h3>{(detail.galleryUrls||[]).length>0 && <div className="detail-gallery">{(detail.galleryUrls||[]).map((url,i)=><a key={url+i} href={url} target="_blank" rel="noreferrer"><img src={url} alt={detail.name+' screenshot '+(i+1)} /></a>)}</div>}{detail.videoUrl && <video className="mod-video" controls preload="metadata" src={detail.videoUrl} />}{detail.embedUrl && <iframe className="product-embed" src={detail.embedUrl} title={detail.name+' embedded content'} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" sandbox="allow-scripts allow-same-origin allow-presentation" allow="fullscreen; picture-in-picture; encrypted-media" />}{!(detail.galleryUrls||[]).length && !detail.videoUrl && !detail.embedUrl && <p className="form-help">No extra media supplied.</p>}</section>
+          <section id="mod-changelog" className="product-info-section"><h3>Changelog</h3>{detail.changelog ? <p className="product-longtext">{detail.changelog}</p> : <p className="form-help">No changelog supplied.</p>}</section>
+        </div>
+      </div>
+            {!desktop && <p className="web-install-note">In a browser this downloads the file only. The desktop app can install it into your selected Gorilla Tag folder.</p>}
     </section></div>}
     {notice && <div className="toast">✓ &nbsp; {notice}</div>}
   </div>;
