@@ -5,9 +5,9 @@ import './hub.css';
 type Mod = {
   id: string; name: string; author: string; category: string; description: string;
   version: string; downloadUrl: string; imageUrl?: string; sourceUrl?: string;
-  dependencies: string[]; featured?: boolean;
+  dependencies: string[]; featured?: boolean; galleryUrls?: string[]; videoUrl?: string; configSettings?: Array<{label:string;key:string;defaultValue?:string}>; ownerId?: string;
 };
-type Draft = Omit<Mod, 'id' | 'featured'>;
+type Draft = Omit<Mod, 'id' | 'featured' | 'ownerId'>;
 declare global {
   interface Window {
     monkeyModManager?: {
@@ -27,7 +27,7 @@ const fallbackMods: Mod[] = [
   { id: 'ii-stupid', name: 'II stupid', author: 'iiDk-the-actual', category: 'Gameplay', description: 'A community mod menu with many gameplay options. Review its source and use gameplay-changing features only where they are permitted, such as compatible modded/private sessions.', version: '8.3.0', downloadUrl: 'https://sourceforge.net/projects/ii-s-stupid-menu.mirror/files/8.3.0/iis_Stupid_Menu.dll/download', imageUrl: 'https://images.gamebanana.com/img/ss/mods/sgi_sd_image_664cd6e384dd5.webp', sourceUrl: 'https://sourceforge.net/projects/ii-s-stupid-menu.mirror/files/8.3.0/', dependencies: ['Utilla'] }
 ];
 const categories = ['All Mods', 'Core', 'Utility', 'Cosmetic', 'Maps', 'Gameplay'];
-const blankDraft: Draft = { name: '', author: '', category: 'Utility', description: '', version: '1.0.0', downloadUrl: '', imageUrl: '', sourceUrl: '', dependencies: [] };
+const blankDraft: Draft = { name: '', author: '', category: 'Utility', description: '', version: '1.0.0', downloadUrl: '', imageUrl: '', sourceUrl: '', dependencies: [], galleryUrls: [], videoUrl: '', configSettings: [] };
 
 export default function App() {
   const [mods, setMods] = useState<Mod[]>(fallbackMods);
@@ -48,6 +48,10 @@ export default function App() {
   const [gameFolder, setGameFolder] = useState<string | null>(null);
   const [installedMods, setInstalledMods] = useState<Record<string, string>>({});
   const [checkingUpdates, setCheckingUpdates] = useState(false);
+  const [account, setAccount] = useState<{id:string;login:string;avatar:string}|null>(null);
+  const [accountConfigured, setAccountConfigured] = useState(false);
+  const [editingId, setEditingId] = useState<string|null>(null);
+  const [configValues, setConfigValues] = useState<Record<string,string>>({});
   const desktop = Boolean(window.monkeyModManager && window.monkeyModManager.isDesktop);
   const apiUrl = (path: string) => (desktop ? 'https://monkey-mod-hub.onrender.com' : '') + path;
 
@@ -63,7 +67,7 @@ export default function App() {
     return mods;
   };
 
-  useEffect(() => { void loadCatalog(); }, []);
+  useEffect(() => { void loadCatalog(); void fetch(apiUrl('/api/account')).then(r=>r.json()).then(data=>{setAccount(data.user||null);setAccountConfigured(Boolean(data.configured));}).catch(()=>{}); }, []);
   useEffect(() => { localStorage.setItem('mmm-saved', JSON.stringify(saved)); }, [saved]);
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem('mmm-theme', theme); }, [theme]);
   useEffect(() => {
@@ -193,7 +197,7 @@ export default function App() {
     </aside>
 
     <main className="main">
-      <header className="topbar"><span>Workspace <b>/</b> <strong>{showAdmin ? 'Mod curator' : page}</strong></span><div><span className="gamepill"><i /> Gorilla Tag</span><button className="roundbtn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☼' : '☾'}</button><span className="avatar">M</span></div></header>
+      <header className="topbar"><span>Workspace <b>/</b> <strong>{showAdmin ? 'Mod curator' : page}</strong></span><div><span className="gamepill"><i /> Gorilla Tag</span><button className="roundbtn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☼' : '☾'}</button><button className="secondary account-button" onClick={()=>{if(account){void fetch(apiUrl('/api/account/logout'),{method:'POST'}).then(()=>{setAccount(null);notify('Signed out.');});}else if(accountConfigured){window.location.href=apiUrl('/auth/github');}else{notify('GitHub account login needs OAuth settings in Render.');}}}>{account ? 'Sign out · '+account.login : 'Sign in with GitHub'}</button><span className="avatar">{account?.login?.slice(0,1).toUpperCase()||'M'}</span></div></header>
       <div className="content">
         <section className="hero">
           <div className="eyebrow">✳ &nbsp; THE COMMUNITY MOD HUB</div>
@@ -246,7 +250,7 @@ export default function App() {
             <p className="desc">{mod.description}</p>
             {mod.dependencies.length > 0 && <p className="dependencies"><span>Requires</span> {mod.dependencies.join(', ')}</p>}
             <div className="cardfoot"><span className="version">v{mod.version}</span><button className="install" onClick={() => void installMod(mod)}>{desktop ? (installedMods[mod.id] ? (installedMods[mod.id] === mod.version ? '✓ Installed' : '↻ Update') : '↓ Install') : '↓ Download'}</button></div>
-            <div className="card-links">{mod.sourceUrl && <a href={mod.sourceUrl} target="_blank" rel="noreferrer">Source / releases ↗</a>}{adminUnlocked && <button className="delete-mod" disabled={adminBusy} onClick={() => void deleteMod(mod)}>Remove</button>}<button className="details" onClick={() => setDetail(mod)}>View details</button></div>
+            <div className="card-links">{mod.sourceUrl && <a href={mod.sourceUrl} target="_blank" rel="noreferrer">Source / releases ↗</a>}{(adminUnlocked || (account && mod.ownerId === account.id)) && <button className="details" onClick={()=>beginEdit(mod)}>Edit</button>}{(adminUnlocked || (account && mod.ownerId === account.id)) && <button className="delete-mod" disabled={adminBusy} onClick={() => void deleteMod(mod)}>Remove</button>}<button className="details" onClick={() => setDetail(mod)}>View details</button></div>
           </div>
         </article>)}</div> : <div className="empty"><div>▣</div><h3>{page === 'Library' ? 'Your library is a blank canvas' : 'No mods found'}</h3><p>{page === 'Library' ? 'Save mods from Discover to get started.' : 'Try a different search or category.'}</p><button className="primary" onClick={() => { setQuery(''); setCategory('All Mods'); setPage('Discover'); }}>Explore mods ↗</button></div>}
 
