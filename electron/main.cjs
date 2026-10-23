@@ -1,4 +1,5 @@
 const { app, BrowserWindow, shell, dialog, ipcMain } = require('electron');
+const { autoUpdater } = require('electron-updater');
 app.setAsDefaultProtocolClient('monkeymodmanager');
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) app.quit();
@@ -213,38 +214,35 @@ ipcMain.handle('config:write-file', async (_event, payload) => {
   } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Could not save config.' }; }
 });
 ipcMain.handle('app:get-version', () => app.getVersion());
-ipcMain.handle('app:install-update', async (_event, assetUrl) => {
-  let tempFile = null;
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = false;
+function sendAppUpdateStatus(status) {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('app:update-status', status);
+}
+autoUpdater.on('checking-for-update', () => sendAppUpdateStatus({ status: 'checking' }));
+autoUpdater.on('update-available', (info) => sendAppUpdateStatus({ status: 'available', version: info.version, releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : '' }));
+autoUpdater.on('update-not-available', (info) => sendAppUpdateStatus({ status: 'not-available', version: info.version }));
+autoUpdater.on('download-progress', (progress) => sendAppUpdateStatus({ status: 'downloading', percent: Math.round(progress.percent), transferred: progress.transferred, total: progress.total }));
+autoUpdater.on('update-downloaded', (info) => sendAppUpdateStatus({ status: 'downloaded', version: info.version }));
+autoUpdater.on('error', (error) => sendAppUpdateStatus({ status: 'error', message: error && error.message ? error.message : 'App update failed.' }));
+ipcMain.handle('app:check-update', async () => {
   try {
-    if (typeof assetUrl !== 'string' || !assetUrl.startsWith('https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/releases/download/')) {
-      throw new Error('Update download URL was not from the official Monkey Mod Manager releases.');
-    }
-    const response = await fetch(assetUrl, { redirect: 'follow', signal: AbortSignal.timeout(120000) });
-    if (!response.ok) throw new Error('Could not download the update (HTTP ' + response.status + ').');
-    const urlPath = new URL(assetUrl).pathname;
-    const name = path.basename(urlPath);
-    const platform = process.platform;
-    const supported = platform === 'win32' ? /-Setup-.*-x64\.exe$/i.test(name) : platform === 'linux' ? /\.AppImage$|\.deb$/i.test(name) : false;
-    if (!supported) throw new Error('No compatible update installer was found for this operating system.');
-    tempFile = path.join(os.tmpdir(), name.replace(/[^a-zA-Z0-9._-]/g, '_'));
-    await fs.writeFile(tempFile, Buffer.from(await response.arrayBuffer()));
-    if (platform === 'win32') {
-      const child = spawn(tempFile, [], { detached: true, stdio: 'ignore' });
-      child.unref();
-      return { ok: true, message: 'Update downloaded and installer launched. Follow the setup prompts to finish updating.' };
-    }
-    if (name.toLowerCase().endsWith('.appimage')) {
-      await fs.chmod(tempFile, 0o755);
-      const child = spawn(tempFile, [], { detached: true, stdio: 'ignore' });
-      child.unref();
-      return { ok: true, message: 'Update AppImage downloaded and launched. Follow its instructions to switch to the new version.' };
-    }
-    const openResult = await shell.openPath(tempFile);
-    if (openResult) throw new Error(openResult);
-    return { ok: true, message: 'Update package downloaded and opened. Follow your system installer prompts.' };
-  } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : 'Could not install the app update.' };
-  }
+    if (!app.isPackaged) return { ok: false, message: 'Built-in updates are available in the installed desktop app, not development mode.' };
+    const result = await autoUpdater.checkForUpdates();
+    return { ok: true, version: result && result.updateInfo ? result.updateInfo.version : null };
+  } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Could not check for app updates.' }; }
+});
+ipcMain.handle('app:download-update', async () => {
+  try {
+    if (!app.isPackaged) throw new Error('Built-in updates are available in the installed desktop app, not development mode.');
+    await autoUpdater.downloadUpdate();
+    return { ok: true, message: 'Downloading update…' };
+  } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Could not download app update.' }; }
+});
+ipcMain.handle('app:install-update', () => {
+  if (!app.isPackaged) return { ok: false, message: 'Install the packaged desktop app to use the updater.' };
+  autoUpdater.quitAndInstall(false, true);
+  return { ok: true, message: 'Restarting to install the update…' };
 });
 ipcMain.handle('mods:get-installed', async () => (await readSettings()).installedMods || {});
 ipcMain.handle('bepinex:has-installed', async () => { const settings = await readSettings(); if (!settings.gameFolder) return false; return fs.stat(path.join(path.resolve(settings.gameFolder), 'BepInEx', 'core', 'BepInEx.dll')).then(() => true).catch(() => false); });
