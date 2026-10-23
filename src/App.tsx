@@ -48,6 +48,8 @@ export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('mmm-theme') || 'dark');
   const [detail, setDetail] = useState<Mod | null>(null);
   const [showAppFallback, setShowAppFallback] = useState(false);
+  const [useGitHubImport, setUseGitHubImport] = useState(false);
+  const [githubImportBusy, setGithubImportBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [showAdmin, setShowAdmin] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
@@ -120,6 +122,21 @@ export default function App() {
   useEffect(() => { localStorage.setItem('mmm-saved', JSON.stringify(saved)); }, [saved]);
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem('mmm-theme', theme); }, [theme]);
   useEffect(() => { setShowAppFallback(false); }, [detail?.id]);
+  useEffect(() => {
+    if (!detail || !detail.sourceUrl || !/https?:\/\/github\.com\//i.test(detail.sourceUrl) || detail.readme?.trim()) return;
+    let active = true;
+    const loadGitHubReadme = async () => {
+      try {
+        const response = await apiFetch(apiUrl('/api/github-import?url=' + encodeURIComponent(detail.sourceUrl!)));
+        if (!response.ok) return;
+        const data = await response.json() as Partial<Mod> & { readme?: string };
+        if (active && data.readme) setDetail(current => current && current.id === detail.id ? { ...current, readme: data.readme, changelog: current.changelog || data.changelog, websiteUrl: current.websiteUrl || data.websiteUrl, version: current.version || data.version } : current);
+      } catch { /* GitHub README is optional; keep the product page usable offline. */ }
+    };
+    void loadGitHubReadme();
+    return () => { active = false; };
+  }, [detail?.id, detail?.sourceUrl, detail?.readme]);
+
   useEffect(() => {
     if (!detail) return;
     try {
@@ -327,6 +344,34 @@ export default function App() {
     setShowAdmin(true);setAdminError('');
   };
 
+  const importFromGitHub = async () => {
+    const source = draft.sourceUrl?.trim();
+    if (!source) { setAdminError('Paste a GitHub repository or releases URL into Source / release page first.'); return; }
+    setGithubImportBusy(true); setAdminError('');
+    try {
+      const response = await apiFetch(apiUrl('/api/github-import?url=' + encodeURIComponent(source)));
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Could not import GitHub details.');
+      setDraft(current => ({
+        ...current,
+        name: data.name || current.name,
+        author: data.author || current.author,
+        description: data.description || current.description,
+        version: data.version || current.version,
+        downloadUrl: data.downloadUrl || current.downloadUrl,
+        sourceUrl: data.sourceUrl || current.sourceUrl,
+        websiteUrl: data.websiteUrl || current.websiteUrl,
+        readme: data.readme || current.readme,
+        changelog: data.changelog || current.changelog,
+        dependencies: Array.isArray(data.dependencies) && data.dependencies.length ? data.dependencies : current.dependencies,
+        category: data.category || current.category,
+        additionalLinks: Array.isArray(data.additionalLinks) && data.additionalLinks.length ? data.additionalLinks : current.additionalLinks
+      }));
+      notify('Imported GitHub repository details, README and release metadata. Review before saving.');
+    } catch (error) { setAdminError(error instanceof Error ? error.message : 'Could not import GitHub details.'); }
+    finally { setGithubImportBusy(false); }
+  };
+
   const addMod = async (event: FormEvent) => {
     event.preventDefault(); setAdminBusy(true); setAdminError('');
     try {
@@ -401,6 +446,10 @@ export default function App() {
           <>
             <div className="admin-manage-heading admin-form-toolbar"><div><h3>{editingId ? 'Edit mod listing' : 'Add a mod'}</h3><p>Fill in the product details below. All optional media fields are visible.</p></div><div className="admin-toolbar-actions"><button className="secondary" type="button" onClick={() => void loadCatalog()} disabled={loading}>↻ Reload</button><button className="secondary" type="button" onClick={() => document.getElementById('add-mod-from-disk')?.click()}>＋ Add mod from disk</button><input id="add-mod-from-disk" className="visually-hidden-file" type="file" accept=".dll,.zip,application/zip" onChange={(event) => { void uploadModFile(event.target.files?.[0]); event.currentTarget.value=''; }} /><button className="secondary" type="button" onClick={() => { setDraft(blankDraft); setEditingId(null); setAdminError(''); }}>＋ New mod</button></div></div>
             <form className="admin-form compact-admin-form add-mod-only-form" onSubmit={addMod}>
+              <div className="github-import-box full">
+                <label className="github-import-toggle"><input type="checkbox" checked={useGitHubImport} onChange={(e) => setUseGitHubImport(e.target.checked)} /><span><b>Use GitHub to import mod details</b><small>Fetch repository description, README, author, latest release and downloadable assets, then combine them with any details you enter manually.</small></span></label>
+                {useGitHubImport && <div className="github-import-actions"><p>Enter a public GitHub repository or its Releases URL in the Source / release page field below, then import.</p><button type="button" className="secondary" onClick={() => void importFromGitHub()} disabled={githubImportBusy || !draft.sourceUrl}>{githubImportBusy ? 'Fetching from GitHub…' : '↓ Fetch README & all GitHub details'}</button></div>}
+              </div>
               <label>Mod name<input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required maxLength={90} placeholder="e.g. MonkePhone" /></label>
               <label>Author<input value={draft.author} onChange={(e) => setDraft({ ...draft, author: e.target.value })} required maxLength={90} placeholder="Creator name" /></label>
               <label>Version<input value={draft.version} onChange={(e) => setDraft({ ...draft, version: e.target.value })} required maxLength={40} placeholder="1.0.0" /></label>
@@ -498,9 +547,9 @@ export default function App() {
           <div className="product-sidebar-facts"><b>Version</b><span>{detail.version}</span><b>Author</b><span>{detail.author}</span><b>Category</b><span>{detail.category}</span><b>Operating systems</b><span>{(detail.supportedOS||[]).length ? detail.supportedOS!.join(', ') : 'Not specified'}</span><b>Requirements</b><span>{detail.requirements || 'See README / source page'}</span></div>
         </aside>
         <div className="product-page-content">
-          <nav className="product-tabs"><a href="#mod-overview">Overview</a><a href="#mod-readme">README</a><a href="#mod-dependencies">Dependencies</a><a href="#mod-media">Media</a><a href="#mod-changelog">Changelog</a></nav>
+          <nav className="product-tabs"><a href="#mod-overview">Overview</a>{detail.sourceUrl && /https?:\/\/github\.com\//i.test(detail.sourceUrl) && <a href="#mod-readme">README</a>}<a href="#mod-dependencies">Dependencies</a><a href="#mod-media">Media</a><a href="#mod-changelog">Changelog</a></nav>
           <section id="mod-overview" className="product-info-section"><h3>About this mod</h3><p className="product-description">{detail.description}</p>{detail.requirements && <p><b>Requirements:</b> {detail.requirements}</p>}<div className="product-meta-grid"><div><small>VERSION</small><b>{detail.version}</b></div><div><small>AUTHOR</small><b>{detail.author}</b></div><div><small>CATEGORY</small><b>{detail.category}</b></div><div><small>PLATFORMS</small><b>{(detail.supportedOS||[]).join(', ') || 'Not specified'}</b></div></div></section>
-          <section id="mod-readme" className="product-info-section"><h3>README & installation</h3>{detail.readme ? <p className="product-longtext">{detail.readme}</p> : <p className="form-help">No README has been provided by the publisher. Check the source / release page for installation instructions.</p>}</section>
+          {detail.sourceUrl && /https?:\/\/github\.com\//i.test(detail.sourceUrl) && <section id="mod-readme" className="product-info-section"><h3>GitHub README & installation</h3>{detail.readme ? <p className="product-longtext">{detail.readme}</p> : <p className="form-help">Fetching README from GitHub… If this repository has no README, check its source page.</p>}</section>}
           <section id="mod-dependencies" className="product-info-section"><h3>Dependencies</h3>{detail.dependencies.length ? <ul className="product-dependencies">{detail.dependencies.map((dep)=><li key={dep}>{dep}</li>)}</ul> : <p className="form-help">No dependencies listed.</p>}</section>
           <section id="mod-media" className="product-info-section"><h3>Screenshots & media</h3>{(detail.galleryUrls||[]).length>0 && <div className="detail-gallery">{(detail.galleryUrls||[]).map((url,i)=><a key={url+i} href={url} target="_blank" rel="noreferrer"><img src={url} alt={detail.name+' screenshot '+(i+1)} /></a>)}</div>}{detail.videoUrl && <video className="mod-video" controls preload="metadata" src={detail.videoUrl} />}{detail.embedUrl && <iframe className="product-embed" src={detail.embedUrl} title={detail.name+' embedded content'} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" sandbox="allow-scripts allow-same-origin allow-presentation" allow="fullscreen; picture-in-picture; encrypted-media" />}{!(detail.galleryUrls||[]).length && !detail.videoUrl && !detail.embedUrl && <p className="form-help">No extra media supplied.</p>}</section>
           <section id="mod-changelog" className="product-info-section"><h3>Changelog</h3>{detail.changelog ? <p className="product-longtext">{detail.changelog}</p> : <p className="form-help">No changelog supplied.</p>}</section>
