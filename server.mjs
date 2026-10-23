@@ -175,7 +175,7 @@ const server = http.createServer(async (req, res) => {
         const repoResponse = await fetch('https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo), { headers: apiHeaders, signal: AbortSignal.timeout(12000) });
         const repoData = await repoResponse.json().catch(() => ({}));
         if (!repoResponse.ok || repoData.private) return reply(res, repoResponse.status === 404 ? 404 : 502, { error: repoData.message || 'Could not read this public GitHub repository.' });
-        const readmeResponse = await fetch('https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo) + '/readme', { headers: { ...apiHeaders, accept: 'application/vnd.github.raw+json' }, signal: AbortSignal.timeout(12000) });
+        const readmeResponse = await fetch('https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo) + '/readme', { headers: { ...apiHeaders, accept: 'application/vnd.github.raw' }, signal: AbortSignal.timeout(12000) });
         let readme = '';
         if (readmeResponse.ok) {
           const contentType = readmeResponse.headers.get('content-type') || '';
@@ -187,7 +187,7 @@ const server = http.createServer(async (req, res) => {
         const releaseResponse = await fetch('https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo) + '/releases/latest', { headers: apiHeaders, signal: AbortSignal.timeout(12000) });
         const release = releaseResponse.ok ? await releaseResponse.json().catch(() => ({})) : {};
         const assets = Array.isArray(release.assets) ? release.assets : [];
-        const asset = assets.find((item) => /\.(dll|zip)$/i.test(String(item.name || ''))) || assets[0];
+        const asset = assets.find((item) => /\.(dll|zip)$/i.test(String(item.name || '')));
         const topics = Array.isArray(repoData.topics) ? repoData.topics : [];
         const topicText = topics.join(' ').toLowerCase();
         const category = /core|library|framework|dependency/.test(topicText) ? 'Core' : /map|level/.test(topicText) ? 'Maps' : /cosmetic|skin|appearance/.test(topicText) ? 'Cosmetic' : /gameplay|menu|cheat/.test(topicText) ? 'Gameplay' : /utility|tool|helper/.test(topicText) ? 'Utility' : '';
