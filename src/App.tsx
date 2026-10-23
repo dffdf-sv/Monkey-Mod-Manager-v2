@@ -87,7 +87,7 @@ export default function App() {
     window.addEventListener('keydown', handleShortcuts);
     return () => window.removeEventListener('keydown', handleShortcuts);
   }, []);
-  useEffect(() => { if (window.monkeyModManager) { void window.monkeyModManager.getGameFolder().then(setGameFolder).catch(() => setGameFolder(null)); void window.monkeyModManager.getInstalledMods().then(setInstalledMods).catch(() => setInstalledMods({})); } }, []);
+  useEffect(() => { if (window.monkeyModManager) { void window.monkeyModManager.getGameFolder().then(setGameFolder).catch(() => setGameFolder(null)); void window.monkeyModManager.getInstalledMods().then(setInstalledMods).catch(() => setInstalledMods({})); void window.monkeyModManager.getDetectedMods().then(setDetectedMods).catch(() => setDetectedMods([])); } }, []);
 
   const visibleMods = useMemo(() => mods.filter((mod) =>
     (page !== 'Library' || saved.includes(mod.id)) &&
