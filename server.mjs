@@ -73,6 +73,23 @@ async function getMods() {
     catch { return []; }
   }
 }
+const FEEDBACK_PATH = 'mod-feedback.json';
+async function readFeedbackFile() {
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) throw new Error('Community feedback storage needs GITHUB_TOKEN.');
+  const response = await fetch('https://api.github.com/repos/' + MOD_REPO + '/contents/' + FEEDBACK_PATH, {headers:{authorization:'Bearer '+token,accept:'application/vnd.github+json','x-github-api-version':'2022-11-28','user-agent':'Monkey-Mod-Hub/2.1'},signal:AbortSignal.timeout(10000)});
+  if (response.status === 404) return {sha:null,data:{}};
+  const result = await response.json().catch(()=>({}));
+  if (!response.ok) throw new Error('Could not read community feedback ('+response.status+').');
+  try { return {sha:result.sha||null,data:JSON.parse(Buffer.from(result.content,'base64').toString('utf8'))}; }
+  catch { throw new Error('Community feedback file is invalid JSON.'); }
+}
+async function saveFeedbackFile(data, sha, message) {
+  const token = process.env.GITHUB_TOKEN;
+  const response = await fetch('https://api.github.com/repos/' + MOD_REPO + '/contents/' + FEEDBACK_PATH, {method:'PUT',headers:{authorization:'Bearer '+token,accept:'application/vnd.github+json','content-type':'application/json','x-github-api-version':'2022-11-28','user-agent':'Monkey-Mod-Hub/2.1'},body:JSON.stringify({message,content:Buffer.from(JSON.stringify(data,null,2)+'\\n').toString('base64'),...(sha?{sha}:{}),branch:'main'}),signal:AbortSignal.timeout(15000)});
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error('Could not save community feedback ('+response.status+'): '+(result.message||'check GITHUB_TOKEN write access.'));
+}
 async function readGithubContents() {
   const token = process.env.GITHUB_TOKEN;
   if (!token) throw new Error('Render is missing GITHUB_TOKEN. Add a fine-grained token with Contents: Read and write access to GORILA-TAG-MODBASE.');
@@ -314,6 +331,43 @@ const server = http.createServer(async (req, res) => {
           additionalLinks, topics, stars: Number(repoData.stargazers_count || 0)
         });
       } catch (error) { return reply(res, 502, { error: error instanceof Error ? error.message : 'GitHub import failed.' }); }
+    }
+    if (url.pathname.startsWith('/api/mod-feedback/')) {
+      const match=url.pathname.match(/^\\/api\\/mod-feedback\\/([^/]+)(?:\\/(vote|comments))?$/);
+      if(!match)return reply(res,404,{error:'Feedback route not found.'});
+      let modId; try{modId=decodeURIComponent(match[1]);}catch{return reply(res,400,{error:'Invalid mod ID.'});}
+      if(!modId||modId.length>120)return reply(res,400,{error:'Invalid mod ID.'});
+      const user=sessionFor(req);
+      try{
+        const file=await readFeedbackFile();
+        const item=file.data[modId]&&typeof file.data[modId]==='object'?file.data[modId]:{votes:{},comments:[]};
+        item.votes=item.votes&&typeof item.votes==='object'?item.votes:{};
+        item.comments=Array.isArray(item.comments)?item.comments:[];
+        if(req.method==='GET'&&!match[2]){
+          const votes=Object.values(item.votes).map(Number);
+          return reply(res,200,{upvotes:votes.filter(v=>v===1).length,downvotes:votes.filter(v=>v===-1).length,myVote:user?Number(item.votes[user.id]||0):0,comments:item.comments.slice(-100).reverse()});
+        }
+        if(!user)return reply(res,401,{error:'Sign in with GitHub to vote or comment.'});
+        if(req.method==='POST'&&match[2]==='vote'){
+          if(!checkRate(req))return reply(res,429,{error:'Too many votes. Wait a minute.'});
+          const body=await readBody(req,5000); const vote=Number(body.vote);
+          if(![-1,0,1].includes(vote))return reply(res,400,{error:'Vote must be helpful, not helpful, or cleared.'});
+          if(vote===0)delete item.votes[user.id];else item.votes[user.id]=vote;
+          file.data[modId]=item;await saveFeedbackFile(file.data,file.sha,'Update community vote for '+modId);
+          const votes=Object.values(item.votes).map(Number);
+          return reply(res,200,{upvotes:votes.filter(v=>v===1).length,downvotes:votes.filter(v=>v===-1).length,myVote:vote});
+        }
+        if(req.method==='POST'&&match[2]==='comments'){
+          if(!checkRate(req))return reply(res,429,{error:'Too many comments. Wait a minute.'});
+          const body=await readBody(req,10000);const comment=String(body.body||'').trim();
+          if(!comment||comment.length>1000)return reply(res,400,{error:'Comment must be between 1 and 1,000 characters.'});
+          item.comments.push({id:crypto.randomUUID(),userId:user.id,login:String(user.login||'Community member').slice(0,80),body:comment,createdAt:new Date().toISOString()});
+          item.comments=item.comments.slice(-100);
+          file.data[modId]=item;await saveFeedbackFile(file.data,file.sha,'Add community comment for '+modId);
+          return reply(res,201,{comments:item.comments.slice().reverse()});
+        }
+        return reply(res,405,{error:'Method not allowed.'});
+      }catch(error){return reply(res,502,{error:error instanceof Error?error.message:'Community feedback storage failed.'});}
     }
     if (url.pathname === '/api/mods' && req.method === 'GET') return reply(res, 200, { mods: await getMods() });
     if (url.pathname === '/api/admin/check' && req.method === 'POST') {
