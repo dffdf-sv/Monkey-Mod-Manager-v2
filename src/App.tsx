@@ -376,6 +376,7 @@ export default function App() {
         updates = catalog.filter((mod) => installed[mod.id] && installed[mod.id] !== mod.version);
       }
       let appUpdateFound = false;
+      let discoveredAppUpdate: {version:string;url:string} | null = null;
       if (desktop) {
         try {
           const response = await fetch('https://api.github.com/repos/dffdf-sv/Monkey-Mod-Manager-v2/releases/latest', {
@@ -392,7 +393,8 @@ export default function App() {
               latestParts.some((part, index) => part > (currentParts[index] || 0) &&
                 latestParts.slice(0, index).every((previous, previousIndex) => previous === (currentParts[previousIndex] || 0)));
             if (!release.draft && release.tag_name && release.html_url && isNewer) {
-              setAppUpdate({ version: latest, url: release.html_url });
+              discoveredAppUpdate = { version: latest, url: release.html_url };
+              setAppUpdate(discoveredAppUpdate);
               appUpdateFound = true;
             } else {
               setAppUpdate(null);
@@ -401,12 +403,12 @@ export default function App() {
         } catch { /* App update lookup is optional; still report mod updates if GitHub is unreachable. */ }
       }
       const messages = [];
-      if (appUpdateFound) messages.push('Monkey Mod Manager update available: v' + appUpdate!.version);
+      if (appUpdateFound && discoveredAppUpdate) messages.push('Monkey Mod Manager update available: v' + discoveredAppUpdate.version);
       if (updates.length) messages.push(updates.length + ' mod update' + (updates.length === 1 ? '' : 's') + ' available');
       if (!messages.length) messages.push(desktop ? 'You’re up to date. No app or tracked mod updates found.' : 'Catalogue refreshed. App and installed-version checks are available in the desktop app.');
       notify(messages.join(' · '));
-      if (appUpdateFound && appUpdate && window.confirm('Monkey Mod Manager v' + appUpdate.version + ' is available. Open the official GitHub release page to download the update?')) {
-        window.open(appUpdate.url, '_blank', 'noopener,noreferrer');
+      if (appUpdateFound && discoveredAppUpdate && window.confirm('Monkey Mod Manager v' + discoveredAppUpdate.version + ' is available. Open the official GitHub release page to download the update?')) {
+        window.open(discoveredAppUpdate.url, '_blank', 'noopener,noreferrer');
       }
     } catch { notify('Could not check for updates. Please try again.'); }
     finally { setCheckingUpdates(false); }
