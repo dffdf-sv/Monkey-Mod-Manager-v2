@@ -151,7 +151,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/account/logout' && req.method === 'POST') { cookie(res,'mmm_session','',0); return reply(res,200,{ok:true}); }
     if (url.pathname === '/api/assets' && req.method === 'POST') {
       if (!checkRate(req)) return reply(res,429,{error:'Too many uploads. Wait one minute and try again.'});
-      const user=sessionFor(req); const admin=adminAllowed(req).ok; if(!user&&!admin)return reply(res,401,{error:'Sign in with GitHub or unlock admin tools before uploading.'});
+      const user=sessionFor(req); if(!user)return reply(res,401,{error:'Sign in with GitHub before uploading files for your mods.'});
       const body=await readBody(req,35000000); const modId=slug(body.modId); const name=path.basename(String(body.fileName||'')).replace(/[^a-zA-Z0-9._-]/g,'_'); const kind=String(body.kind||'image'); const mime=String(body.mime||''); const allowed=kind==='image'?['image/png','image/jpeg','image/webp','image/gif']:kind==='video'?['video/mp4','video/webm']:kind==='mod'?['application/zip','application/x-zip-compressed','application/octet-stream','application/x-msdownload']:[];
       if(!modId||!name||!allowed.includes(mime))return reply(res,400,{error:'Unsupported upload type.'});
       const raw=String(body.base64||'').replace(/^data:[^,]+,/,''); if(!raw||raw.length>33000000)return reply(res,413,{error:'Upload too large.'}); const bytes=Buffer.from(raw,'base64'); const max=kind==='video'?12000000:kind==='mod'?24000000:8000000;
@@ -275,7 +275,7 @@ const server = http.createServer(async (req, res) => {
         const deps = Array.isArray(body.dependencies) ? body.dependencies : [];
         const websiteUrl=httpsUrl(body.websiteUrl||'',false), embedUrl=httpsUrl(body.embedUrl||'',false); if(websiteUrl===null||embedUrl===null)return reply(res,400,{error:'Website and embed URLs must use HTTPS.'});
         const additionalLinks=Array.isArray(body.additionalLinks)?body.additionalLinks.map((item)=>({label:String(item.label||'').trim().slice(0,80),url:httpsUrl(item.url,true)})).filter((item)=>item.label&&item.url).slice(0,20):[];
-        const entry = { name, version, author, description, category, download_url: downloadUrl, image_url: imageUrl || '', gallery_urls: Array.isArray(body.galleryUrls) ? body.galleryUrls.map((value) => httpsUrl(value, true)).filter(Boolean).slice(0, 8) : [], video_url: videoUrl || '', source_url: sourceUrl || '', website_url:websiteUrl||'',embed_url:embedUrl||'',requirements:String(body.requirements||'').slice(0,500),supported_os:Array.isArray(body.supportedOS)?body.supportedOS.map(String).slice(0,12):[],readme:String(body.readme||'').slice(0,12000),changelog:String(body.changelog||'').slice(0,6000),additional_links:additionalLinks, dependencies: deps.map((item) => String(item).trim()).filter(Boolean).slice(0, 20), featured: false, owner_id: user ? user.id : '' };
+        const entry = { name, version, author, description, category, download_url: downloadUrl, image_url: imageUrl || '', gallery_urls: Array.isArray(body.galleryUrls) ? body.galleryUrls.map((value) => httpsUrl(value, true)).filter(Boolean).slice(0, 8) : [], video_url: videoUrl || '', source_url: sourceUrl || '', website_url:websiteUrl||'',embed_url:embedUrl||'',requirements:String(body.requirements||'').slice(0,500),supported_os:Array.isArray(body.supportedOS)?body.supportedOS.map(String).slice(0,12):[],readme:String(body.readme||'').slice(0,12000),changelog:String(body.changelog||'').slice(0,6000),additional_links:additionalLinks, dependencies: deps.map((item) => String(item).trim()).filter(Boolean).slice(0, 20), featured: false, owner_id: user.id };
         current.list.push(entry);
         try { await saveGithubList(current.list, current.sha, 'Add ' + name + ' to mod hub'); }
         catch (error) { return reply(res, 502, { error: error instanceof Error ? error.message : 'Could not save mod to GitHub.' }); }
@@ -287,7 +287,7 @@ const server = http.createServer(async (req, res) => {
         const index = current.list.findIndex((entry) => slug(entry.name) === id);
         if (index < 0) return reply(res, 404, { error: 'Mod was not found.' });
         const old = current.list[index];
-        if (!isAdmin && (!user || String(old.owner_id || '') !== user.id)) return reply(res, 403, { error: 'You can only edit mods published by your account.' });
+        if (String(old.owner_id || '') !== user.id) return reply(res, 403, { error: 'You can only edit mods published by your account.' });
         const name=String(body.name||'').trim(), author=String(body.author||'').trim(), version=String(body.version||'').trim(), description=String(body.description||'').trim();
         const downloadUrl=httpsUrl(body.downloadUrl,true), imageUrl=httpsUrl(body.imageUrl||'',false), sourceUrl=httpsUrl(body.sourceUrl||'',false), videoUrl=httpsUrl(body.videoUrl||'',false);
         if(!name||!author||!version||!description||!downloadUrl||imageUrl===null||sourceUrl===null||videoUrl===null)return reply(res,400,{error:'Required fields and HTTPS URLs must be valid.'});
@@ -299,7 +299,7 @@ const server = http.createServer(async (req, res) => {
         return reply(res,200,{ok:true,mod:normalise(current.list[index])});
       }
       const oldEntry=current.list.find(entry=>slug(entry.name)===id);
-      if(oldEntry&&!isAdmin&&(!user||String(oldEntry.owner_id||'')!==user.id))return reply(res,403,{error:'You can only remove mods published by your account.'});
+      if(oldEntry&&String(oldEntry.owner_id||'')!==user.id)return reply(res,403,{error:'You can only remove mods published by your account.'});
       const next = current.list.filter((entry) => slug(entry.name) !== id);
       if (next.length === current.list.length) return reply(res, 404, { error: 'Mod was not found.' });
       try { await saveGithubList(next, current.sha, 'Remove ' + id + ' from mod hub'); }
