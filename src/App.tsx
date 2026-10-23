@@ -17,6 +17,8 @@ declare global {
       onAuthToken: (callback:(token:string)=>void) => () => void;
       onOpenMod: (callback:(modId:string)=>void) => () => void;
       getGameFolder: () => Promise<string | null>;
+      getAppVersion: () => Promise<string>;
+      installAppUpdate: (assetUrl:string) => Promise<{ok:boolean;message:string}>;
       chooseGameFolder: () => Promise<string | null>;
       installMod: (mod: Mod) => Promise<{ ok: boolean; message: string; path?: string }>;
       getInstalledMods: () => Promise<Record<string, string>>;
@@ -74,7 +76,9 @@ export default function App() {
   const [hideInstallNotice, setHideInstallNotice] = useState(() => localStorage.getItem('mmm-hide-install-notice') === 'true');
   const [installedMods, setInstalledMods] = useState<Record<string, string>>({});
   const [checkingUpdates, setCheckingUpdates] = useState(false);
-  const [appUpdate, setAppUpdate] = useState<{version:string;url:string}|null>(null);
+  const [appUpdate, setAppUpdate] = useState<{version:string;url:string;assetUrl?:string}|null>(null);
+  const [appVersion, setAppVersion] = useState('2.0.0');
+  const [autoInstallUpdates, setAutoInstallUpdates] = useState(() => localStorage.getItem('mmm-auto-install-updates') === 'true');
   const [account, setAccount] = useState<{id:string;login:string;avatar:string}|null>(null);
   const [accountConfigured, setAccountConfigured] = useState(false);
   const [accountData, setAccountData] = useState<{profiles:Array<{id:string;name:string;createdAt:string;installedMods:Record<string,string>;configs:Record<string,string>;savedMods:string[]}>;savedMods:string[];configs:Record<string,string>;installedMods:Record<string,string>}>({profiles:[],savedMods:[],configs:{},installedMods:{}});
@@ -127,6 +131,7 @@ export default function App() {
   };
 
   useEffect(() => {
+    if (window.monkeyModManager?.isDesktop) void window.monkeyModManager.getAppVersion().then(setAppVersion).catch(() => {});
     void loadCatalog(); void refreshAccount();
     const handleMessage = (event: MessageEvent) => {
       if (event.origin === 'https://monkey-mod-hub.onrender.com' && event.data?.type === 'mmm-github-auth-complete') {
@@ -394,16 +399,17 @@ export default function App() {
             signal: AbortSignal.timeout(10000)
           });
           if (response.ok) {
-            const release = await response.json() as { tag_name?:string; html_url?:string; draft?:boolean };
+            const release = await response.json() as { tag_name?:string; html_url?:string; draft?:boolean; assets?:Array<{name:string;browser_download_url:string}> };
             const latest = String(release.tag_name || '').replace(/^v/i, '').split(/[+-]/)[0];
-            const current = '2.0.0';
+            const current = appVersion;
             const latestParts = latest.split('.').map(part => Number.parseInt(part, 10));
             const currentParts = current.split('.').map(part => Number.parseInt(part, 10));
             const isNewer = latestParts.length >= 3 && latestParts.every(Number.isFinite) &&
               latestParts.some((part, index) => part > (currentParts[index] || 0) &&
                 latestParts.slice(0, index).every((previous, previousIndex) => previous === (currentParts[previousIndex] || 0)));
             if (!release.draft && release.tag_name && release.html_url && isNewer) {
-              discoveredAppUpdate = { version: latest, url: release.html_url };
+              const asset = (release.assets || []).find(item => /-Setup-.*-x64\.exe$/i.test(item.name)) || (release.assets || []).find(item => /\.AppImage$/i.test(item.name)) || (release.assets || []).find(item => /\.deb$/i.test(item.name));
+              discoveredAppUpdate = { version: latest, url: release.html_url, assetUrl: asset?.browser_download_url };
               setAppUpdate(discoveredAppUpdate);
               appUpdateFound = true;
             } else {
@@ -417,8 +423,13 @@ export default function App() {
       if (updates.length) messages.push(updates.length + ' mod update' + (updates.length === 1 ? '' : 's') + ' available');
       if (!messages.length) messages.push(desktop ? 'You’re up to date. No app or tracked mod updates found.' : 'Catalogue refreshed. App and installed-version checks are available in the desktop app.');
       notify(messages.join(' · '));
-      if (appUpdateFound && discoveredAppUpdate && window.confirm('Monkey Mod Manager v' + discoveredAppUpdate.version + ' is available. Open the official GitHub release page to download the update?')) {
-        window.open(discoveredAppUpdate.url, '_blank', 'noopener,noreferrer');
+      if (appUpdateFound && discoveredAppUpdate) {
+        if (autoInstallUpdates && discoveredAppUpdate.assetUrl && window.monkeyModManager?.installAppUpdate) {
+          const result = await window.monkeyModManager.installAppUpdate(discoveredAppUpdate.assetUrl);
+          notify(result.message);
+        } else if (window.confirm('Monkey Mod Manager v' + discoveredAppUpdate.version + ' is available. Open the official GitHub release page to download the update?')) {
+          window.open(discoveredAppUpdate.url, '_blank', 'noopener,noreferrer');
+        }
       }
     } catch { notify('Could not check for updates. Please try again.'); }
     finally { setCheckingUpdates(false); }
@@ -726,7 +737,7 @@ export default function App() {
           {adminError && <div className="admin-error" role="alert">{adminError}</div>}
         </section>}
 
-        {page === 'Settings' ? <section className="cfg-workspace settings-workspace"><div className="cfg-heading"><div><label>LOCAL INSTALLATION</label><h2>Game settings</h2><p>Choose which Gorilla Tag edition to manage and verify the install folder used by the desktop installer.</p></div></div><div className="settings-card"><label>Game installation / PCVR platform<select value={gamePlatform} onChange={event => void changeGamePlatform(event.target.value as 'Steam'|'Meta')}><option value="Steam">SteamVR (Steam)</option><option value="Meta">Meta Quest Link / Oculus PCVR</option></select></label><div className="settings-path"><small>ACTIVE GORILLA TAG FOLDER</small><code>{gameFolder || 'No folder selected'}</code></div>{desktop && <button className="primary" onClick={async()=>{const folder=await window.monkeyModManager!.chooseGameFolder();setGameFolder(folder);if(folder){setDetectedMods(await window.monkeyModManager!.getDetectedMods());notify('Game folder saved.');}}}>Choose folder…</button>}<label className="settings-check"><input type="checkbox" checked={hideInstallNotice} onChange={event=>{setHideInstallNotice(event.target.checked);localStorage.setItem('mmm-hide-install-notice',String(event.target.checked));}} /> Hide install-complete prompts</label><p className="form-help">Choose the edition where Gorilla Tag is installed. You can switch between SteamVR and Meta PCVR here any time; changing the platform searches for that install, and you can use Choose folder if it is not detected automatically.</p><div className="settings-path"><small>MONKEY MOD MANAGER APP</small><code>Installed version: v2.0.0</code>{appUpdate ? <p className="form-help">Update available: v{appUpdate.version}</p> : <p className="form-help">Use Check updates to check for the latest app release and tracked mod updates.</p>}{appUpdate && <button className="secondary" onClick={()=>window.open(appUpdate.url,'_blank','noopener,noreferrer')}>Download app update ↗</button>}<button className="secondary" disabled={checkingUpdates} onClick={()=>void checkForUpdates()}>{checkingUpdates ? 'Checking…' : 'Check app + mod updates'}</button></div></div></section> : page === 'Profiles' ? <section className="cfg-workspace">
+        {page === 'Settings' ? <section className="cfg-workspace settings-workspace"><div className="cfg-heading"><div><label>LOCAL INSTALLATION</label><h2>Game settings</h2><p>Choose which Gorilla Tag edition to manage and verify the install folder used by the desktop installer.</p></div></div><div className="settings-card"><label>Game installation / PCVR platform<select value={gamePlatform} onChange={event => void changeGamePlatform(event.target.value as 'Steam'|'Meta')}><option value="Steam">SteamVR (Steam)</option><option value="Meta">Meta Quest Link / Oculus PCVR</option></select></label><div className="settings-path"><small>ACTIVE GORILLA TAG FOLDER</small><code>{gameFolder || 'No folder selected'}</code></div>{desktop && <button className="primary" onClick={async()=>{const folder=await window.monkeyModManager!.chooseGameFolder();setGameFolder(folder);if(folder){setDetectedMods(await window.monkeyModManager!.getDetectedMods());notify('Game folder saved.');}}}>Choose folder…</button>}<label className="settings-check"><input type="checkbox" checked={hideInstallNotice} onChange={event=>{setHideInstallNotice(event.target.checked);localStorage.setItem('mmm-hide-install-notice',String(event.target.checked));}} /> Hide install-complete prompts</label><p className="form-help">Choose the edition where Gorilla Tag is installed. You can switch between SteamVR and Meta PCVR here any time; changing the platform searches for that install, and you can use Choose folder if it is not detected automatically.</p><div className="settings-path"><small>MONKEY MOD MANAGER APP</small><code>Installed version: v{appVersion}</code>{appUpdate ? <p className="form-help">Update available: v{appUpdate.version}</p> : <p className="form-help">Use Check updates to check for the latest app release and tracked mod updates.</p>}{appUpdate && <button className="secondary" onClick={()=>window.open(appUpdate.url,'_blank','noopener,noreferrer')}>Download app update ↗</button>}<button className="secondary" disabled={checkingUpdates} onClick={()=>void checkForUpdates()}>{checkingUpdates ? 'Checking…' : 'Check app + mod updates'}</button><label className="settings-check"><input type="checkbox" checked={autoInstallUpdates} onChange={event=>{setAutoInstallUpdates(event.target.checked);localStorage.setItem('mmm-auto-install-updates',String(event.target.checked));}} /> Automatically download and launch app updates</label><p className="form-help">When enabled, a newer release asset is downloaded and its installer is launched automatically. Windows runs the setup installer; Linux uses the available AppImage or package. Updates still require a published GitHub Release with downloadable assets.</p></div></div></section> : page === 'Profiles' ? <section className="cfg-workspace">
           <div className="cfg-heading"><div><label>YOUR ACCOUNT</label><h2>Account & profiles</h2><p>Keep saved mods, installed-mod snapshots, and config files synced to your GitHub account in private cloud storage.</p></div><button className="secondary" disabled={!account || accountDataBusy} onClick={() => void refreshAccount()}>↻ Refresh account</button></div>
           {!account ? <div className="cfg-empty">Sign in with GitHub to save profiles, configs, and installed-mod lists to your account.</div> : <>
             <div className="product-meta-grid">
