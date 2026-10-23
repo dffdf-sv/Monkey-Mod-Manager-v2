@@ -15,6 +15,7 @@ declare global {
       getGameFolder: () => Promise<string | null>;
       chooseGameFolder: () => Promise<string | null>;
       installMod: (mod: Mod) => Promise<{ ok: boolean; message: string; path?: string }>;
+      installBepInEx: () => Promise<{ ok: boolean; message: string; path?: string }>;
     };
   }
 }
@@ -102,6 +103,19 @@ export default function App() {
     } catch { notify('Install failed. Check the download link and selected Gorilla Tag folder.'); }
   };
 
+  const installBepInEx = async () => {
+    if (!desktop) {
+      window.open('https://github.com/BepInEx/BepInEx/releases', '_blank', 'noopener,noreferrer');
+      notify('Opened official BepInEx releases. The website cannot install files into your game folder.');
+      return;
+    }
+    try {
+      notify('Downloading official BepInEx 5.4.23.5…');
+      const result = await window.monkeyModManager!.installBepInEx();
+      notify(result.ok ? 'BepInEx installed. Launch Gorilla Tag once to finish setup.' : result.message);
+    } catch { notify('BepInEx installation failed. Check your game folder and internet connection.'); }
+  };
+
   const unlockAdmin = async (event: FormEvent) => {
     event.preventDefault(); setAdminBusy(true); setAdminError('');
     try {
@@ -168,6 +182,7 @@ export default function App() {
             <button className="primary" onClick={() => { setPage('Discover'); document.getElementById('modsearch')?.focus(); }}>⌕ &nbsp; Explore mods ↗</button>
             <button className="secondary" onClick={() => setPage('Library')}>▣ &nbsp; My library <b>{saved.length}</b></button>
             {desktop && <button className="secondary" onClick={async () => { const folder = await window.monkeyModManager!.chooseGameFolder(); setGameFolder(folder); if (folder) notify('Gorilla Tag folder saved.'); }}>📁 &nbsp; {gameFolder ? 'Change game folder' : 'Choose game folder'}</button>}
+            <button className="secondary bepinex-button" onClick={() => void installBepInEx()}>⬇ &nbsp; Install BepInEx <small>{desktop ? 'Auto setup' : 'Official download'}</small></button>
           </div>
           <div className="hero-art hero-art-photo"><img src={jungleArt} alt="Colourful Gorilla Tag characters in a jungle scene" /><div className="hero-shade" /><div className="float float1">✦ <span><b>Built for the community</b><small>Discover useful add-ons</small></span></div><div className="float float2">↓ <span><b>{mods.length} catalogue entries</b><small>Fed by your mod base</small></span></div></div>
         </section>
