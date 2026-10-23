@@ -322,6 +322,7 @@ export default function App() {
       <label className="side-label">WORKSPACE</label>
       <button className={'nav ' + (page === 'Discover' ? 'chosen' : '')} onClick={() => setPage('Discover')}>▦ <span>Discover mods</span></button>
       <button className={'nav ' + (page === 'Library' ? 'chosen' : '')} onClick={() => setPage('Library')}>▣ <span>My library</span><b className="count">{saved.length}</b></button>
+      {desktop && <button className={'nav ' + (page === 'Configs' ? 'chosen' : '')} onClick={() => { setPage('Configs'); void loadConfigFiles(); }}>⚙ <span>CFG editor</span></button>}
       <label className="side-label">CATEGORIES</label>
       {categories.map((item) => <button key={item} className={'nav catnav ' + (category === item ? 'chosen' : '')} onClick={() => setCategory(item)}><i className={'dot ' + item.toLowerCase().replace(' ', '-')} /><span>{item}</span></button>)}
       <div className="sidebottom">
@@ -387,10 +388,38 @@ export default function App() {
               <div className="admin-manage-heading"><h3>Manage mods</h3><span>{mods.length} total</span></div>
               {mods.map((mod) => <div className="admin-mod-row" key={mod.id}><div><b>{mod.name}</b><small>v{mod.version} · {mod.category}</small></div><div className="admin-mod-actions"><button className="details" type="button" onClick={()=>beginEdit(mod)}>Edit</button><button className="delete-mod" type="button" disabled={adminBusy} onClick={()=>void deleteMod(mod)}>Remove</button></div></div>)}
             </div>
+            {adminUnlocked && <section className="render-env-panel">
+              <div className="admin-manage-heading"><div><h3>Render environment variables</h3><p>Change service variables such as ADMIN_PASSWORD without exposing existing secret values.</p></div><button className="secondary" type="button" onClick={() => { setShowRenderSettings((value) => !value); if (!showRenderSettings) void loadRenderVariables(); }}>{showRenderSettings ? 'Hide' : 'Manage variables'}</button></div>
+              {showRenderSettings && <>
+                <div className="render-env-list">{renderVariables.map((variable) => <button type="button" key={variable.key} className={'render-env-chip ' + (renderKey === variable.key ? 'selected' : '')} onClick={() => setRenderKey(variable.key)}><b>{variable.key}</b><small>{variable.hasValue ? 'Value set · hidden' : 'Empty'}</small></button>)}{!renderVariables.length && <p className="cfg-muted">{renderBusy ? 'Loading variables…' : 'No variables listed yet. Add one below or check the Render integration setup.'}</p>}</div>
+                <form className="render-env-form" onSubmit={saveRenderVariable}>
+                  <label>Variable name<input value={renderKey} onChange={(event) => setRenderKey(event.target.value.toUpperCase().replace(/[^A-Z0-9_]/g,''))} pattern="[A-Z][A-Z0-9_]{0,127}" required placeholder="ADMIN_PASSWORD" /></label>
+                  <label>New value<input type="password" autoComplete="new-password" value={renderValue} onChange={(event) => setRenderValue(event.target.value)} required maxLength={8000} placeholder="Enter a new value (current value is never shown)" /></label>
+                  <button className="primary" disabled={renderBusy || !renderValue}>{renderBusy ? 'Saving…' : 'Save & deploy'}</button>
+                </form>
+                <p className="cfg-muted">For security, existing values are never sent to the app. Saving a variable requests a Render deployment. Set RENDER_API_KEY and RENDER_SERVICE_ID in Render first.</p>
+                {renderError && <div className="admin-error" role="alert">{renderError}</div>}
+              </>}
+            </section>}
           </>}
           {adminError && <div className="admin-error" role="alert">{adminError}</div>}
         </section>}
 
+        {page === 'Configs' ? <section className="cfg-workspace">
+          <div className="cfg-heading"><div><label>LOCAL GAME FILES</label><h2>CFG viewer & editor</h2><p>Edit BepInEx configuration files directly in your Gorilla Tag installation. A .bak backup is created before overwriting an existing file.</p></div><button className="secondary" onClick={() => void loadConfigFiles()} disabled={configBusy}>↻ Refresh files</button></div>
+          {!gameFolder && <div className="cfg-empty">Gorilla Tag folder not detected. Use “Choose game folder” on Discover first.</div>}
+          <div className="cfg-layout">
+            <aside className="cfg-files"><div className="cfg-files-title">BepInEx / config <span>{configFiles.length}</span></div>
+              {configFiles.map((file) => <button key={file.name} className={'cfg-file ' + (selectedConfig === file.name ? 'active' : '')} onClick={() => void openConfigFile(file.name)}><b>{file.name}</b><small>{(file.size / 1024).toFixed(1)} KB</small></button>)}
+              {!configFiles.length && <p className="cfg-muted">{configBusy ? 'Loading files…' : 'No .cfg files found in BepInEx/config.'}</p>}
+            </aside>
+            <div className="cfg-editor"><div className="cfg-editor-bar"><b>{selectedConfig || 'Select a configuration file'}</b><button className="primary" disabled={!selectedConfig || configBusy} onClick={() => void saveConfigFile()}>{configBusy ? 'Working…' : 'Save config'}</button></div>
+              <textarea className="cfg-textarea" spellCheck={false} value={configText} onChange={(event) => setConfigText(event.target.value)} placeholder="Choose a .cfg file from the list to view and edit its contents…" disabled={!selectedConfig} />
+              <p className="cfg-muted">Changes are written to the local game folder. Some mods only reload settings when the game restarts.</p>
+            </div>
+          </div>
+          {configError && <div className="admin-error" role="alert">{configError}</div>}
+        </section> : <>
         <div className="sectionhead"><div><label>THE COLLECTION</label><h2>{page === 'Discover' ? 'Explore community mods' : 'Your saved library'} <span>{visibleMods.length}</span></h2><p>{page === 'Discover' ? 'Browse the current catalogue and open the source before installing.' : 'Your saved mods, ready when you are.'}</p></div><button className="reset" onClick={() => { setQuery(''); setCategory('All Mods'); }}>⟳ Reset filters</button></div>
         <div className="toolbar"><label className="search">⌕ <input id="modsearch" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search mods, creators, categories…" />{query && <button onClick={() => setQuery('')}>×</button>}<kbd>Ctrl K</kbd></label><div className="pills">{categories.map((item) => <button key={item} className={category === item ? 'pillactive' : ''} onClick={() => setCategory(item)}>{item === 'All Mods' ? 'All' : item}</button>)}</div></div>
 
@@ -406,6 +435,8 @@ export default function App() {
             <div className="card-links">{mod.sourceUrl && <a href={mod.sourceUrl} target="_blank" rel="noreferrer">Source / releases ↗</a>}{(adminUnlocked || (account && mod.ownerId === account.id)) && <button className="details" onClick={()=>beginEdit(mod)}>Edit</button>}{(adminUnlocked || (account && mod.ownerId === account.id)) && <button className="delete-mod" disabled={adminBusy} onClick={() => void deleteMod(mod)}>Remove</button>}<button className="details" onClick={() => setDetail(mod)}>View details</button></div>
           </div>
         </article>)}</div> : <div className="empty"><div>▣</div><h3>{page === 'Library' ? 'Your library is a blank canvas' : 'No mods found'}</h3><p>{page === 'Library' ? 'Save mods from Discover to get started.' : 'Try a different search or category.'}</p><button className="primary" onClick={() => { setQuery(''); setCategory('All Mods'); setPage('Discover'); }}>Explore mods ↗</button></div>}
+
+        </>}
 
         <footer><span><b>MONKEY MOD HUB</b> · Community-maintained releases</span><span>Not affiliated with Another Axiom. Use mods responsibly. ✳</span></footer>
       </div>
