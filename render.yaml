@@ -17,3 +17,9 @@ services:
         sync: false
       - key: GITHUB_TOKEN
         sync: false
+      - key: GITHUB_OAUTH_CLIENT_ID
+        sync: false
+      - key: GITHUB_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
