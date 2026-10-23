@@ -1,39 +1,44 @@
-# Monkey Mod Manager V2
+# Monkey Mod Hub V2
 
-A fresh React + TypeScript + Vite redesign for the Monkey Mod Manager project.
+A compact Gorilla Tag PC mod hub with a web catalogue, thumbnails, source links, browser downloads, a protected curator panel, and an Electron desktop installer.
 
 ## Run locally
 
-Requirements: Node.js 18 or newer.
+Use Node.js 20 or newer.
 
-```bash
-npm install
-npm run dev
-```
+Terminal 1 — API for the Vite dev server:
+    npm install
+    npm run server:dev
 
-Create a production build with:
+Terminal 2 — frontend:
+    npm run dev
 
-```bash
-npm run build
-npm run preview
-```
+Production:
+    npm install
+    npm run build
+    npm start
 
-## Current prototype features
+## Deploy on Render
 
-- Responsive dashboard and mod-card layout
-- Search and category filters
-- Saved-mod library persisted in browser local storage
-- Dark/light theme persisted in browser local storage
-- Mod detail dialog and empty states
+The repository contains render.yaml for a free Render web service. Create a new Blueprint from this repository, then set these two secret environment variables in the Render service:
 
-## Important limitations
+- ADMIN_PASSWORD: a strong password used by the curator page.
+- GITHUB_TOKEN: a fine-grained GitHub token restricted to dffdf-sv/GORILA-TAG-MODBASE, with Contents: Read and write permission.
 
-This repository currently provides a **web UI prototype**, not a native Gorilla Tag mod installer. The sample catalog is demonstration data; version numbers and descriptions are not verified live release metadata. The Add/Save action only stores items in this browser and does not download, install, update, or remove mod files from a PC.
+The app reads modinfo.Json from the mod-base repository. Publishing or removing a mod through Admin · Add mods commits the metadata file back to that repository, so the catalogue survives Render restarts without relying on an ephemeral filesystem. Never put GITHUB_TOKEN in frontend code or in a committed file.
 
-Before calling this a working installer, the project needs a trusted mod metadata source, release/dependency validation, compatibility checks, safe download handling, and a desktop bridge/installer with explicit user-selected Gorilla Tag paths. Do not treat the sample catalog as a recommendation to install those files.
+The curator form accepts a mod name, author, version, category, description, HTTPS direct download URL, optional HTTPS image/source URLs, and dependency names. It stores metadata only; binaries remain at their trusted upstream download URL. Use official releases and only add binaries you trust.
 
-## Tech stack
+## Mod install behaviour
 
-- React 18
-- TypeScript
-- Vite
+- Website: opens the upstream HTTPS download. Browsers cannot silently write into a local Gorilla Tag installation.
+- Desktop app: the user explicitly selects their Gorilla Tag game folder. A direct DLL download is copied to BepInEx/plugins; a ZIP is extracted into the selected game root. Only HTTPS, DLL, and ZIP are accepted, with a download size limit. Dependencies are displayed but must be installed in the right order.
+- If a game folder has no BepInEx installation yet, install BepInEx first. Back up game files before installing mods.
+
+## Desktop builds
+
+The GitHub Actions workflow builds a Windows x64 EXE installer and Linux x64 AppImage / DEB packages from Actions > Desktop builds > Run workflow or by pushing a v* tag. Build outputs are workflow artifacts; they are not created until the workflow completes successfully.
+
+## Data source and disclaimer
+
+The catalogue is backed by dffdf-sv/GORILA-TAG-MODBASE (modinfo.Json). The repository should contain one JSON array. No affiliation with or endorsement by Another Axiom is implied. Mod compatibility and safety are the responsibility of each mod's author; check the upstream release page before installing.
