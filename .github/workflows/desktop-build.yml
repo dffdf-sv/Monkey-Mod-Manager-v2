@@ -74,15 +74,15 @@ jobs:
         env:
           INPUT_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
         run: |
-          VERSION="\${INPUT_VERSION#v}"
+          VERSION="${INPUT_VERSION#v}"
           [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+)*$ ]] || { echo "Invalid version: $INPUT_VERSION. Use v2, v2.0, v2.0.1, or any dot-separated numeric version."; exit 1; }
           IFS='.' read -r -a PARTS <<< "$VERSION"
-          while (( \${#PARTS[@]} < 3 )); do PARTS+=(0); done
-          if (( \${#PARTS[@]} > 3 )); then
-            EXTRA="$(IFS='.'; echo "\${PARTS[*]:3}")"
-            PACKAGE_VERSION="\${PARTS[0]}.\${PARTS[1]}.\${PARTS[2]}-$EXTRA"
+          while (( ${#PARTS[@]} < 3 )); do PARTS+=(0); done
+          if (( ${#PARTS[@]} > 3 )); then
+            EXTRA="$(IFS='.'; echo "${PARTS[*]:3}")"
+            PACKAGE_VERSION="${PARTS[0]}.${PARTS[1]}.${PARTS[2]}-$EXTRA"
           else
-            PACKAGE_VERSION="\${PARTS[0]}.\${PARTS[1]}.\${PARTS[2]}"
+            PACKAGE_VERSION="${PARTS[0]}.${PARTS[1]}.${PARTS[2]}"
           fi
           echo "Release version: v$VERSION; package version: $PACKAGE_VERSION"
           npm pkg set "version=$PACKAGE_VERSION"
@@ -125,7 +125,7 @@ jobs:
         env:
           INPUT_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
         run: |
-          VERSION="\${INPUT_VERSION#v}"
+          VERSION="${INPUT_VERSION#v}"
           [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+)*$ ]] || { echo "Invalid release version: $INPUT_VERSION"; exit 1; }
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           echo "name=Monkey Mod Manager v$VERSION" >> "$GITHUB_OUTPUT"
