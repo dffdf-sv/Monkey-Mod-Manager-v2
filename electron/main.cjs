@@ -206,6 +206,8 @@ ipcMain.handle('config:write-file', async (_event, payload) => {
     await fs.mkdir(dir, { recursive: true });
     try { await fs.copyFile(file, file + '.bak'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
     await fs.writeFile(file, content, 'utf8');
+    const savedContent = await fs.readFile(file, 'utf8');
+    if (savedContent !== content) throw new Error('The config file could not be verified after saving.');
     return { ok: true, message: 'Saved ' + name + (await fs.stat(file + '.bak').then(() => ' (backup created)').catch(() => '')), path: file };
   } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Could not save config.' }; }
 });
@@ -264,8 +266,8 @@ ipcMain.handle('mods:get-detected', async () => {
     const full = path.join(plugins, entry.name);
     if (entry.isDirectory()) {
       const nested = await fs.readdir(full, { withFileTypes: true }).catch(() => []);
-      if (nested.some(item => item.isFile() && /\\.dll(?:\\.disabled)?$/i.test(item.name))) detected.push(entry.name);
-    } else if (entry.isFile() && /\\.dll(?:\\.disabled)?$/i.test(entry.name)) detected.push(entry.name);
+      if (nested.some(item => item.isFile() && /\.dll(?:\.disabled)?$/i.test(item.name))) detected.push(entry.name);
+    } else if (entry.isFile() && /\.dll(?:\.disabled)?$/i.test(entry.name)) detected.push(entry.name);
   }
   return [...new Set(detected)];
 });
