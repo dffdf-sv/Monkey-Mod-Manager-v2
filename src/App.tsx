@@ -649,7 +649,7 @@ export default function App() {
             {desktop && <button className="secondary" onClick={async () => { const folder = await window.monkeyModManager!.chooseGameFolder(); setGameFolder(folder); if (folder) {setDetectedMods(await window.monkeyModManager!.getDetectedMods());notify('Gorilla Tag folder saved.');} }}>📁 &nbsp; {gameFolder ? 'Change game folder' : 'Choose game folder'}</button>}
             <button className="secondary bepinex-button" onClick={() => void installBepInEx()}>⬇ &nbsp; Install BepInEx <small>{desktop ? 'Auto setup' : 'Official download'}</small></button>
           </div>
-          <div className="hero-art hero-art-photo"><img src={jungleArt} alt="Gorilla Tag Halloween update artwork" /><div className="hero-shade" /><div className="float float1">✦ <span><b>Built for the community</b><small>Discover useful add-ons</small></span></div><div className="float float2">↓ <span><b>{mods.length} catalogue entries</b><small>Fed by your mod base</small></span></div></div>
+          <div className="hero-art hero-art-photo"><img src={jungleArt} alt="Gorilla Tag Halloween update artwork" /><div className="hero-shade" /><div className="hero-logo-mark"><img src="/image.jpg" alt="Monkey Mod Hub logo" /></div></div>
         </section>
 
         <div className="stats">
