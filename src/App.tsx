@@ -30,6 +30,8 @@ declare global {
       installModFromDisk: () => Promise<{ok:boolean;message:string;paths?:string[]}>;
       getGamePlatform: () => Promise<'Steam'|'Meta'>;
       setGamePlatform: (platform:'Steam'|'Meta') => Promise<{ok:boolean;gameFolder:string|null;platform:'Steam'|'Meta'}>;
+      toggleInstalledMod: (name:string) => Promise<{ok:boolean;message:string;enabled?:boolean}>;
+      launchGame: () => Promise<{ok:boolean;message:string}>;
     };
   }
 }
@@ -48,7 +50,7 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All Mods');
-  const [page, setPage] = useState<'Overview' | 'Discover' | 'Library' | 'Configs' | 'Profiles' | 'Editor' | 'Settings'>(() => (window.location.pathname === '/editor' || window.location.hash === '#/editor') ? 'Editor' : (window.monkeyModManager?.isDesktop && (window.location.pathname === '/settings' || window.location.hash === '#/settings')) ? 'Settings' : 'Overview');
+  const [page, setPage] = useState<'Overview' | 'Discover' | 'Library' | 'Installed' | 'Configs' | 'Profiles' | 'Editor' | 'Settings'>(() => (window.location.pathname === '/editor' || window.location.hash === '#/editor') ? 'Editor' : (window.monkeyModManager?.isDesktop && (window.location.pathname === '/settings' || window.location.hash === '#/settings')) ? 'Settings' : 'Overview');
   const [saved, setSaved] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('mmm-saved') || '[]') as string[]; } catch { return []; } });
   const [theme, setTheme] = useState(() => localStorage.getItem('mmm-theme') || 'dark');
   const [detail, setDetail] = useState<Mod | null>(null);
@@ -482,12 +484,12 @@ export default function App() {
     finally { setConfigBusy(false); }
   };
   const saveConfigFile = async () => {
-    if (!selectedConfig) return;
+    if (!selectedConfig) { setConfigError('Select a .cfg file before saving.'); return; }
     setConfigBusy(true); setConfigError('');
     try {
       const result = await window.monkeyModManager!.writeConfigFile({ name: selectedConfig, content: configText });
       if (!result.ok) throw new Error(result.message || 'Could not save config.');
-      notify(result.message); await loadConfigFiles();
+      notify(result.message); setConfigError(''); await loadConfigFiles();
     } catch (error) { setConfigError(error instanceof Error ? error.message : 'Could not save config.'); }
     finally { setConfigBusy(false); }
   };
@@ -609,7 +611,7 @@ export default function App() {
     finally { setAdminBusy(false); }
   };
 
-  const goToPage = (next:'Overview'|'Discover'|'Library'|'Configs'|'Profiles'|'Editor'|'Settings') => {
+  const goToPage = (next:'Overview'|'Discover'|'Library'|'Installed'|'Configs'|'Profiles'|'Editor'|'Settings') => {
     if (!desktop && (next === 'Settings' || next === 'Configs')) next = 'Discover';
     setPage(next); setShowAdmin(next === 'Editor');
     const route = next === 'Editor' ? '/editor' : next === 'Settings' ? '/settings' : next === 'Overview' ? '/' : '/'+next.toLowerCase();
@@ -618,7 +620,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    const onPop = () => { const p = window.location.pathname; const h = window.location.hash; const editor = p === '/editor' || h === '#/editor'; const settings = desktop && (p === '/settings' || h === '#/settings'); const routePage = (h.startsWith('#/') ? h.slice(2) : p.slice(1)).toLowerCase(); const knownPage = ['discover','library','profiles'].includes(routePage) ? (routePage[0].toUpperCase()+routePage.slice(1)) as 'Discover'|'Library'|'Profiles' : 'Overview'; setPage(editor ? 'Editor' : settings ? 'Settings' : knownPage); setShowAdmin(editor); if (!desktop && (p === '/settings' || h === '#/settings')) window.history.replaceState({}, '', '/'); };
+    const onPop = () => { const p = window.location.pathname; const h = window.location.hash; const editor = p === '/editor' || h === '#/editor'; const settings = desktop && (p === '/settings' || h === '#/settings'); const routePage = (h.startsWith('#/') ? h.slice(2) : p.slice(1)).toLowerCase(); const knownPage = ['discover','library','installed','profiles'].includes(routePage) ? (routePage[0].toUpperCase()+routePage.slice(1)) as 'Discover'|'Library'|'Profiles' : 'Overview'; setPage(editor ? 'Editor' : settings ? 'Settings' : knownPage); setShowAdmin(editor); if (!desktop && (p === '/settings' || h === '#/settings')) window.history.replaceState({}, '', '/'); };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
@@ -631,6 +633,7 @@ export default function App() {
       <button className={'nav ' + (page === 'Discover' ? 'chosen' : '')} onClick={() => goToPage('Discover')}>▦ <span>Discover mods</span></button>
       <button className={'nav ' + (page === 'Library' ? 'chosen' : '')} onClick={() => goToPage('Library')}>▣ <span>Your mods</span><b className="count">{saved.length}</b></button>
       <button className={'nav ' + (page === 'Profiles' ? 'chosen' : '')} onClick={() => goToPage('Profiles')}>♙ <span>Account + profiles</span><b className="count">{accountData.profiles.length}</b></button>
+      {desktop && <button className={'nav ' + (page === 'Installed' ? 'chosen' : '')} onClick={() => { goToPage('Installed'); void window.monkeyModManager!.getDetectedMods().then(setDetectedMods); void window.monkeyModManager!.getInstalledMods().then(setInstalledMods); }}>▣ <span>Installed mods</span><b className="count">{detectedMods.length}</b></button>}
       {desktop && <button className={'nav ' + (page === 'Configs' ? 'chosen' : '')} onClick={() => { goToPage('Configs'); void loadConfigFiles(); }}>⚙ <span>CFG editor</span></button>}
       <button className={'nav ' + (page === 'Editor' ? 'chosen' : '')} onClick={() => { if (!account) { notify('Sign in with GitHub to add and manage your own mods.'); return; } setEditingId(null); setDraft(blankDraft); goToPage('Editor'); }}>{showAdmin ? '×' : '＋'} <span>Mod editor ↗</span></button>
       {desktop && <button className={'nav ' + (page === 'Settings' ? 'chosen' : '')} onClick={() => goToPage('Settings')}>⚙ <span>Settings</span></button>}
@@ -644,7 +647,7 @@ export default function App() {
     </aside>
 
     <main className="main">
-      <header className="topbar"><span>Workspace <b>/</b> <strong>{page === 'Editor' ? 'Mod editor' : page}</strong></span><div><span className="gamepill"><i /> Gorilla Tag</span><button className="roundbtn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☼' : '☾'}</button><button className="secondary account-button" onClick={()=>{if(account){localStorage.removeItem('mmm-auth-token');void apiFetch(apiUrl('/api/account/logout'),{method:'POST'}).finally(()=>{setAccount(null);notify('Signed out.');});}else if(accountConfigured){if(desktop){void window.monkeyModManager?.signInWithGitHub().catch(()=>notify('Could not open your default browser.'));}else{const popup=window.open(apiUrl('/auth/github'),'mmm-github-signin','popup,width=560,height=760');if(!popup)notify('Allow pop-ups to sign in with GitHub.');}}else{notify('GitHub account login needs OAuth settings in Render.');}}}>{account ? 'Sign out · '+account.login : 'Sign in with GitHub'}</button><span className="avatar">{account?.login?.slice(0,1).toUpperCase()||'M'}</span></div></header>
+      <header className="topbar"><span>Workspace <b>/</b> <strong>{page === 'Editor' ? 'Mod editor' : page}</strong></span><div><span className="gamepill"><i /> Gorilla Tag</span>{desktop && <button className="primary launch-game" onClick={async()=>{const result=await window.monkeyModManager!.launchGame();notify(result.message);}} title="Launch Gorilla Tag">▶ Launch game</button>}<button className="roundbtn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☼' : '☾'}</button><button className="secondary account-button" onClick={()=>{if(account){localStorage.removeItem('mmm-auth-token');void apiFetch(apiUrl('/api/account/logout'),{method:'POST'}).finally(()=>{setAccount(null);notify('Signed out.');});}else if(accountConfigured){if(desktop){void window.monkeyModManager?.signInWithGitHub().catch(()=>notify('Could not open your default browser.'));}else{const popup=window.open(apiUrl('/auth/github'),'mmm-github-signin','popup,width=560,height=760');if(!popup)notify('Allow pop-ups to sign in with GitHub.');}}else{notify('GitHub account login needs OAuth settings in Render.');}}}>{account ? 'Sign out · '+account.login : 'Sign in with GitHub'}</button><span className="avatar">{account?.login?.slice(0,1).toUpperCase()||'M'}</span></div></header>
       <div className="content">
         {page === 'Overview' && <>
         <section className="hero">
@@ -751,7 +754,7 @@ export default function App() {
               {!Object.keys(accountData.configs).length && <p className="form-help">Save a config from the CFG editor to keep a private cloud copy.</p>}
             </div>
           </>}
-        </section> : page === 'Configs' ? <section className="cfg-workspace">
+        </section> : page === 'Installed' ? <section className="cfg-workspace installed-workspace"><div className="cfg-heading"><div><label>LOCAL GAME FILES</label><h2>Installed mods <span className="count">{detectedMods.length}</span></h2><p>Detected from BepInEx/plugins in your selected Gorilla Tag folder. Toggle a mod off or back on without uninstalling it.</p></div><div className="installed-actions"><button className="secondary" onClick={async()=>{const folder=await window.monkeyModManager!.chooseGameFolder();setGameFolder(folder);if(folder){setDetectedMods(await window.monkeyModManager!.getDetectedMods());setInstalledMods(await window.monkeyModManager!.getInstalledMods());}}}>Choose folder</button><button className="secondary" onClick={async()=>{setDetectedMods(await window.monkeyModManager!.getDetectedMods());setInstalledMods(await window.monkeyModManager!.getInstalledMods());notify('Installed mod list refreshed.');}}>↻ Refresh</button><button className="primary" onClick={()=>void installModFromDisk()}>＋ Install from files</button></div></div>{!gameFolder ? <div className="cfg-empty">Choose your Gorilla Tag game folder to scan for installed mods.</div> : detectedMods.length ? <div className="installed-mod-list">{detectedMods.map(name=>{const key=name.toLowerCase().replace(/[^a-z0-9]+/g,'');const match=mods.find(mod=>mod.name.toLowerCase().replace(/[^a-z0-9]+/g,'')===key||mod.id.toLowerCase().replace(/[^a-z0-9]+/g,'')===key||key.includes(mod.name.toLowerCase().replace(/[^a-z0-9]+/g,'')));const isDisabled=name.toLowerCase().endsWith('.disabled');return <article className="installed-mod-row" key={name}><div className="installed-mod-icon">{match ? match.name.slice(0,2).toUpperCase() : 'DLL'}</div><div className="installed-mod-info"><b>{name.replace(/\.disabled$/i,'')}</b><small>{match ? 'Recognised catalogue mod · '+match.version : 'Detected local mod'} · {gameFolder ? 'BepInEx/plugins' : ''}</small></div><span className={'installed-state '+(isDisabled?'off':'on')}>{isDisabled?'Disabled':'Enabled'}</span><button className={isDisabled?'primary':'secondary'} onClick={async()=>{const result=await window.monkeyModManager!.toggleInstalledMod(name);notify(result.message);if(result.ok){setDetectedMods(await window.monkeyModManager!.getDetectedMods());setInstalledMods(await window.monkeyModManager!.getInstalledMods());}}}>{isDisabled?'Enable':'Disable'}</button></article>})}</div> : <div className="cfg-empty">No BepInEx mods detected yet. Install BepInEx, then use “Install from files” or install a mod from Discover.</div>}</section> : page === 'Configs' ? <section className="cfg-workspace">
           <div className="cfg-heading"><div><label>LOCAL GAME FILES</label><h2>CFG viewer & editor</h2><p>Edit BepInEx configuration files directly in your Gorilla Tag installation. A .bak backup is created before overwriting an existing file.</p></div><button className="secondary" onClick={() => void loadConfigFiles()} disabled={configBusy}>↻ Refresh files</button></div>
           {!gameFolder && <div className="cfg-empty">Gorilla Tag folder not detected. Use “Choose game folder” on Discover first.</div>}
           <div className="cfg-layout">
