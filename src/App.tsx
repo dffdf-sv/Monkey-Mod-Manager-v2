@@ -250,7 +250,7 @@ export default function App() {
   const loadRenderVariables = async () => {
     setRenderBusy(true); setRenderError('');
     try {
-      const response = await fetch(apiUrl('/api/admin/render-env'), { headers: { 'x-admin-password': adminPassword } });
+      const response = await apiFetch(apiUrl('/api/admin/render-env'), { headers: { 'x-admin-password': adminPassword } });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || 'Could not load Render variables.');
       setRenderVariables(Array.isArray(result.variables) ? result.variables : []);
@@ -260,7 +260,7 @@ export default function App() {
   const saveRenderVariable = async (event: FormEvent) => {
     event.preventDefault(); setRenderBusy(true); setRenderError('');
     try {
-      const response = await fetch(apiUrl('/api/admin/render-env/' + encodeURIComponent(renderKey)), {
+      const response = await apiFetch(apiUrl('/api/admin/render-env/' + encodeURIComponent(renderKey)), {
         method: 'PUT', headers: { 'content-type': 'application/json', 'x-admin-password': adminPassword },
         body: JSON.stringify({ value: renderValue })
       });
@@ -276,7 +276,7 @@ export default function App() {
   const unlockAdmin = async (event: FormEvent) => {
     event.preventDefault(); setAdminBusy(true); setAdminError('');
     try {
-      const response = await fetch(apiUrl('/api/admin/check'), { method: 'POST', headers: { 'x-admin-password': adminPassword } });
+      const response = await apiFetch(apiUrl('/api/admin/check'), { method: 'POST', headers: { 'x-admin-password': adminPassword } });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || 'Admin password was not accepted.');
       setAdminUnlocked(true);
@@ -287,7 +287,7 @@ export default function App() {
   const uploadAsset = async (file: File, kind: 'image'|'video'|'mod') => {
     if (!account && !adminUnlocked) throw new Error('Sign in with GitHub or unlock admin tools before uploading files.');
     const base64 = await new Promise<string>((resolve,reject)=>{ const reader=new FileReader(); reader.onload=()=>resolve(String(reader.result||'')); reader.onerror=()=>reject(new Error('Could not read file.')); reader.readAsDataURL(file); });
-    const response=await fetch(apiUrl('/api/assets'),{method:'POST',headers:{'content-type':'application/json','x-admin-password':adminPassword},body:JSON.stringify({modId:draft.name,fileName:file.name,mime:file.type||(kind==='mod'?'application/octet-stream':''),kind,base64})});
+    const response=await apiFetch(apiUrl('/api/assets'),{method:'POST',headers:{'content-type':'application/json','x-admin-password':adminPassword},body:JSON.stringify({modId:draft.name,fileName:file.name,mime:file.type||(kind==='mod'?'application/octet-stream':''),kind,base64})});
     const data=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(data.error||'Upload failed.');
     return String(data.url);
@@ -312,7 +312,7 @@ export default function App() {
   const addMod = async (event: FormEvent) => {
     event.preventDefault(); setAdminBusy(true); setAdminError('');
     try {
-      const response = await fetch(apiUrl(editingId ? '/api/mods/' + encodeURIComponent(editingId) : '/api/mods'), {
+      const response = await apiFetch(apiUrl(editingId ? '/api/mods/' + encodeURIComponent(editingId) : '/api/mods'), {
         method: editingId ? 'PUT' : 'POST', headers: { 'content-type': 'application/json', 'x-admin-password': adminPassword },
         body: JSON.stringify(draft)
       });
@@ -327,7 +327,7 @@ export default function App() {
     if (!window.confirm('Remove ' + mod.name + ' from the public mod hub? This updates GORILA-TAG-MODBASE.')) return;
     setAdminBusy(true); setAdminError('');
     try {
-      const response = await fetch(apiUrl('/api/mods/' + encodeURIComponent(mod.id)), { method: 'DELETE', headers: { 'x-admin-password': adminPassword } });
+      const response = await apiFetch(apiUrl('/api/mods/' + encodeURIComponent(mod.id)), { method: 'DELETE', headers: { 'x-admin-password': adminPassword } });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || 'Could not remove mod.');
       setMods((current) => current.filter((item) => item.id !== mod.id));
