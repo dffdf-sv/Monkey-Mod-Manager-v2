@@ -218,3 +218,23 @@ button:disabled{opacity:.55;cursor:wait}
 .github-import-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:13px 0 0 28px}
 .github-import-actions button{font-size:10px}
 @media(max-width:700px){.github-import-actions{margin-left:0;align-items:stretch;flex-direction:column}}
+
+/* Dedicated editor/settings pages and full-screen mod detail route */
+.page-editor .hero,.page-editor .stats,.page-editor .content>.sectionhead,.page-editor .content>.toolbar,.page-editor .content>.grid,.page-editor .content>.empty,.page-editor footer,
+.page-settings .hero,.page-settings .stats,.page-settings .content>.sectionhead,.page-settings .content>.toolbar,.page-settings .content>.grid,.page-settings .content>.empty,.page-settings footer{display:none!important}
+.page-editor .content,.page-settings .content{max-width:1500px;padding-top:28px}
+.editor-page{margin:0 0 24px;max-width:none;border:1px solid var(--line);border-radius:16px;padding:clamp(18px,3vw,34px);background:var(--panel)}
+.editor-page .admin-heading h2{font-size:clamp(28px,4vw,42px);letter-spacing:-1px}
+.editor-page .admin-heading p{max-width:720px;line-height:1.7}
+.settings-card{display:grid;gap:18px;max-width:850px;padding:24px;border:1px solid var(--line);border-radius:14px;background:var(--panel);margin-top:20px}
+.settings-card>label:not(.settings-check){display:grid;gap:8px;font-size:12px;font-weight:700}
+.settings-card select{width:100%;max-width:420px;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:12px}
+.settings-path{display:grid;gap:8px;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);min-width:0}
+.settings-path small{font-size:10px;letter-spacing:1px;color:var(--muted)}
+.settings-path code{font-size:12px;white-space:normal;overflow-wrap:anywhere;color:var(--text)}
+.settings-check{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--text)}
+.settings-check input{accent-color:var(--accent)}
+.product-page-route{position:fixed;z-index:30;inset:0;overflow:auto;background:var(--bg);padding:0}
+.product-page-route .product-page-modal{width:100%;max-width:1440px;min-height:100vh;margin:0 auto;border:0;border-radius:0;box-shadow:none;background:var(--bg);padding-bottom:32px}
+.product-page-route .product-page-modal>.modalclose{position:fixed;top:18px;right:20px;z-index:40;width:40px;height:40px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--text)}
+@media(max-width:760px){.editor-page{padding:16px}.settings-card{padding:16px}.product-page-route .product-page-modal>.detail-picture{height:240px}}
