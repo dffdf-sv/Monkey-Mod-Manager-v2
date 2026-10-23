@@ -86,7 +86,7 @@ async function readFeedbackFile() {
 }
 async function saveFeedbackFile(data, sha, message) {
   const token = process.env.GITHUB_TOKEN;
-  const response = await fetch('https://api.github.com/repos/' + MOD_REPO + '/contents/' + FEEDBACK_PATH, {method:'PUT',headers:{authorization:'Bearer '+token,accept:'application/vnd.github+json','content-type':'application/json','x-github-api-version':'2022-11-28','user-agent':'Monkey-Mod-Hub/2.1'},body:JSON.stringify({message,content:Buffer.from(JSON.stringify(data,null,2)+'\\n').toString('base64'),...(sha?{sha}:{}),branch:'main'}),signal:AbortSignal.timeout(15000)});
+  const response = await fetch('https://api.github.com/repos/' + MOD_REPO + '/contents/' + FEEDBACK_PATH, {method:'PUT',headers:{authorization:'Bearer '+token,accept:'application/vnd.github+json','content-type':'application/json','x-github-api-version':'2022-11-28','user-agent':'Monkey-Mod-Hub/2.1'},body:JSON.stringify({message,content:Buffer.from(JSON.stringify(data,null,2)+'\n').toString('base64'),...(sha?{sha}:{}),branch:'main'}),signal:AbortSignal.timeout(15000)});
   const result=await response.json().catch(()=>({}));
   if(!response.ok)throw new Error('Could not save community feedback ('+response.status+'): '+(result.message||'check GITHUB_TOKEN write access.'));
 }
@@ -333,7 +333,7 @@ const server = http.createServer(async (req, res) => {
       } catch (error) { return reply(res, 502, { error: error instanceof Error ? error.message : 'GitHub import failed.' }); }
     }
     if (url.pathname.startsWith('/api/mod-feedback/')) {
-      const match=url.pathname.match(/^\\/api\\/mod-feedback\\/([^/]+)(?:\\/(vote|comments))?$/);
+      const match=url.pathname.match(/^\/api\/mod-feedback\/([^/]+)(?:\/(vote|comments))?$/);
       if(!match)return reply(res,404,{error:'Feedback route not found.'});
       let modId; try{modId=decodeURIComponent(match[1]);}catch{return reply(res,400,{error:'Invalid mod ID.'});}
       if(!modId||modId.length>120)return reply(res,400,{error:'Invalid mod ID.'});
