@@ -2,6 +2,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('monkeyModManager', {
   isDesktop: true,
+  getAppVersion: () => ipcRenderer.invoke('app:get-version'),
+  installAppUpdate: (assetUrl) => ipcRenderer.invoke('app:install-update', assetUrl),
   signInWithGitHub: () => ipcRenderer.invoke('auth:github-sign-in'),
   onAuthToken: (callback) => { const listener = (_event, token) => callback(token); ipcRenderer.on('auth:token', listener); return () => ipcRenderer.removeListener('auth:token', listener); },
   onOpenMod: (callback) => { const listener = (_event, modId) => callback(modId); ipcRenderer.on('mod:open', listener); return () => ipcRenderer.removeListener('mod:open', listener); },
