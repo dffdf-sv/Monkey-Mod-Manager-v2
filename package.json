@@ -14,7 +14,8 @@
     "dist:win": "npm run build && electron-builder --win nsis --publish never",
     "dist:linux": "npm run build && electron-builder --linux AppImage deb --publish never",
     "start": "node server.mjs",
-    "server:dev": "node server.mjs --api-only"
+    "server:dev": "node server.mjs --api-only",
+    "prebuild": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -29,7 +30,9 @@
     "electron": "^33.2.1",
     "electron-builder": "^25.1.8",
     "typescript": "^5.5.3",
-    "vite": "^5.4.2"
+    "vite": "^5.4.2",
+    "sharp": "^0.34.3",
+    "png-to-ico": "^2.1.8"
   },
   "build": {
     "appId": "com.dffdfsv.monkeymodmanagerv2",
@@ -41,6 +44,7 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
+      "build/**/*",
       "package.json"
     ],
     "win": {
@@ -52,7 +56,8 @@
           ]
         }
       ],
-      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}"
+      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}",
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -76,7 +81,8 @@
           ]
         }
       ],
-      "artifactName": "${productName}-${version}-${arch}.${ext}"
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "icon": "build/icon.png"
     },
     "protocols": [
       {
