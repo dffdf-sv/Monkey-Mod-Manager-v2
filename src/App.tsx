@@ -61,6 +61,20 @@ export default function App() {
   useEffect(() => { void loadCatalog(); }, []);
   useEffect(() => { localStorage.setItem('mmm-saved', JSON.stringify(saved)); }, [saved]);
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem('mmm-theme', theme); }, [theme]);
+  useEffect(() => {
+    const handleShortcuts = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        document.getElementById('modsearch')?.focus();
+      }
+      if (event.key === 'Escape') {
+        setDetail(null);
+        setShowAdmin(false);
+      }
+    };
+    window.addEventListener('keydown', handleShortcuts);
+    return () => window.removeEventListener('keydown', handleShortcuts);
+  }, []);
   useEffect(() => { if (window.monkeyModManager) void window.monkeyModManager.getGameFolder().then(setGameFolder).catch(() => setGameFolder(null)); }, []);
 
   const visibleMods = useMemo(() => mods.filter((mod) =>
@@ -184,7 +198,7 @@ export default function App() {
         </section>}
 
         <div className="sectionhead"><div><label>THE COLLECTION</label><h2>{page === 'Discover' ? 'Explore community mods' : 'Your saved library'} <span>{visibleMods.length}</span></h2><p>{page === 'Discover' ? 'Browse the current catalogue and open the source before installing.' : 'Your saved mods, ready when you are.'}</p></div><button className="reset" onClick={() => { setQuery(''); setCategory('All Mods'); }}>⟳ Reset filters</button></div>
-        <div className="toolbar"><label className="search">⌕ <input id="modsearch" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search mods, creators, categories…" />{query && <button onClick={() => setQuery('')}>×</button>}<kbd>⌘ K</kbd></label><div className="pills">{categories.map((item) => <button key={item} className={category === item ? 'pillactive' : ''} onClick={() => setCategory(item)}>{item === 'All Mods' ? 'All' : item}</button>)}</div></div>
+        <div className="toolbar"><label className="search">⌕ <input id="modsearch" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search mods, creators, categories…" />{query && <button onClick={() => setQuery('')}>×</button>}<kbd>Ctrl K</kbd></label><div className="pills">{categories.map((item) => <button key={item} className={category === item ? 'pillactive' : ''} onClick={() => setCategory(item)}>{item === 'All Mods' ? 'All' : item}</button>)}</div></div>
 
         {visibleMods.length ? <div className="grid">{visibleMods.map((mod) => <article className="modcard" key={mod.id}>
           <div className="mod-picture" style={mod.imageUrl ? { backgroundImage: 'linear-gradient(180deg, #0a110522 0%, #0a1105b5 100%), url("' + mod.imageUrl + '")' } : undefined}>
