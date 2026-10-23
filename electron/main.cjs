@@ -30,6 +30,7 @@ app.on('second-instance', (_event, argv) => { const link = argv.find((arg) => ar
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const extractZip = require('extract-zip');
+const { spawn } = require('node:child_process');
 
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
 async function readSettings() { try { return JSON.parse(await fs.readFile(settingsFile(), 'utf8')); } catch { return {}; } }
@@ -121,6 +122,43 @@ ipcMain.handle('game:get-folder', async () => {
   const found = await autoDetectGameFolder(settings.gamePlatform === 'Meta' ? 'Meta' : 'Steam');
   if (found) { await writeSettings({ ...settings, gameFolder: found }); return found; }
   return settings.gameFolder || null;
+});
+ipcMain.handle('game:launch', async () => {
+  try {
+    const settings = await readSettings();
+    if (!settings.gameFolder) return { ok:false, message:'Choose your Gorilla Tag game folder first.' };
+    const folder = path.resolve(settings.gameFolder);
+    if (!isGameFolder(folder)) return { ok:false, message:'The selected folder does not look like Gorilla Tag. Choose the folder containing the game executable.' };
+    const names = await fs.readdir(folder);
+    const candidates = process.platform === 'win32' ? ['Gorilla Tag.exe'] : process.platform === 'darwin' ? ['Gorilla Tag.app'] : ['Gorilla Tag.x86_64','Gorilla Tag.exe'];
+    const executable = candidates.map(name=>path.join(folder,name)).find(name=>names.some(entry=>entry.toLowerCase()===path.basename(name).toLowerCase()));
+    if (!executable) return { ok:false, message:'Could not find the Gorilla Tag executable in the selected folder. For Steam, launch it from Steam if this install uses Steam DRM.' };
+    if (executable.toLowerCase().endsWith('.app')) { const child=spawn('open',[executable],{detached:true,stdio:'ignore'}); child.unref(); }
+    else { const child=spawn(executable,[],{cwd:folder,detached:true,stdio:'ignore'}); child.unref(); }
+    return { ok:true, message:'Launching Gorilla Tag…' };
+  } catch (error) { return { ok:false, message:error instanceof Error ? error.message : 'Could not launch Gorilla Tag.' }; }
+});
+ipcMain.handle('mods:toggle-installed', async (_event, requestedName) => {
+  try {
+    if (typeof requestedName !== 'string' || !requestedName || requestedName.length > 180 || requestedName.includes('..')) throw new Error('Invalid mod name.');
+    const settings = await readSettings(); if (!settings.gameFolder) throw new Error('Choose your Gorilla Tag game folder first.');
+    const root = path.resolve(settings.gameFolder); const plugins = path.resolve(root,'BepInEx','plugins');
+    if (!plugins.startsWith(root + path.sep)) throw new Error('Invalid plugins folder.');
+    const entries = await fs.readdir(plugins,{withFileTypes:true}).catch(()=>[]);
+    const matched = entries.find(entry=>entry.name===requestedName || entry.name.replace(/\\.disabled$/i,'')===requestedName.replace(/\\.disabled$/i,''));
+    if (!matched) throw new Error('That mod is no longer in the plugins folder. Refresh the installed-mod list.');
+    const base = path.resolve(plugins,matched.name); if (!base.startsWith(plugins + path.sep)) throw new Error('Invalid mod path.');
+    const paths = [];
+    if (matched.isDirectory()) {
+      const nested = await fs.readdir(base,{withFileTypes:true});
+      for (const entry of nested) if (entry.isFile() && (/\\.dll$/i.test(entry.name)||/\\.dll\\.disabled$/i.test(entry.name))) paths.push(path.join(base,entry.name));
+    } else if (matched.isFile() && (/\\.dll$/i.test(matched.name)||/\\.dll\\.disabled$/i.test(matched.name))) paths.push(base);
+    if (!paths.length) throw new Error('No DLL files found for this mod. This toggle supports DLL-based BepInEx mods.');
+    const disable = paths.some(file=>file.toLowerCase().endsWith('.dll'));
+    for (const file of paths) { const target = disable ? file+'.disabled' : file.replace(/\\.dll\\.disabled$/i,'.dll'); await fs.rename(file,target); }
+    const label = matched.name.replace(/\\.disabled$/i,'');
+    return {ok:true,enabled:!disable,message:label+(disable?' disabled.':' enabled.')};
+  } catch(error) { return {ok:false,message:error instanceof Error?error.message:'Could not toggle mod.'}; }
 });
 ipcMain.handle('config:list-files', async () => {
   try {
