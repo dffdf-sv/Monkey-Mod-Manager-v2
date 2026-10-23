@@ -98,6 +98,21 @@ function adminAllowed(req) {
   if (!safeEqual(req.headers['x-admin-password'], process.env.ADMIN_PASSWORD)) return { ok: false, status: 401, error: 'Admin password was not accepted.' };
   return { ok: true };
 }
+
+function parseCookies(req) { return Object.fromEntries(String(req.headers.cookie || '').split(';').map(x => x.trim()).filter(Boolean).map(x => { const i=x.indexOf('='); return i<0?[x,'']:[x.slice(0,i),decodeURIComponent(x.slice(i+1))]; })); }
+function sessionFor(req) {
+  const token=parseCookies(req).mmm_session||''; const parts=token.split('.'); if(parts.length!==2)return null;
+  const expected=crypto.createHmac('sha256',process.env.SESSION_SECRET||'missing-session-secret').update(parts[0]).digest();
+  const actual=Buffer.from(parts[1],'base64url'); if(actual.length!==expected.length||!crypto.timingSafeEqual(actual,expected))return null;
+  try { const user=JSON.parse(Buffer.from(parts[0],'base64url').toString()); return user.exp>Date.now()?user:null; } catch { return null; }
+}
+function signedSession(user) { const body=Buffer.from(JSON.stringify(user)).toString('base64url'); return body+'.'+crypto.createHmac('sha256',process.env.SESSION_SECRET||'missing-session-secret').update(body).digest('base64url'); }
+function cookie(res,name,value,age) { res.setHeader('Set-Cookie',name+'='+encodeURIComponent(value)+'; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age='+age); }
+async function githubContent(pathname, bytes, message) {
+  const token=process.env.GITHUB_TOKEN; if(!token)throw new Error('GITHUB_TOKEN is not configured.');
+  const response=await fetch('https://api.github.com/repos/'+MOD_REPO+'/contents/'+pathname,{method:'PUT',headers:{authorization:'Bearer '+token,accept:'application/vnd.github+json','content-type':'application/json','x-github-api-version':'2022-11-28','user-agent':'Monkey-Mod-Hub'},body:JSON.stringify({message,content:bytes.toString('base64'),branch:'main'}),signal:AbortSignal.timeout(20000)});
+  const data=await response.json().catch(()=>({})); if(!response.ok)throw new Error(data.message||'GitHub asset upload failed.'); return data;
+}
 function contentType(file) { return MIME[path.extname(file).toLowerCase()] || 'application/octet-stream'; }
 
 const server = http.createServer(async (req, res) => {
@@ -107,6 +122,35 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
   }
   try {
+
+    if (url.pathname === '/auth/github' && req.method === 'GET') {
+      if (!process.env.GITHUB_OAUTH_CLIENT_ID || !process.env.GITHUB_OAUTH_CLIENT_SECRET || !process.env.SESSION_SECRET) return reply(res,503,{error:'GitHub account login is not configured in Render yet.'});
+      const state=crypto.randomBytes(24).toString('hex'); cookie(res,'mmm_state',state,600);
+      const auth=new URL('https://github.com/login/oauth/authorize'); auth.searchParams.set('client_id',process.env.GITHUB_OAUTH_CLIENT_ID); auth.searchParams.set('redirect_uri','https://monkey-mod-hub.onrender.com/auth/github/callback'); auth.searchParams.set('scope','read:user'); auth.searchParams.set('state',state);
+      res.writeHead(302,{location:auth.toString()}); return res.end();
+    }
+    if (url.pathname === '/auth/github/callback' && req.method === 'GET') {
+      if (!parseCookies(req).mmm_state || !safeEqual(parseCookies(req).mmm_state,url.searchParams.get('state'))) return reply(res,400,{error:'Account sign-in state did not match.'});
+      const tr=await fetch('https://github.com/login/oauth/access_token',{method:'POST',headers:{accept:'application/json','content-type':'application/json'},body:JSON.stringify({client_id:process.env.GITHUB_OAUTH_CLIENT_ID,client_secret:process.env.GITHUB_OAUTH_CLIENT_SECRET,code:url.searchParams.get('code')}),signal:AbortSignal.timeout(10000)});
+      const td=await tr.json(); if(!tr.ok||!td.access_token)return reply(res,401,{error:'GitHub sign-in failed.'});
+      const pr=await fetch('https://api.github.com/user',{headers:{authorization:'Bearer '+td.access_token,accept:'application/vnd.github+json','user-agent':'Monkey-Mod-Hub'},signal:AbortSignal.timeout(10000)}); const p=await pr.json();
+      if(!pr.ok||!p.id||!p.login)return reply(res,401,{error:'Could not verify GitHub account.'});
+      cookie(res,'mmm_session',signedSession({id:String(p.id),login:String(p.login),avatar:String(p.avatar_url||''),exp:Date.now()+604800000}),604800); cookie(res,'mmm_state','',0);
+      res.writeHead(302,{location:'https://monkey-mod-hub.onrender.com/?signed_in=1'}); return res.end();
+    }
+    if (url.pathname === '/api/account' && req.method === 'GET') { const u=sessionFor(req); return reply(res,200,{configured:Boolean(process.env.GITHUB_OAUTH_CLIENT_ID&&process.env.GITHUB_OAUTH_CLIENT_SECRET&&process.env.SESSION_SECRET),user:u?{id:u.id,login:u.login,avatar:u.avatar}:null}); }
+    if (url.pathname === '/api/account/logout' && req.method === 'POST') { cookie(res,'mmm_session','',0); return reply(res,200,{ok:true}); }
+    if (url.pathname === '/api/assets' && req.method === 'POST') {
+      const user=sessionFor(req); if(!user)return reply(res,401,{error:'Sign in with GitHub before uploading.'});
+      const body=await readBody(req,35000000); const modId=slug(body.modId); const name=path.basename(String(body.fileName||'')).replace(/[^a-zA-Z0-9._-]/g,'_'); const kind=String(body.kind||'image'); const mime=String(body.mime||''); const allowed=kind==='image'?['image/png','image/jpeg','image/webp','image/gif']:kind==='video'?['video/mp4','video/webm']:kind==='mod'?['application/zip','application/x-zip-compressed','application/octet-stream','application/x-msdownload']:[];
+      if(!modId||!name||!allowed.includes(mime))return reply(res,400,{error:'Unsupported upload type.'});
+      const raw=String(body.base64||'').replace(/^data:[^,]+,/,''); if(!raw||raw.length>33000000)return reply(res,413,{error:'Upload too large.'}); const bytes=Buffer.from(raw,'base64'); const max=kind==='video'?12000000:kind==='mod'?24000000:8000000;
+      if(!bytes.length||bytes.length>max)return reply(res,413,{error:'Upload exceeds the '+Math.round(max/1000000)+' MB limit.'});
+      const ext=path.extname(name).toLowerCase(); if(kind==='image'&&!['.png','.jpg','.jpeg','.webp','.gif'].includes(ext)||kind==='video'&&!['.mp4','.webm'].includes(ext)||kind==='mod'&&!['.zip','.dll'].includes(ext))return reply(res,400,{error:'File extension is not allowed.'});
+      try { const p='mods/'+modId+'/'+kind+'/'+Date.now()+'-'+name; await githubContent(p,bytes,'Upload '+kind+' for '+modId+' by '+user.login); return reply(res,201,{ok:true,url:'https://raw.githubusercontent.com/'+MOD_REPO+'/main/'+p,path:p}); }
+      catch(e){return reply(res,502,{error:e instanceof Error?e.message:'Upload failed.'});}
+    }
+
     if (url.pathname === '/healthz') return reply(res, 200, { ok: true, service: 'monkey-mod-hub' });
     if (url.pathname === '/api/mods' && req.method === 'GET') return reply(res, 200, { mods: await getMods() });
     if (url.pathname === '/api/admin/check' && req.method === 'POST') {
