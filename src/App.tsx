@@ -44,14 +44,15 @@ export default function App() {
   const [draft, setDraft] = useState<Draft>(blankDraft);
   const [gameFolder, setGameFolder] = useState<string | null>(null);
   const desktop = Boolean(window.monkeyModManager && window.monkeyModManager.isDesktop);
+  const apiUrl = (path: string) => (desktop ? 'https://monkey-mod-hub.onrender.com' : '') + path;
 
   const notify = (message: string) => { setNotice(message); window.setTimeout(() => setNotice(''), 3600); };
   const loadCatalog = async () => {
     try {
-      const response = await fetch('/api/mods');
+      const response = await fetch(apiUrl('/api/mods'));
       if (!response.ok) throw new Error('Catalog unavailable');
       const data = await response.json() as { mods?: Mod[] };
-      if (Array.isArray(data.mods) && data.mods.length) setMods(data.mods);
+      if (Array.isArray(data.mods)) setMods(data.mods);
     } catch { /* Baked-in fallback keeps local/offline preview usable. */ }
     finally { setLoading(false); }
   };
@@ -89,7 +90,7 @@ export default function App() {
   const unlockAdmin = async (event: FormEvent) => {
     event.preventDefault(); setAdminBusy(true); setAdminError('');
     try {
-      const response = await fetch('/api/admin/check', { method: 'POST', headers: { 'x-admin-password': adminPassword } });
+      const response = await fetch(apiUrl('/api/admin/check'), { method: 'POST', headers: { 'x-admin-password': adminPassword } });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || 'Admin password was not accepted.');
       setAdminUnlocked(true);
@@ -100,7 +101,7 @@ export default function App() {
   const addMod = async (event: FormEvent) => {
     event.preventDefault(); setAdminBusy(true); setAdminError('');
     try {
-      const response = await fetch('/api/mods', {
+      const response = await fetch(apiUrl('/api/mods'), {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-admin-password': adminPassword },
         body: JSON.stringify(draft)
       });
@@ -115,7 +116,7 @@ export default function App() {
     if (!window.confirm('Remove ' + mod.name + ' from the public mod hub? This updates GORILA-TAG-MODBASE.')) return;
     setAdminBusy(true); setAdminError('');
     try {
-      const response = await fetch('/api/mods/' + encodeURIComponent(mod.id), { method: 'DELETE', headers: { 'x-admin-password': adminPassword } });
+      const response = await fetch(apiUrl('/api/mods/' + encodeURIComponent(mod.id)), { method: 'DELETE', headers: { 'x-admin-password': adminPassword } });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || 'Could not remove mod.');
       setMods((current) => current.filter((item) => item.id !== mod.id));
