@@ -435,6 +435,12 @@ export default function App() {
     finally { setCheckingUpdates(false); }
   };
 
+  useEffect(() => {
+    if (!desktop || !autoInstallUpdates) return;
+    const timer = window.setTimeout(() => void checkForUpdates(), 1800);
+    return () => window.clearTimeout(timer);
+  }, [desktop, autoInstallUpdates]);
+
   const installModFromDisk = async () => {
     if (!desktop) { notify('Install from disk is available in the desktop app.'); return; }
     try {
