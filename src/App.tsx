@@ -119,6 +119,7 @@ export default function App() {
   }, []);
   useEffect(() => { localStorage.setItem('mmm-saved', JSON.stringify(saved)); }, [saved]);
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem('mmm-theme', theme); }, [theme]);
+  useEffect(() => { setShowAppFallback(false); }, [detail?.id]);
   useEffect(() => {
     if (!detail) return;
     try {
@@ -489,7 +490,7 @@ export default function App() {
       {detail.videoUrl && <video className="mod-video" controls preload="metadata" src={detail.videoUrl} />}
       <div className="product-page-layout">
         <aside className="product-sidebar"><button className="product-side-action primary" onClick={() => void installMod(detail)}>{desktop ? (installedMods[detail.id] && installedMods[detail.id] !== detail.version ? '↻ Update mod' : installedMods[detail.id] === detail.version ? '✓ Reinstall mod' : '↓ Install mod') : '↓ Download mod'}</button>
-          {!desktop && <><button className="product-side-action secondary" onClick={() => openModInApp(detail)}>↗ Open / download in app</button>{showAppFallback && <div className="app-download-fallback"><p>Monkey Mod Manager did not open? Install the desktop app to download and install mods directly.</p><a href="https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/releases/latest" target="_blank" rel="noreferrer">Download app ↗</a></div>}</>}
+          {!desktop && <><button className="product-side-action secondary" onClick={() => openModInApp(detail)}>↓ Download in app</button>{showAppFallback && <div className="app-download-fallback"><p>Monkey Mod Manager did not open? Install the desktop app to download and install mods directly.</p><a href="https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/releases/latest" target="_blank" rel="noreferrer">Download app ↗</a></div>}</>}
           <a href={detail.downloadUrl} target="_blank" rel="noreferrer">Direct download ↗</a>
           {detail.sourceUrl && <a href={detail.sourceUrl} target="_blank" rel="noreferrer">Source / releases ↗</a>}
           {detail.websiteUrl && <a href={detail.websiteUrl} target="_blank" rel="noreferrer">Official website ↗</a>}
