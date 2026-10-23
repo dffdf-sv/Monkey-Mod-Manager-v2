@@ -28,8 +28,8 @@ ipcMain.handle('game:choose-folder', async () => {
 ipcMain.handle('bepinex:install', async () => {
   let tempFile = null;
   try {
-    if (process.platform !== 'win32') {
-      return { ok: false, message: 'Automatic BepInEx setup currently supports Windows x64. Open the official releases page for the correct Linux/macOS package and instructions.' };
+    if (process.platform !== 'win32' && process.platform !== 'linux') {
+      return { ok: false, message: 'Automatic BepInEx setup currently supports Windows and Linux/Steam Proton. Open the official releases page for macOS packages and instructions.' };
     }
     let settings = await readSettings();
     if (!settings.gameFolder) {
@@ -41,8 +41,10 @@ ipcMain.handle('bepinex:install', async () => {
     const gameFolder = path.resolve(settings.gameFolder);
     const rootEntries = await fs.readdir(gameFolder).catch(() => []);
     const rootNames = rootEntries.map((name) => name.toLowerCase());
-    const looksLikeGame = rootNames.some((name) => name === 'gorilla tag.exe' || name === 'gorilla tag_data');
-    if (!looksLikeGame) throw new Error('That folder does not look like a Windows Gorilla Tag installation. Choose the folder containing Gorilla Tag.exe and Gorilla Tag_Data.');
+    const looksLikeGame = process.platform === 'linux'
+      ? rootNames.some((name) => name === 'gorilla tag.x86_64' || name === 'gorilla tag_data' || name === 'gorilla tag.exe')
+      : rootNames.some((name) => name === 'gorilla tag.exe' || name === 'gorilla tag_data');
+    if (!looksLikeGame) throw new Error('That folder does not look like a Gorilla Tag installation. Choose the game folder containing Gorilla Tag.exe (Windows) or Gorilla Tag.x86_64 (Linux/Proton), plus Gorilla Tag_Data.');
     const existing = await fs.stat(path.join(gameFolder, 'BepInEx')).then(() => true).catch(() => false);
     if (existing) {
       const choice = await dialog.showMessageBox({
