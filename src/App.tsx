@@ -51,6 +51,9 @@ export default function App() {
   const [saved, setSaved] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('mmm-saved') || '[]') as string[]; } catch { return []; } });
   const [theme, setTheme] = useState(() => localStorage.getItem('mmm-theme') || 'dark');
   const [detail, setDetail] = useState<Mod | null>(null);
+  const [modFeedback, setModFeedback] = useState<{upvotes:number;downvotes:number;myVote:number;comments:Array<{id:string;login:string;body:string;createdAt:string}>}>({upvotes:0,downvotes:0,myVote:0,comments:[]});
+  const [commentDraft, setCommentDraft] = useState('');
+  const [feedbackBusy, setFeedbackBusy] = useState(false);
   const [showAppFallback, setShowAppFallback] = useState(false);
   const [useGitHubImport, setUseGitHubImport] = useState(false);
   const [githubImportBusy, setGithubImportBusy] = useState(false);
@@ -154,6 +157,45 @@ export default function App() {
     void loadGitHubReadme();
     return () => { active = false; };
   }, [detail?.id, detail?.sourceUrl, detail?.readme]);
+
+  useEffect(() => {
+    if (!detail) { setModFeedback({upvotes:0,downvotes:0,myVote:0,comments:[]}); return; }
+    let active = true;
+    apiFetch(apiUrl('/api/mod-feedback/' + encodeURIComponent(detail.id)))
+      .then(async response => { const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Feedback unavailable'); return data; })
+      .then(data => { if (active) setModFeedback({upvotes:Number(data.upvotes||0),downvotes:Number(data.downvotes||0),myVote:Number(data.myVote||0),comments:Array.isArray(data.comments)?data.comments:[]}); })
+      .catch(() => { if (active) setModFeedback({upvotes:0,downvotes:0,myVote:0,comments:[]}); });
+    return () => { active = false; };
+  }, [detail?.id, account?.id]);
+
+  const voteForMod = async (vote:number) => {
+    if (!account) { notify('Sign in with GitHub to vote on mods.'); return; }
+    if (!detail || feedbackBusy) return;
+    setFeedbackBusy(true);
+    try {
+      const response = await apiFetch(apiUrl('/api/mod-feedback/' + encodeURIComponent(detail.id) + '/vote'), {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({vote:modFeedback.myVote===vote?0:vote})});
+      const data = await response.json().catch(()=>({}));
+      if (!response.ok) throw new Error(data.error || 'Could not save vote.');
+      setModFeedback(current=>({...current,upvotes:Number(data.upvotes||0),downvotes:Number(data.downvotes||0),myVote:Number(data.myVote||0)}));
+    } catch (error) { notify(error instanceof Error ? error.message : 'Could not save vote.'); }
+    finally { setFeedbackBusy(false); }
+  };
+  const postModComment = async (event:FormEvent) => {
+    event.preventDefault();
+    const body = commentDraft.trim();
+    if (!account) { notify('Sign in with GitHub to comment.'); return; }
+    if (!detail || !body || feedbackBusy) return;
+    setFeedbackBusy(true);
+    try {
+      const response = await apiFetch(apiUrl('/api/mod-feedback/' + encodeURIComponent(detail.id) + '/comments'), {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({body})});
+      const data = await response.json().catch(()=>({}));
+      if (!response.ok) throw new Error(data.error || 'Could not post comment.');
+      setModFeedback(current=>({...current,comments:Array.isArray(data.comments)?data.comments:current.comments}));
+      setCommentDraft('');
+      notify('Comment posted.');
+    } catch (error) { notify(error instanceof Error ? error.message : 'Could not post comment.'); }
+    finally { setFeedbackBusy(false); }
+  };
 
   useEffect(() => {
     if (!detail) return;
@@ -702,12 +744,18 @@ export default function App() {
           <div className="product-sidebar-facts"><b>Version</b><span>{detail.version}</span><b>Author</b><span>{detail.author}</span><b>Category</b><span>{detail.category}</span><b>Operating systems</b><span>{(detail.supportedOS||[]).length ? detail.supportedOS!.join(', ') : 'Not specified'}</span><b>Requirements</b><span>{detail.requirements || 'See README / source page'}</span></div>
         </aside>
         <div className="product-page-content">
-          <nav className="product-tabs"><a href="#mod-overview">Overview</a>{detail.sourceUrl && /https?:\/\/github\.com\//i.test(detail.sourceUrl) && <a href="#mod-readme">README</a>}<a href="#mod-dependencies">Dependencies</a><a href="#mod-media">Media</a><a href="#mod-changelog">Changelog</a></nav>
+          <nav className="product-tabs"><a href="#mod-overview">Overview</a>{detail.sourceUrl && /https?:\/\/github\.com\//i.test(detail.sourceUrl) && <a href="#mod-readme" title="Read project info">Info</a>}<a href="#mod-dependencies">Dependencies</a><a href="#mod-media">Media</a><a href="#mod-changelog">Changelog</a><a href="#mod-community">Community</a></nav>
           <section id="mod-overview" className="product-info-section"><h3>About this mod</h3><p className="product-description">{detail.description}</p>{detail.requirements && <p><b>Requirements:</b> {detail.requirements}</p>}<div className="product-meta-grid"><div><small>VERSION</small><b>{detail.version}</b></div><div><small>AUTHOR</small><b>{detail.author}</b></div><div><small>CATEGORY</small><b>{detail.category}</b></div><div><small>PLATFORMS</small><b>{(detail.supportedOS||[]).join(', ') || 'Not specified'}</b></div></div></section>
           {detail.sourceUrl && /https?:\/\/github\.com\//i.test(detail.sourceUrl) && <section id="mod-readme" className="product-info-section"><h3>GitHub README & installation</h3>{detail.readme ? <p className="product-longtext">{detail.readme}</p> : <p className="form-help">Fetching README from GitHub… If this repository has no README, check its source page.</p>}</section>}
           <section id="mod-dependencies" className="product-info-section"><h3>Dependencies</h3>{detail.dependencies.length ? <ul className="product-dependencies">{detail.dependencies.map((dep)=><li key={dep}>{dep}</li>)}</ul> : <p className="form-help">No dependencies listed.</p>}</section>
           <section id="mod-media" className="product-info-section"><h3>Screenshots & media</h3>{(detail.galleryUrls||[]).length>0 && <div className="detail-gallery">{(detail.galleryUrls||[]).map((url,i)=><a key={url+i} href={url} target="_blank" rel="noreferrer"><img src={url} alt={detail.name+' screenshot '+(i+1)} /></a>)}</div>}{detail.videoUrl && <video className="mod-video" controls preload="metadata" src={detail.videoUrl} />}{detail.embedUrl && <iframe className="product-embed" src={detail.embedUrl} title={detail.name+' embedded content'} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" sandbox="allow-scripts allow-same-origin allow-presentation" allow="fullscreen; picture-in-picture; encrypted-media" />}{!(detail.galleryUrls||[]).length && !detail.videoUrl && !detail.embedUrl && <p className="form-help">No extra media supplied.</p>}</section>
           <section id="mod-changelog" className="product-info-section"><h3>Changelog</h3>{detail.changelog ? <p className="product-longtext">{detail.changelog}</p> : <p className="form-help">No changelog supplied.</p>}</section>
+          <section id="mod-community" className="product-info-section mod-community">
+            <h3>Community feedback</h3>
+            <div className="mod-voting"><span>{modFeedback.upvotes} helpful · {modFeedback.downvotes} not helpful</span><div><button type="button" className={'secondary vote-button '+(modFeedback.myVote===1?'vote-selected':'')} disabled={feedbackBusy} onClick={()=>void voteForMod(1)} aria-pressed={modFeedback.myVote===1}>▲ Helpful</button><button type="button" className={'secondary vote-button '+(modFeedback.myVote===-1?'vote-selected':'')} disabled={feedbackBusy} onClick={()=>void voteForMod(-1)} aria-pressed={modFeedback.myVote===-1}>▼ Not helpful</button></div></div>
+            <form className="comment-form" onSubmit={postModComment}><label htmlFor="mod-comment">Leave a comment</label><textarea id="mod-comment" value={commentDraft} onChange={event=>setCommentDraft(event.target.value)} maxLength={1000} rows={3} placeholder={account?'Share a useful tip or compatibility note…':'Sign in with GitHub to comment'} disabled={!account||feedbackBusy}/><div className="comment-form-foot"><small>{commentDraft.length}/1000 · {account?'Posting as '+account.login:'GitHub sign-in required'}</small><button className="primary" disabled={!account||!commentDraft.trim()||feedbackBusy}>{feedbackBusy?'Sending…':'Post comment'}</button></div></form>
+            <div className="comment-list">{modFeedback.comments.map(comment=><article className="community-comment" key={comment.id}><div><b>{comment.login}</b><time>{comment.createdAt?new Date(comment.createdAt).toLocaleDateString():''}</time></div><p>{comment.body}</p></article>)}{!modFeedback.comments.length&&<p className="form-help">No comments yet. Be the first to share useful feedback.</p>}</div>
+          </section>
         </div>
       </div>
             {!desktop && <p className="web-install-note">In a browser this downloads the file only. The desktop app can install it into your selected Gorilla Tag folder.</p>}
