@@ -47,11 +47,11 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All Mods');
-  const [page, setPage] = useState<'Discover' | 'Library' | 'Configs' | 'Profiles' | 'Editor' | 'Settings'>(() => (window.location.pathname === '/editor' || window.location.hash === '#/editor') ? 'Editor' : (window.monkeyModManager?.isDesktop && (window.location.pathname === '/settings' || window.location.hash === '#/settings')) ? 'Settings' : 'Discover');
+  const [page, setPage] = useState<'Overview' | 'Discover' | 'Library' | 'Configs' | 'Profiles' | 'Editor' | 'Settings'>(() => (window.location.pathname === '/editor' || window.location.hash === '#/editor') ? 'Editor' : (window.monkeyModManager?.isDesktop && (window.location.pathname === '/settings' || window.location.hash === '#/settings')) ? 'Settings' : 'Overview');
   const [saved, setSaved] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('mmm-saved') || '[]') as string[]; } catch { return []; } });
   const [theme, setTheme] = useState(() => localStorage.getItem('mmm-theme') || 'dark');
   const [detail, setDetail] = useState<Mod | null>(null);
-  const [modFeedback, setModFeedback] = useState<{upvotes:number;downvotes:number;myVote:number;comments:Array<{id:string;login:string;body:string;createdAt:string}>}>({upvotes:0,downvotes:0,myVote:0,comments:[]});
+  const [modFeedback, setModFeedback] = useState<{upvotes:number;downvotes:number;myVote:number;ratingAverage:number;ratingCount:number;myRating:number;comments:Array<{id:string;login:string;body:string;createdAt:string}>}>({upvotes:0,downvotes:0,myVote:0,ratingAverage:0,ratingCount:0,myRating:0,comments:[]});
   const [commentDraft, setCommentDraft] = useState('');
   const [feedbackBusy, setFeedbackBusy] = useState(false);
   const [showAppFallback, setShowAppFallback] = useState(false);
@@ -159,11 +159,11 @@ export default function App() {
   }, [detail?.id, detail?.sourceUrl, detail?.readme]);
 
   useEffect(() => {
-    if (!detail) { setModFeedback({upvotes:0,downvotes:0,myVote:0,comments:[]}); return; }
+    if (!detail) { setModFeedback({upvotes:0,downvotes:0,myVote:0,ratingAverage:0,ratingCount:0,myRating:0,comments:[]}); return; }
     let active = true;
     apiFetch(apiUrl('/api/mod-feedback/' + encodeURIComponent(detail.id)))
       .then(async response => { const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Feedback unavailable'); return data; })
-      .then(data => { if (active) setModFeedback({upvotes:Number(data.upvotes||0),downvotes:Number(data.downvotes||0),myVote:Number(data.myVote||0),comments:Array.isArray(data.comments)?data.comments:[]}); })
+      .then(data => { if (active) setModFeedback({upvotes:Number(data.upvotes||0),downvotes:Number(data.downvotes||0),myVote:Number(data.myVote||0),ratingAverage:Number(data.ratingAverage||0),ratingCount:Number(data.ratingCount||0),myRating:Number(data.myRating||0),comments:Array.isArray(data.comments)?data.comments:[]}); })
       .catch(() => { if (active) setModFeedback({upvotes:0,downvotes:0,myVote:0,comments:[]}); });
     return () => { active = false; };
   }, [detail?.id, account?.id]);
@@ -180,6 +180,19 @@ export default function App() {
     } catch (error) { notify(error instanceof Error ? error.message : 'Could not save vote.'); }
     finally { setFeedbackBusy(false); }
   };
+  const rateMod = async (rating:number) => {
+    if (!account) { notify('Sign in with GitHub to rate mods.'); return; }
+    if (!detail || feedbackBusy) return;
+    setFeedbackBusy(true);
+    try {
+      const response = await apiFetch(apiUrl('/api/mod-feedback/' + encodeURIComponent(detail.id) + '/rating'), {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({rating})});
+      const data = await response.json().catch(()=>({}));
+      if (!response.ok) throw new Error(data.error || 'Could not save rating.');
+      setModFeedback(current=>({...current,ratingAverage:Number(data.ratingAverage||0),ratingCount:Number(data.ratingCount||0),myRating:Number(data.myRating||0)}));
+    } catch (error) { notify(error instanceof Error ? error.message : 'Could not save rating.'); }
+    finally { setFeedbackBusy(false); }
+  };
+
   const postModComment = async (event:FormEvent) => {
     event.preventDefault();
     const body = commentDraft.trim();
@@ -554,16 +567,16 @@ export default function App() {
     finally { setAdminBusy(false); }
   };
 
-  const goToPage = (next:'Discover'|'Library'|'Configs'|'Profiles'|'Editor'|'Settings') => {
+  const goToPage = (next:'Overview'|'Discover'|'Library'|'Configs'|'Profiles'|'Editor'|'Settings') => {
     if (!desktop && (next === 'Settings' || next === 'Configs')) next = 'Discover';
     setPage(next); setShowAdmin(next === 'Editor');
-    const route = next === 'Editor' ? '/editor' : next === 'Settings' ? '/settings' : '/';
-    const target = desktop ? (next === 'Editor' ? '#/editor' : next === 'Settings' ? '#/settings' : '#/') : route;
+    const route = next === 'Editor' ? '/editor' : next === 'Settings' ? '/settings' : next === 'Overview' ? '/' : '/'+next.toLowerCase();
+    const target = desktop ? (next === 'Editor' ? '#/editor' : next === 'Settings' ? '#/settings' : next === 'Overview' ? '#/' : '#/'+next.toLowerCase()) : route;
     if (desktop ? window.location.hash !== target : window.location.pathname !== route) window.history.pushState({}, '', target);
   };
 
   useEffect(() => {
-    const onPop = () => { const p = window.location.pathname; const h = window.location.hash; const editor = p === '/editor' || h === '#/editor'; const settings = desktop && (p === '/settings' || h === '#/settings'); setPage(editor ? 'Editor' : settings ? 'Settings' : 'Discover'); setShowAdmin(editor); if (!desktop && (p === '/settings' || h === '#/settings')) window.history.replaceState({}, '', '/'); };
+    const onPop = () => { const p = window.location.pathname; const h = window.location.hash; const editor = p === '/editor' || h === '#/editor'; const settings = desktop && (p === '/settings' || h === '#/settings'); const routePage = (h.startsWith('#/') ? h.slice(2) : p.slice(1)).toLowerCase(); const knownPage = ['discover','library','profiles'].includes(routePage) ? (routePage[0].toUpperCase()+routePage.slice(1)) as 'Discover'|'Library'|'Profiles' : 'Overview'; setPage(editor ? 'Editor' : settings ? 'Settings' : knownPage); setShowAdmin(editor); if (!desktop && (p === '/settings' || h === '#/settings')) window.history.replaceState({}, '', '/'); };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
@@ -572,6 +585,7 @@ export default function App() {
     <aside className="sidebar">
       <div className="brand"><div className="brand-logo">🐒</div><div><b>MONKEY</b><small>MOD HUB <i>V2</i></small></div></div>
       <label className="side-label">WORKSPACE</label>
+      <button className={'nav ' + (page === 'Overview' ? 'chosen' : '')} onClick={() => goToPage('Overview')}>⌂ <span>Overview</span></button>
       <button className={'nav ' + (page === 'Discover' ? 'chosen' : '')} onClick={() => goToPage('Discover')}>▦ <span>Discover mods</span></button>
       <button className={'nav ' + (page === 'Library' ? 'chosen' : '')} onClick={() => goToPage('Library')}>▣ <span>Your mods</span><b className="count">{saved.length}</b></button>
       <button className={'nav ' + (page === 'Profiles' ? 'chosen' : '')} onClick={() => goToPage('Profiles')}>♙ <span>Account + profiles</span><b className="count">{accountData.profiles.length}</b></button>
@@ -589,6 +603,7 @@ export default function App() {
     <main className="main">
       <header className="topbar"><span>Workspace <b>/</b> <strong>{page === 'Editor' ? 'Mod editor' : page}</strong></span><div><span className="gamepill"><i /> Gorilla Tag</span><button className="roundbtn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☼' : '☾'}</button><button className="secondary account-button" onClick={()=>{if(account){localStorage.removeItem('mmm-auth-token');void apiFetch(apiUrl('/api/account/logout'),{method:'POST'}).finally(()=>{setAccount(null);notify('Signed out.');});}else if(accountConfigured){if(desktop){void window.monkeyModManager?.signInWithGitHub().catch(()=>notify('Could not open your default browser.'));}else{const popup=window.open(apiUrl('/auth/github'),'mmm-github-signin','popup,width=560,height=760');if(!popup)notify('Allow pop-ups to sign in with GitHub.');}}else{notify('GitHub account login needs OAuth settings in Render.');}}}>{account ? 'Sign out · '+account.login : 'Sign in with GitHub'}</button><span className="avatar">{account?.login?.slice(0,1).toUpperCase()||'M'}</span></div></header>
       <div className="content">
+        {page === 'Overview' && <>
         <section className="hero">
           <div className="eyebrow">✳ &nbsp; THE COMMUNITY MOD HUB</div>
           <h1>Find your next<br /><em>jungle upgrade.</em></h1>
@@ -608,6 +623,7 @@ export default function App() {
           <div><span className="staticon green">✓</span><small>YOUR LIBRARY</small><b>{String(saved.length).padStart(2, '0')} <i>saved</i></b><label>{saved.length ? 'Collection started' : 'Ready to build'}</label></div>
           <div><span className="staticon orange">↓</span><small>INSTALL OPTIONS</small><b>{desktop ? 'One-click' : 'Downloads'} <i>{desktop ? 'desktop' : 'web'}</i></b><label>{desktop ? (gameFolder ? 'Game folder selected · '+detectedMods.length+' detected' : 'Select game folder') : 'Open downloads safely'}</label></div>
         </div>
+        </>}
 
         {(page === 'Editor' || showAdmin) && <section className="admin-panel editor-page">
           <div className="admin-heading"><div><h2>{editingId ? 'Edit mod' : 'Mod editor'}</h2><p>Publish a mod or manage your own entries in the catalogue.</p></div></div>
@@ -706,7 +722,11 @@ export default function App() {
             </div>
           </div>
           {configError && <div className="admin-error" role="alert">{configError}</div>}
-        </section> : page === 'Editor' ? <></> : <>
+        </section> : page === 'Editor' ? <></> : page === 'Overview' ? <section className="overview-dashboard">
+          <div className="overview-heading"><div><label>YOUR MOD HUB</label><h2>Welcome to the jungle.</h2><p>Browse, compare, rate and discuss Gorilla Tag PC mods in one place.</p></div><button className="primary" onClick={()=>goToPage('Discover')}>Browse all mods ↗</button></div>
+          <div className="overview-tiles"><button onClick={()=>goToPage('Discover')}><span>▦</span><b>Discover mods</b><small>Explore {mods.length} catalogue entries and their details.</small></button><button onClick={()=>goToPage('Library')}><span>▣</span><b>Your library</b><small>{saved.length} saved mods ready to revisit.</small></button><button onClick={()=>goToPage('Profiles')}><span>♙</span><b>Account & profiles</b><small>Keep your mod setup and preferences together.</small></button></div>
+          <div className="overview-featured"><div className="overview-heading"><div><label>QUICK PICKS</label><h3>Featured mods</h3></div><button className="secondary" onClick={()=>goToPage('Discover')}>View catalogue →</button></div><div className="overview-mod-grid">{mods.filter(mod=>mod.featured).slice(0,3).map(mod=><button className="overview-mod-card" key={mod.id} onClick={()=>setDetail(mod)}>{mod.imageUrl?<img src={mod.imageUrl} alt="" />:<span className="overview-mod-icon">🐒</span>}<b>{mod.name}</b><small>{mod.category} · v{mod.version}</small><p>{mod.description}</p></button>)}</div></div>
+        </section> : <>
         <div className="sectionhead"><div><label>THE COLLECTION</label><h2>{page === 'Discover' ? 'Explore community mods' : 'Your mods'} <span>{visibleMods.length}</span></h2><p>{page === 'Discover' ? 'Browse the current catalogue and open the source before installing.' : 'Your saved mods, ready when you are.'}</p></div><div className="catalogue-actions"><button className="secondary" onClick={() => void loadCatalog()} disabled={loading}>{loading ? 'Loading…' : '↻ Reload mods'}</button><button className="reset" onClick={() => { setQuery(''); setCategory('All Mods'); }}>⟳ Reset filters</button></div></div>
         <div className="toolbar"><label className="search">⌕ <input id="modsearch" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search mods, creators, categories…" />{query && <button onClick={() => setQuery('')}>×</button>}<kbd>Ctrl K</kbd></label><div className="pills">{categories.map((item) => <button key={item} className={category === item ? 'pillactive' : ''} onClick={() => setCategory(item)}>{item === 'All Mods' ? 'All' : item}</button>)}</div></div>
 
@@ -744,14 +764,16 @@ export default function App() {
           <div className="product-sidebar-facts"><b>Version</b><span>{detail.version}</span><b>Author</b><span>{detail.author}</span><b>Category</b><span>{detail.category}</span><b>Operating systems</b><span>{(detail.supportedOS||[]).length ? detail.supportedOS!.join(', ') : 'Not specified'}</span><b>Requirements</b><span>{detail.requirements || 'See README / source page'}</span></div>
         </aside>
         <div className="product-page-content">
-          <nav className="product-tabs"><a href="#mod-overview">Overview</a>{detail.sourceUrl && /https?:\/\/github\.com\//i.test(detail.sourceUrl) && <a href="#mod-readme" title="Read project info">Info</a>}<a href="#mod-dependencies">Dependencies</a><a href="#mod-media">Media</a><a href="#mod-changelog">Changelog</a><a href="#mod-community">Community</a></nav>
-          <section id="mod-overview" className="product-info-section"><h3>About this mod</h3><p className="product-description">{detail.description}</p>{detail.requirements && <p><b>Requirements:</b> {detail.requirements}</p>}<div className="product-meta-grid"><div><small>VERSION</small><b>{detail.version}</b></div><div><small>AUTHOR</small><b>{detail.author}</b></div><div><small>CATEGORY</small><b>{detail.category}</b></div><div><small>PLATFORMS</small><b>{(detail.supportedOS||[]).join(', ') || 'Not specified'}</b></div></div></section>
+          <nav className="product-tabs"><a href="#mod-overview">Overview</a>{detail.sourceUrl && /https?:\/\/github\.com\//i.test(detail.sourceUrl) && <a href="#mod-readme" title="Read project info">Info</a>}<a href="#mod-details">Details</a><a href="#mod-dependencies">Dependencies</a><a href="#mod-media">Media</a><a href="#mod-changelog">Changelog</a><a href="#mod-community">Community</a></nav>
+          <section id="mod-details" className="product-info-section"><h3>Mod details</h3><p className="product-description">{detail.description}</p>{detail.requirements && <p><b>Requirements:</b> {detail.requirements}</p>}<div className="product-meta-grid"><div><small>VERSION</small><b>{detail.version}</b></div><div><small>AUTHOR</small><b>{detail.author}</b></div><div><small>CATEGORY</small><b>{detail.category}</b></div><div><small>PLATFORMS</small><b>{(detail.supportedOS||[]).join(', ') || 'Not specified'}</b></div></div></section>
+          <section id="mod-overview" className="product-info-section"><h3>Overview</h3><p className="product-description">{detail.description}</p>{detail.requirements && <p><b>Requirements:</b> {detail.requirements}</p>}<div className="product-meta-grid"><div><small>VERSION</small><b>{detail.version}</b></div><div><small>AUTHOR</small><b>{detail.author}</b></div><div><small>CATEGORY</small><b>{detail.category}</b></div><div><small>PLATFORMS</small><b>{(detail.supportedOS||[]).join(', ') || 'Not specified'}</b></div></div></section>
           {detail.sourceUrl && /https?:\/\/github\.com\//i.test(detail.sourceUrl) && <section id="mod-readme" className="product-info-section"><h3>GitHub README & installation</h3>{detail.readme ? <p className="product-longtext">{detail.readme}</p> : <p className="form-help">Fetching README from GitHub… If this repository has no README, check its source page.</p>}</section>}
           <section id="mod-dependencies" className="product-info-section"><h3>Dependencies</h3>{detail.dependencies.length ? <ul className="product-dependencies">{detail.dependencies.map((dep)=><li key={dep}>{dep}</li>)}</ul> : <p className="form-help">No dependencies listed.</p>}</section>
           <section id="mod-media" className="product-info-section"><h3>Screenshots & media</h3>{(detail.galleryUrls||[]).length>0 && <div className="detail-gallery">{(detail.galleryUrls||[]).map((url,i)=><a key={url+i} href={url} target="_blank" rel="noreferrer"><img src={url} alt={detail.name+' screenshot '+(i+1)} /></a>)}</div>}{detail.videoUrl && <video className="mod-video" controls preload="metadata" src={detail.videoUrl} />}{detail.embedUrl && <iframe className="product-embed" src={detail.embedUrl} title={detail.name+' embedded content'} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" sandbox="allow-scripts allow-same-origin allow-presentation" allow="fullscreen; picture-in-picture; encrypted-media" />}{!(detail.galleryUrls||[]).length && !detail.videoUrl && !detail.embedUrl && <p className="form-help">No extra media supplied.</p>}</section>
           <section id="mod-changelog" className="product-info-section"><h3>Changelog</h3>{detail.changelog ? <p className="product-longtext">{detail.changelog}</p> : <p className="form-help">No changelog supplied.</p>}</section>
           <section id="mod-community" className="product-info-section mod-community">
             <h3>Community feedback</h3>
+            <div className="star-rating-panel"><div className="rating-score"><strong>{modFeedback.ratingCount ? modFeedback.ratingAverage.toFixed(1) : '—'}</strong><span>{modFeedback.ratingCount ? 'out of 5' : 'No ratings yet'}</span><small>{modFeedback.ratingCount} {modFeedback.ratingCount===1?'rating':'ratings'}</small></div><div className="rating-action"><b>Rate this mod</b><div className="rating-stars" role="group" aria-label="Rate this mod from 1 to 5">{[1,2,3,4,5].map(star=><button key={star} type="button" aria-label={star+' star'+(star===1?'':'s')} aria-pressed={modFeedback.myRating===star} className={star<=modFeedback.myRating?'star-selected':''} disabled={feedbackBusy||!account} onClick={()=>void rateMod(star)}>★</button>)}</div><small>{account?(modFeedback.myRating?'Your rating: '+modFeedback.myRating+'/5':'Select a star rating'):'Sign in with GitHub to rate'}</small></div></div>
             <div className="mod-voting"><span>{modFeedback.upvotes} helpful · {modFeedback.downvotes} not helpful</span><div><button type="button" className={'secondary vote-button '+(modFeedback.myVote===1?'vote-selected':'')} disabled={feedbackBusy} onClick={()=>void voteForMod(1)} aria-pressed={modFeedback.myVote===1}>▲ Helpful</button><button type="button" className={'secondary vote-button '+(modFeedback.myVote===-1?'vote-selected':'')} disabled={feedbackBusy} onClick={()=>void voteForMod(-1)} aria-pressed={modFeedback.myVote===-1}>▼ Not helpful</button></div></div>
             <form className="comment-form" onSubmit={postModComment}><label htmlFor="mod-comment">Leave a comment</label><textarea id="mod-comment" value={commentDraft} onChange={event=>setCommentDraft(event.target.value)} maxLength={1000} rows={3} placeholder={account?'Share a useful tip or compatibility note…':'Sign in with GitHub to comment'} disabled={!account||feedbackBusy}/><div className="comment-form-foot"><small>{commentDraft.length}/1000 · {account?'Posting as '+account.login:'GitHub sign-in required'}</small><button className="primary" disabled={!account||!commentDraft.trim()||feedbackBusy}>{feedbackBusy?'Sending…':'Post comment'}</button></div></form>
             <div className="comment-list">{modFeedback.comments.map(comment=><article className="community-comment" key={comment.id}><div><b>{comment.login}</b><time>{comment.createdAt?new Date(comment.createdAt).toLocaleDateString():''}</time></div><p>{comment.body}</p></article>)}{!modFeedback.comments.length&&<p className="form-help">No comments yet. Be the first to share useful feedback.</p>}</div>
