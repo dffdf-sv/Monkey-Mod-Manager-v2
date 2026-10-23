@@ -662,7 +662,7 @@ export default function App() {
             </div>
           </div>
           {configError && <div className="admin-error" role="alert">{configError}</div>}
-        </section> : (page === 'Editor' || page === 'Settings') ? <></> : <>
+        </section> : page === 'Editor' ? <></> : <>
         <div className="sectionhead"><div><label>THE COLLECTION</label><h2>{page === 'Discover' ? 'Explore community mods' : 'Your mods'} <span>{visibleMods.length}</span></h2><p>{page === 'Discover' ? 'Browse the current catalogue and open the source before installing.' : 'Your saved mods, ready when you are.'}</p></div><div className="catalogue-actions"><button className="secondary" onClick={() => void loadCatalog()} disabled={loading}>{loading ? 'Loading…' : '↻ Reload mods'}</button><button className="reset" onClick={() => { setQuery(''); setCategory('All Mods'); }}>⟳ Reset filters</button></div></div>
         <div className="toolbar"><label className="search">⌕ <input id="modsearch" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search mods, creators, categories…" />{query && <button onClick={() => setQuery('')}>×</button>}<kbd>Ctrl K</kbd></label><div className="pills">{categories.map((item) => <button key={item} className={category === item ? 'pillactive' : ''} onClick={() => setCategory(item)}>{item === 'All Mods' ? 'All' : item}</button>)}</div></div>
 
