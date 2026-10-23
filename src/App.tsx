@@ -47,7 +47,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All Mods');
-  const [page, setPage] = useState<'Discover' | 'Library' | 'Configs' | 'Profiles' | 'Editor' | 'Settings'>(() => window.location.pathname === '/editor' ? 'Editor' : window.location.pathname === '/settings' ? 'Settings' : 'Discover');
+  const [page, setPage] = useState<'Discover' | 'Library' | 'Configs' | 'Profiles' | 'Editor' | 'Settings'>(() => (window.location.pathname === '/editor' || window.location.hash === '#/editor') ? 'Editor' : (window.location.pathname === '/settings' || window.location.hash === '#/settings') ? 'Settings' : 'Discover');
   const [saved, setSaved] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('mmm-saved') || '[]') as string[]; } catch { return []; } });
   const [theme, setTheme] = useState(() => localStorage.getItem('mmm-theme') || 'dark');
   const [detail, setDetail] = useState<Mod | null>(null);
@@ -515,11 +515,12 @@ export default function App() {
   const goToPage = (next:'Discover'|'Library'|'Configs'|'Profiles'|'Editor'|'Settings') => {
     setPage(next); setShowAdmin(next === 'Editor');
     const route = next === 'Editor' ? '/editor' : next === 'Settings' ? '/settings' : '/';
-    if (window.location.pathname !== route) window.history.pushState({}, '', route);
+    const target = desktop ? (next === 'Editor' ? '#/editor' : next === 'Settings' ? '#/settings' : '#/') : route;
+    if (desktop ? window.location.hash !== target : window.location.pathname !== route) window.history.pushState({}, '', target);
   };
 
   useEffect(() => {
-    const onPop = () => { const p = window.location.pathname; setPage(p === '/editor' ? 'Editor' : p === '/settings' ? 'Settings' : 'Discover'); setShowAdmin(p === '/editor'); };
+    const onPop = () => { const p = window.location.pathname; const h = window.location.hash; const editor = p === '/editor' || h === '#/editor'; const settings = p === '/settings' || h === '#/settings'; setPage(editor ? 'Editor' : settings ? 'Settings' : 'Discover'); setShowAdmin(editor); };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
