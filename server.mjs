@@ -114,6 +114,50 @@ async function githubContent(pathname, bytes, message) {
   const response=await fetch('https://api.github.com/repos/'+MOD_REPO+'/contents/'+pathname,{method:'PUT',headers:{authorization:'Bearer '+token,accept:'application/vnd.github+json','content-type':'application/json','x-github-api-version':'2022-11-28','user-agent':'Monkey-Mod-Hub'},body:JSON.stringify({message,content:bytes.toString('base64'),branch:'main'}),signal:AbortSignal.timeout(20000)});
   const data=await response.json().catch(()=>({})); if(!response.ok)throw new Error(data.message||'GitHub asset upload failed.'); return data;
 }
+
+async function accountGists(userId) {
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) throw new Error('Cloud account storage needs GITHUB_TOKEN with permission to create and edit private gists.');
+  const response = await fetch('https://api.github.com/gists?per_page=100', { headers: { authorization: 'Bearer ' + token, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'Monkey-Mod-Hub' }, signal: AbortSignal.timeout(12000) });
+  const data = await response.json().catch(() => []);
+  if (!response.ok || !Array.isArray(data)) throw new Error('Could not access private account storage. Ensure GITHUB_TOKEN has gist permission.');
+  const marker = 'Monkey Mod Manager account data for user ' + userId;
+  return data.find((gist) => String(gist.description || '') === marker) || null;
+}
+async function readAccountData(userId) {
+  const gist = await accountGists(userId);
+  if (!gist) return { profiles: [], savedMods: [], configs: {}, installedMods: {} };
+  const raw = gist.files && gist.files['monkey-mod-manager-account.json'] && gist.files['monkey-mod-manager-account.json'].content;
+  if (!raw) return { profiles: [], savedMods: [], configs: {}, installedMods: {} };
+  try {
+    const data = JSON.parse(raw);
+    return { profiles: Array.isArray(data.profiles) ? data.profiles.slice(0,50) : [], savedMods: Array.isArray(data.savedMods) ? data.savedMods.slice(0,500) : [], configs: data.configs && typeof data.configs === 'object' ? data.configs : {}, installedMods: data.installedMods && typeof data.installedMods === 'object' ? data.installedMods : {} };
+  } catch { throw new Error('Saved account data is unreadable.'); }
+}
+async function writeAccountData(userId, value) {
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) throw new Error('Cloud account storage needs GITHUB_TOKEN with permission to create and edit private gists.');
+  const data = {
+    profiles: Array.isArray(value.profiles) ? value.profiles.slice(0,50) : [],
+    savedMods: Array.isArray(value.savedMods) ? value.savedMods.map(String).slice(0,500) : [],
+    configs: value.configs && typeof value.configs === 'object' ? value.configs : {},
+    installedMods: value.installedMods && typeof value.installedMods === 'object' ? value.installedMods : {}
+  };
+  const content = JSON.stringify(data, null, 2);
+  if (Buffer.byteLength(content) > 900000) throw new Error('Account data is too large (900 KB limit).');
+  const existing = await accountGists(userId);
+  const marker = 'Monkey Mod Manager account data for user ' + userId;
+  const response = await fetch(existing ? 'https://api.github.com/gists/' + existing.id : 'https://api.github.com/gists', {
+    method: existing ? 'PATCH' : 'POST',
+    headers: { authorization: 'Bearer ' + token, accept: 'application/vnd.github+json', 'content-type': 'application/json', 'x-github-api-version': '2022-11-28', 'user-agent': 'Monkey-Mod-Hub' },
+    body: JSON.stringify({ description: marker, public: false, files: { 'monkey-mod-manager-account.json': { content } } }),
+    signal: AbortSignal.timeout(15000)
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error('Private cloud save failed. Check that GITHUB_TOKEN has gist permission (' + response.status + ').');
+  return data;
+}
+
 function contentType(file) { return MIME[path.extname(file).toLowerCase()] || 'application/octet-stream'; }
 
 const server = http.createServer(async (req, res) => {
@@ -149,6 +193,18 @@ const server = http.createServer(async (req, res) => {
       res.end('<!doctype html><meta charset="utf-8"><title>Signed in · Monkey Mod Hub</title><style>body{font:16px system-ui;background:#10150f;color:#f4f6f0;display:grid;place-items:center;min-height:90vh;text-align:center}main{max-width:440px;padding:32px;border:1px solid #3a4937;border-radius:18px}p{color:#b9c5b4}</style><main><h1>GitHub sign-in complete</h1><p>You can return to Monkey Mod Hub. This tab will close automatically.</p></main><script>try{if(window.opener)window.opener.postMessage({type:"mmm-github-auth-complete"},"https://monkey-mod-hub.onrender.com")}catch{}setTimeout(()=>window.close(),350);setTimeout(()=>{location.href="https://monkey-mod-hub.onrender.com/?signed_in=1"},900);</script>'); return;
     }
     if (url.pathname === '/api/account' && req.method === 'GET') { const u=sessionFor(req); return reply(res,200,{configured:Boolean(process.env.GITHUB_OAUTH_CLIENT_ID&&process.env.GITHUB_OAUTH_CLIENT_SECRET&&process.env.SESSION_SECRET),user:u?{id:u.id,login:u.login,avatar:u.avatar}:null}); }
+
+    if (url.pathname === '/api/account/data' && (req.method === 'GET' || req.method === 'PUT')) {
+      const user = sessionFor(req);
+      if (!user) return reply(res, 401, { error: 'Sign in with GitHub to access account data.' });
+      try {
+        if (req.method === 'GET') return reply(res, 200, { data: await readAccountData(user.id) });
+        const body = await readBody(req, 1000000);
+        return reply(res, 200, { ok: true, data: await writeAccountData(user.id, body.data || {}) });
+      } catch (error) {
+        return reply(res, 502, { error: error instanceof Error ? error.message : 'Cloud account storage failed.' });
+      }
+    }
     if (url.pathname === '/api/account/logout' && req.method === 'POST') { cookie(res,'mmm_session','',0); return reply(res,200,{ok:true}); }
     if (url.pathname === '/api/assets' && req.method === 'POST') {
       if (!checkRate(req)) return reply(res,429,{error:'Too many uploads. Wait one minute and try again.'});
