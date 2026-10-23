@@ -333,7 +333,7 @@ const server = http.createServer(async (req, res) => {
       } catch (error) { return reply(res, 502, { error: error instanceof Error ? error.message : 'GitHub import failed.' }); }
     }
     if (url.pathname.startsWith('/api/mod-feedback/')) {
-      const match=url.pathname.match(/^\/api\/mod-feedback\/([^/]+)(?:\/(vote|comments))?$/);
+      const match=url.pathname.match(/^\/api\/mod-feedback\/([^/]+)(?:\/(vote|comments|rating))?$/);
       if(!match)return reply(res,404,{error:'Feedback route not found.'});
       let modId; try{modId=decodeURIComponent(match[1]);}catch{return reply(res,400,{error:'Invalid mod ID.'});}
       if(!modId||modId.length>120)return reply(res,400,{error:'Invalid mod ID.'});
@@ -342,10 +342,11 @@ const server = http.createServer(async (req, res) => {
         const file=await readFeedbackFile();
         const item=file.data[modId]&&typeof file.data[modId]==='object'?file.data[modId]:{votes:{},comments:[]};
         item.votes=item.votes&&typeof item.votes==='object'?item.votes:{};
+        item.ratings=item.ratings&&typeof item.ratings==='object'?item.ratings:{};
         item.comments=Array.isArray(item.comments)?item.comments:[];
         if(req.method==='GET'&&!match[2]){
           const votes=Object.values(item.votes).map(Number);
-          return reply(res,200,{upvotes:votes.filter(v=>v===1).length,downvotes:votes.filter(v=>v===-1).length,myVote:user?Number(item.votes[user.id]||0):0,comments:item.comments.slice(-100).reverse()});
+          const ratings=Object.values(item.ratings).map(Number).filter(v=>Number.isInteger(v)&&v>=1&&v<=5); return reply(res,200,{upvotes:votes.filter(v=>v===1).length,downvotes:votes.filter(v=>v===-1).length,myVote:user?Number(item.votes[user.id]||0):0,ratingAverage:ratings.length?Math.round((ratings.reduce((sum,v)=>sum+v,0)/ratings.length)*10)/10:0,ratingCount:ratings.length,myRating:user?Number(item.ratings[user.id]||0):0,comments:item.comments.slice(-100).reverse()});
         }
         if(!user)return reply(res,401,{error:'Sign in with GitHub to vote or comment.'});
         if(req.method==='POST'&&match[2]==='vote'){
@@ -356,6 +357,15 @@ const server = http.createServer(async (req, res) => {
           file.data[modId]=item;await saveFeedbackFile(file.data,file.sha,'Update community vote for '+modId);
           const votes=Object.values(item.votes).map(Number);
           return reply(res,200,{upvotes:votes.filter(v=>v===1).length,downvotes:votes.filter(v=>v===-1).length,myVote:vote});
+        }
+        if(req.method==='POST'&&match[2]==='rating'){
+          if(!checkRate(req))return reply(res,429,{error:'Too many ratings. Wait a minute.'});
+          const body=await readBody(req,5000);const rating=Number(body.rating);
+          if(!Number.isInteger(rating)||rating<1||rating>5)return reply(res,400,{error:'Rating must be a whole number from 1 to 5.'});
+          item.ratings[user.id]=rating;file.data[modId]=item;
+          await saveFeedbackFile(file.data,file.sha,'Rate mod '+modId);
+          const ratings=Object.values(item.ratings).map(Number).filter(v=>Number.isInteger(v)&&v>=1&&v<=5);
+          return reply(res,200,{ratingAverage:Math.round((ratings.reduce((sum,v)=>sum+v,0)/ratings.length)*10)/10,ratingCount:ratings.length,myRating:rating});
         }
         if(req.method==='POST'&&match[2]==='comments'){
           if(!checkRate(req))return reply(res,429,{error:'Too many comments. Wait a minute.'});
