@@ -27,12 +27,15 @@ The repository contains render.yaml for a free Render web service. Create a new 
 
 The app reads modinfo.Json from the mod-base repository. Publishing or removing a mod through Admin · Add mods commits the metadata file back to that repository, so the catalogue survives Render restarts without relying on an ephemeral filesystem. Never put GITHUB_TOKEN in frontend code or in a committed file.
 
-The curator form accepts a mod name, author, version, category, description, HTTPS direct download URL, optional HTTPS image/source URLs, and dependency names. It stores metadata only; binaries remain at their trusted upstream download URL. Use official releases and only add binaries you trust.
+The curator/creator form supports mod metadata, editing, a primary product image, a gallery of up to eight images, a preview video, dependencies and JSON configuration fields. Creator uploads are committed into `mods/<mod-name>/<kind>/` in the GitHub mod-base repository. Upload limits: images 8 MB each, MP4/WebM video 12 MB, and DLL/ZIP mod files 24 MB. Only upload files you have permission to distribute and have checked for safety.
+
+### Creator accounts
+Creator sign-in uses GitHub OAuth; it does not store GitHub passwords. Create a GitHub OAuth App with homepage URL `https://monkey-mod-hub.onrender.com` and callback URL `https://monkey-mod-hub.onrender.com/auth/github/callback`. In Render set `GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`, and a long random `SESSION_SECRET`. The GitHub OAuth app only requests public profile access. The existing `GITHUB_TOKEN` remains server-side and must have Contents read/write access to `dffdf-sv/GORILA-TAG-MODBASE`. Each signed-in creator can edit/remove their own entries; the admin password can manage all entries.
 
 ## Mod install behaviour
 
 - Website: opens the upstream HTTPS download. Browsers cannot silently write into a local Gorilla Tag installation.
-- Desktop app: the user explicitly selects their Gorilla Tag game folder. A direct DLL download is copied to BepInEx/plugins; a ZIP is extracted into the selected game root. Only HTTPS, DLL, and ZIP are accepted, with a download size limit. Dependencies are displayed but must be installed in the right order.
+- Desktop app: the user explicitly selects their Gorilla Tag game folder. DLL files are copied into `BepInEx/plugins/<Mod Name>/`; ZIPs are extracted into that mod's own folder. The app detects DLLs/folders under `BepInEx/plugins`. Configuration settings authored in the catalogue can be saved as a generated file under `BepInEx/config`; some mods require their own documented config format, so generated generic settings may not configure every mod automatically. Only HTTPS DLL/ZIP downloads are accepted, with a size limit. Dependencies are displayed but must be installed in the right order.
 - If a game folder has no BepInEx installation yet, install BepInEx first. Back up game files before installing mods.
 
 ## Desktop builds
