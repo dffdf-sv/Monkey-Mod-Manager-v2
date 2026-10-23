@@ -126,8 +126,15 @@ export default function App() {
 
   useEffect(() => {
     void loadCatalog(); void refreshAccount();
-    const handleMessage = (event: MessageEvent) => { if (event.origin === 'https://monkey-mod-hub.onrender.com' && event.data?.type === 'mmm-github-auth-complete') void refreshAccount(); };
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin === 'https://monkey-mod-hub.onrender.com' && event.data?.type === 'mmm-github-auth-complete') {
+        void refreshAccount();
+        window.setTimeout(() => void refreshAccount(), 700);
+      }
+    };
+    const handleWindowFocus = () => { void refreshAccount(); };
     window.addEventListener('message', handleMessage);
+    window.addEventListener('focus', handleWindowFocus);
     const stopListening = window.monkeyModManager?.onAuthToken((token) => {
       localStorage.setItem('mmm-auth-token', token);
       void refreshAccount();
@@ -140,7 +147,7 @@ export default function App() {
         else notify('That mod was not found in the current catalogue.');
       });
     });
-    return () => { window.removeEventListener('message', handleMessage); stopListening?.(); stopModListening?.(); };
+    return () => { window.removeEventListener('message', handleMessage); window.removeEventListener('focus', handleWindowFocus); stopListening?.(); stopModListening?.(); };
   }, []);
   useEffect(() => { localStorage.setItem('mmm-saved', JSON.stringify(saved)); }, [saved]);
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem('mmm-theme', theme); }, [theme]);
