@@ -43,7 +43,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All Mods');
-  const [page, setPage] = useState<'Discover' | 'Library' | 'Configs'>('Discover');
+  const [page, setPage] = useState<'Discover' | 'Library' | 'Configs' | 'Profiles'>('Discover');
   const [saved, setSaved] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('mmm-saved') || '[]') as string[]; } catch { return []; } });
   const [theme, setTheme] = useState(() => localStorage.getItem('mmm-theme') || 'dark');
   const [detail, setDetail] = useState<Mod | null>(null);
@@ -64,6 +64,9 @@ export default function App() {
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const [account, setAccount] = useState<{id:string;login:string;avatar:string}|null>(null);
   const [accountConfigured, setAccountConfigured] = useState(false);
+  const [accountData, setAccountData] = useState<{profiles:Array<{id:string;name:string;createdAt:string;installedMods:Record<string,string>;configs:Record<string,string>;savedMods:string[]}>;savedMods:string[];configs:Record<string,string>;installedMods:Record<string,string>}>({profiles:[],savedMods:[],configs:{},installedMods:{}});
+  const [profileName, setProfileName] = useState('My Gorilla Tag setup');
+  const [accountDataBusy, setAccountDataBusy] = useState(false);
   const [editingId, setEditingId] = useState<string|null>(null);
   const [configValues, setConfigValues] = useState<Record<string,string>>({});
   const [advancedConfig, setAdvancedConfig] = useState('{}');
@@ -87,8 +90,15 @@ export default function App() {
     if (token) headers.set('Authorization', 'Bearer ' + token);
     return fetch(url, { ...init, headers, credentials: desktop ? 'omit' : 'same-origin' });
   };
-  const refreshAccount = () => apiFetch(apiUrl('/api/account')).then((r) => r.json()).then((data) => {
+  const refreshAccount = () => apiFetch(apiUrl('/api/account')).then((r) => r.json()).then(async (data) => {
     setAccount(data.user || null); setAccountConfigured(Boolean(data.configured));
+    if (data.user) {
+      try {
+        const response = await apiFetch(apiUrl('/api/account/data'));
+        const result = await response.json();
+        if (response.ok && result.data) setAccountData({profiles:result.data.profiles||[],savedMods:result.data.savedMods||[],configs:result.data.configs||{},installedMods:result.data.installedMods||{}});
+      } catch { /* Cloud data can be refreshed from Profiles later. */ }
+    } else setAccountData({profiles:[],savedMods:[],configs:{},installedMods:{}});
   }).catch(() => {});
 
   const notify = (message: string) => { setNotice(message); window.setTimeout(() => setNotice(''), 3600); };
@@ -198,6 +208,40 @@ export default function App() {
     [mod.name, mod.author, mod.category, mod.description].join(' ').toLowerCase().includes(query.toLowerCase())
   ), [mods, page, saved, category, query, account]);
 
+  const saveAccountData = async (next: typeof accountData, successMessage = 'Saved to your account.') => {
+    if (!account) { notify('Sign in with GitHub to save data to your account.'); return false; }
+    setAccountDataBusy(true);
+    try {
+      const response = await apiFetch(apiUrl('/api/account/data'), {method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({data:next})});
+      const result = await response.json().catch(()=>({}));
+      if (!response.ok) throw new Error(result.error || 'Cloud save failed.');
+      setAccountData(next); notify(successMessage); return true;
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Cloud save failed. Check account storage setup.');
+      return false;
+    } finally { setAccountDataBusy(false); }
+  };
+  const saveCurrentConfigToAccount = async () => {
+    if (!selectedConfig) { notify('Choose a config file first.'); return; }
+    const next = {...accountData, configs:{...accountData.configs,[selectedConfig]:configText}, savedMods:[...new Set([...accountData.savedMods,...saved])], installedMods:{...accountData.installedMods,...installedMods}};
+    await saveAccountData(next, selectedConfig + ' saved to your account.');
+  };
+  const createProfile = async (event: FormEvent) => {
+    event.preventDefault();
+    const name = profileName.trim();
+    if (!name) return;
+    const profile = {id:crypto.randomUUID(),name,createdAt:new Date().toISOString(),installedMods:{...installedMods},configs:{...accountData.configs,...(selectedConfig?{[selectedConfig]:configText}:{})},savedMods:[...saved]};
+    const next = {...accountData,profiles:[profile,...accountData.profiles].slice(0,50),savedMods:[...new Set([...accountData.savedMods,...saved])],installedMods:{...accountData.installedMods,...installedMods}};
+    if (await saveAccountData(next, 'Profile "' + name + '" saved to your account.')) setProfileName('');
+  };
+  const restoreProfile = async (profile: typeof accountData.profiles[number]) => {
+    const next = {...accountData,savedMods:[...profile.savedMods],installedMods:{...profile.installedMods},configs:{...profile.configs}};
+    if (await saveAccountData(next, 'Profile loaded into your account. Reinstall listed mods on this device as needed.')) {
+      setSaved(profile.savedMods);
+      const firstConfig = Object.entries(profile.configs)[0];
+      if (firstConfig && desktop) { setPage('Configs'); await loadConfigFiles(); setSelectedConfig(firstConfig[0]); setConfigText(firstConfig[1]); }
+    }
+  };
   const toggleSaved = (mod: Mod) => {
     const adding = !saved.includes(mod.id);
     setSaved((current) => adding ? [...current, mod.id] : current.filter((id) => id !== mod.id));
@@ -408,6 +452,7 @@ export default function App() {
       <label className="side-label">WORKSPACE</label>
       <button className={'nav ' + (page === 'Discover' ? 'chosen' : '')} onClick={() => setPage('Discover')}>▦ <span>Discover mods</span></button>
       <button className={'nav ' + (page === 'Library' ? 'chosen' : '')} onClick={() => setPage('Library')}>▣ <span>Your mods</span><b className="count">{saved.length}</b></button>
+      <button className={'nav ' + (page === 'Profiles' ? 'chosen' : '')} onClick={() => {setPage('Profiles');setShowAdmin(false);}}>♙ <span>Account + profiles</span><b className="count">{accountData.profiles.length}</b></button>
       {desktop && <button className={'nav ' + (page === 'Configs' ? 'chosen' : '')} onClick={() => { setPage('Configs'); setShowAdmin(false); void loadConfigFiles(); }}>⚙ <span>CFG editor</span></button>}
       <button className={'nav ' + (showAdmin ? 'chosen' : '')} onClick={() => { if (!account) { notify('Sign in with GitHub to add and manage your own mods.'); return; } setShowAdmin((open) => !open); setEditingId(null); setDraft(blankDraft); }}>{showAdmin ? '×' : '＋'} <span>Mod editor</span></button>
       <label className="side-label">CATEGORIES</label>
@@ -497,7 +542,35 @@ export default function App() {
           {adminError && <div className="admin-error" role="alert">{adminError}</div>}
         </section>}
 
-        {page === 'Configs' ? <section className="cfg-workspace">
+        {page === 'Profiles' ? <section className="cfg-workspace">
+          <div className="cfg-heading"><div><label>YOUR ACCOUNT</label><h2>Account & profiles</h2><p>Keep saved mods, installed-mod snapshots, and config files synced to your GitHub account in private cloud storage.</p></div><button className="secondary" disabled={!account || accountDataBusy} onClick={() => void refreshAccount()}>↻ Refresh account</button></div>
+          {!account ? <div className="cfg-empty">Sign in with GitHub to save profiles, configs, and installed-mod lists to your account.</div> : <>
+            <div className="product-meta-grid">
+              <div><small>SAVED MODS</small><b>{accountData.savedMods.length || saved.length}</b></div>
+              <div><small>INSTALLED MODS SNAPSHOT</small><b>{Object.keys(accountData.installedMods).length}</b></div>
+              <div><small>CLOUD CONFIGS</small><b>{Object.keys(accountData.configs).length}</b></div>
+              <div><small>PROFILES</small><b>{accountData.profiles.length}</b></div>
+            </div>
+            <div className="admin-manage">
+              <div className="admin-manage-heading"><h3>Save a profile</h3><span>Mods + configs + library</span></div>
+              <form className="render-env-form" onSubmit={createProfile}>
+                <label>Profile name<input value={profileName} onChange={event=>setProfileName(event.target.value)} required maxLength={80} placeholder="e.g. Casual / Modded / VR" /></label>
+                <p className="cfg-muted">Captures installed-mod versions, saved library, and any config loaded in the CFG editor.</p>
+                <button className="primary" disabled={accountDataBusy}>{accountDataBusy ? 'Saving…' : '＋ Save profile'}</button>
+              </form>
+            </div>
+            <div className="admin-manage">
+              <div className="admin-manage-heading"><h3>Your profiles</h3><span>{accountData.profiles.length} saved</span></div>
+              {accountData.profiles.map(profile=><div className="admin-mod-row" key={profile.id}><div><b>{profile.name}</b><small>{new Date(profile.createdAt).toLocaleString()} · {Object.keys(profile.installedMods).length} installed mods · {Object.keys(profile.configs).length} configs</small></div><div className="admin-mod-actions"><button type="button" className="details" onClick={()=>void restoreProfile(profile)}>Load</button><button type="button" className="delete-mod" disabled={accountDataBusy} onClick={()=>void saveAccountData({...accountData,profiles:accountData.profiles.filter(item=>item.id!==profile.id)},'Profile removed.')}>Delete</button></div></div>)}
+              {!accountData.profiles.length && <p className="form-help">No profiles yet. Create one above to save a snapshot to your account.</p>}
+            </div>
+            <div className="admin-manage">
+              <div className="admin-manage-heading"><h3>Cloud configuration files</h3><span>{Object.keys(accountData.configs).length} saved</span></div>
+              {Object.entries(accountData.configs).map(([name,content])=><div className="admin-mod-row" key={name}><div><b>{name}</b><small>{content.length.toLocaleString()} characters stored privately</small></div><div className="admin-mod-actions"><button type="button" className="details" onClick={()=>{setSelectedConfig(name);setConfigText(content);setPage('Configs');}}>Open</button><button type="button" className="delete-mod" disabled={accountDataBusy} onClick={()=>void saveAccountData({...accountData,configs:Object.fromEntries(Object.entries(accountData.configs).filter(([key])=>key!==name))},'Cloud config deleted.')}>Delete</button></div></div>)}
+              {!Object.keys(accountData.configs).length && <p className="form-help">Save a config from the CFG editor to keep a private cloud copy.</p>}
+            </div>
+          </>}
+        </section> : page === 'Configs' ? <section className="cfg-workspace">
           <div className="cfg-heading"><div><label>LOCAL GAME FILES</label><h2>CFG viewer & editor</h2><p>Edit BepInEx configuration files directly in your Gorilla Tag installation. A .bak backup is created before overwriting an existing file.</p></div><button className="secondary" onClick={() => void loadConfigFiles()} disabled={configBusy}>↻ Refresh files</button></div>
           {!gameFolder && <div className="cfg-empty">Gorilla Tag folder not detected. Use “Choose game folder” on Discover first.</div>}
           <div className="cfg-layout">
@@ -505,9 +578,9 @@ export default function App() {
               {configFiles.map((file) => <button key={file.name} className={'cfg-file ' + (selectedConfig === file.name ? 'active' : '')} onClick={() => void openConfigFile(file.name)}><b>{file.name}</b><small>{(file.size / 1024).toFixed(1)} KB</small></button>)}
               {!configFiles.length && <p className="cfg-muted">{configBusy ? 'Loading files…' : 'No .cfg files found in BepInEx/config.'}</p>}
             </aside>
-            <div className="cfg-editor"><div className="cfg-editor-bar"><b>{selectedConfig || 'Select a configuration file'}</b><button className="primary" disabled={!selectedConfig || configBusy} onClick={() => void saveConfigFile()}>{configBusy ? 'Working…' : 'Save config'}</button></div>
+            <div className="cfg-editor"><div className="cfg-editor-bar"><b>{selectedConfig || 'Select a configuration file'}</b><button className="secondary" disabled={!selectedConfig || !account || accountDataBusy} onClick={() => void saveCurrentConfigToAccount()}>{accountDataBusy ? 'Saving…' : 'Save to account'}</button><button className="primary" disabled={!selectedConfig || configBusy} onClick={() => void saveConfigFile()}>{configBusy ? 'Working…' : 'Save config'}</button></div>
               <textarea className="cfg-textarea" spellCheck={false} value={configText} onChange={(event) => setConfigText(event.target.value)} placeholder="Choose a .cfg file from the list to view and edit its contents…" disabled={!selectedConfig} />
-              <p className="cfg-muted">Changes are written to the local game folder. Some mods only reload settings when the game restarts.</p>
+              <p className="cfg-muted">Changes are written to the local game folder. Use “Save to account” to store a private cloud copy; use Account + profiles to bundle configs and installed-mod snapshots.</p>
             </div>
           </div>
           {configError && <div className="admin-error" role="alert">{configError}</div>}
