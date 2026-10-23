@@ -45,6 +45,7 @@ const blankDraft: Draft = { name: '', author: '', category: 'Utility', descripti
 export default function App() {
   const [mods, setMods] = useState<Mod[]>(fallbackMods);
   const [loading, setLoading] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All Mods');
   const [page, setPage] = useState<'Overview' | 'Discover' | 'Library' | 'Configs' | 'Profiles' | 'Editor' | 'Settings'>(() => (window.location.pathname === '/editor' || window.location.hash === '#/editor') ? 'Editor' : (window.monkeyModManager?.isDesktop && (window.location.pathname === '/settings' || window.location.hash === '#/settings')) ? 'Settings' : 'Overview');
@@ -615,7 +616,7 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
-  return <div className={"shell page-" + page.toLowerCase()}>
+  return <div className={"shell page-" + page.toLowerCase() + (sidebarCollapsed ? " sidebar-collapsed" : "")}>
     <aside className="sidebar">
       <div className="brand"><div className="brand-logo"><img src="/image.jpg" alt="Monkey Mod Manager" /></div><div><b>MONKEY</b><small>MOD HUB <i>V2</i></small></div></div>
       <label className="side-label">WORKSPACE</label>
@@ -625,7 +626,8 @@ export default function App() {
       <button className={'nav ' + (page === 'Profiles' ? 'chosen' : '')} onClick={() => goToPage('Profiles')}>♙ <span>Account + profiles</span><b className="count">{accountData.profiles.length}</b></button>
       {desktop && <button className={'nav ' + (page === 'Configs' ? 'chosen' : '')} onClick={() => { goToPage('Configs'); void loadConfigFiles(); }}>⚙ <span>CFG editor</span></button>}
       <button className={'nav ' + (page === 'Editor' ? 'chosen' : '')} onClick={() => { if (!account) { notify('Sign in with GitHub to add and manage your own mods.'); return; } setEditingId(null); setDraft(blankDraft); goToPage('Editor'); }}>{showAdmin ? '×' : '＋'} <span>Mod editor ↗</span></button>
-      {desktop && <button className={'nav ' + (page === 'Settings' ? 'chosen' : '')} onClick={() => goToPage('Settings')}>⚙ <span>Settings</span></button>}\n      <label className="side-label">CATEGORIES</label>
+      {desktop && <button className={'nav ' + (page === 'Settings' ? 'chosen' : '')} onClick={() => goToPage('Settings')}>⚙ <span>Settings</span></button>}
+      <label className="side-label">CATEGORIES</label>
       {categories.map((item) => <button key={item} className={'nav catnav ' + (category === item ? 'chosen' : '')} onClick={() => setCategory(item)}><i className={'dot ' + item.toLowerCase().replace(' ', '-')} /><span>{item}</span></button>)}
       <div className="sidebottom">
         <div className="status"><i /><span><b>Mod base</b><small>{loading ? 'Loading catalogue…' : mods.length + ' listed mods'}</small></span></div>
