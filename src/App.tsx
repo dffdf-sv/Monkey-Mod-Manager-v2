@@ -78,7 +78,7 @@ export default function App() {
     const token = localStorage.getItem('mmm-auth-token') || '';
     const headers = new Headers(init.headers || {});
     if (token) headers.set('Authorization', 'Bearer ' + token);
-    return fetch(url, { ...init, headers, credentials: 'include' });
+    return fetch(url, { ...init, headers, credentials: desktop ? 'omit' : 'same-origin' });
   };
   const refreshAccount = () => apiFetch(apiUrl('/api/account')).then((r) => r.json()).then((data) => {
     setAccount(data.user || null); setAccountConfigured(Boolean(data.configured));
