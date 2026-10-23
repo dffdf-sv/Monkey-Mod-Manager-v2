@@ -48,8 +48,10 @@ jobs:
           npm pkg set "version=$packageVersion"
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Build Windows installer
-        run: npm run dist:win
+      - name: Build and publish Windows installer + update metadata
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build && npx electron-builder --win nsis --publish always
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
@@ -61,7 +63,8 @@ jobs:
           retention-days: 14
 
   build-linux:
-    name: Build Linux packages
+    name: Build and publish Linux packages
+    needs: build-windows
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -90,8 +93,10 @@ jobs:
           npm pkg set "version=$PACKAGE_VERSION"
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Build Linux packages
-        run: npm run dist:linux
+      - name: Build and publish Linux packages + update metadata
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build && npx electron-builder --linux AppImage deb --publish always
       - name: Upload Linux packages
         uses: actions/upload-artifact@v4
         with:
@@ -103,44 +108,3 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  publish-release:
-    name: Publish direct downloads to GitHub Releases
-    runs-on: ubuntu-latest
-    needs:
-      - build-windows
-      - build-linux
-    steps:
-      - name: Download Windows installer
-        uses: actions/download-artifact@v4
-        with:
-          name: Monkey-Mod-Manager-Windows
-          path: release-files
-          merge-multiple: true
-      - name: Download Linux packages
-        uses: actions/download-artifact@v4
-        with:
-          name: Monkey-Mod-Manager-Linux
-          path: release-files
-          merge-multiple: true
-      - name: Set release metadata
-        id: release
-        shell: bash
-        env:
-          INPUT_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
-        run: |
-          VERSION="${INPUT_VERSION#v}"
-          [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+)*$ ]] || { echo "Invalid release version: $INPUT_VERSION"; exit 1; }
-          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
-          echo "name=Monkey Mod Manager v$VERSION" >> "$GITHUB_OUTPUT"
-      - name: Publish direct installer files
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.release.outputs.tag }}
-          target_commitish: main
-          name: ${{ steps.release.outputs.name }}
-          generate_release_notes: true
-          files: |
-            release-files/*.exe
-            release-files/*.AppImage
-            release-files/*.deb
-            release-files/*.yml
