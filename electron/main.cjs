@@ -4,8 +4,26 @@ const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) app.quit();
 let mainWindow = null;
 let pendingAuthToken = null;
+let pendingModId = null;
 function handleAuthDeepLink(value) {
-  try { const url = new URL(value); if (url.protocol !== 'monkeymodmanager:' || url.hostname !== 'auth') return; const token = url.searchParams.get('token'); if (!token || token.length > 4096) return; pendingAuthToken = token; if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoading()) { mainWindow.webContents.send('auth:token', token); pendingAuthToken = null; } } catch {}
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'monkeymodmanager:') return;
+    if (url.hostname === 'auth') {
+      const token = url.searchParams.get('token');
+      if (!token || token.length > 4096) return;
+      pendingAuthToken = token;
+      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoading()) { mainWindow.webContents.send('auth:token', token); pendingAuthToken = null; }
+      return;
+    }
+    if (url.hostname === 'mod') {
+      const modId = decodeURIComponent(url.pathname.replace(/^\/+/, '')).slice(0, 120);
+      if (!/^[a-zA-Z0-9_-]+$/.test(modId)) return;
+      pendingModId = modId;
+      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoading()) { mainWindow.webContents.send('mod:open', modId); pendingModId = null; }
+      if (mainWindow) { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.focus(); }
+    }
+  } catch {}
 }
 app.on('open-url', (event, value) => { event.preventDefault(); handleAuthDeepLink(value); });
 app.on('second-instance', (_event, argv) => { const link = argv.find((arg) => arg.startsWith('monkeymodmanager://')); if (link) handleAuthDeepLink(link); if (mainWindow) { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.focus(); } });
@@ -27,7 +45,7 @@ function createWindow() {
   });
   mainWindow = win;
   win.webContents.setWindowOpenHandler(({ url }) => { if (url.startsWith('https://')) shell.openExternal(url); return { action: 'deny' }; });
-  win.webContents.on('did-finish-load', () => { if (pendingAuthToken) { win.webContents.send('auth:token', pendingAuthToken); pendingAuthToken = null; } });
+  win.webContents.on('did-finish-load', () => { if (pendingAuthToken) { win.webContents.send('auth:token', pendingAuthToken); pendingAuthToken = null; } if (pendingModId) { win.webContents.send('mod:open', pendingModId); pendingModId = null; } });
   win.on('closed', () => { if (mainWindow === win) mainWindow = null; });
   win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   return win;
