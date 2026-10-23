@@ -17,6 +17,9 @@ declare global {
       installMod: (mod: Mod) => Promise<{ ok: boolean; message: string; path?: string }>;
       getInstalledMods: () => Promise<Record<string, string>>;
       getDetectedMods: () => Promise<string[]>;
+      listConfigFiles: () => Promise<{ok:boolean;message?:string;files:Array<{name:string;size:number;modified:string}>}>;
+      readConfigFile: (name:string) => Promise<{ok:boolean;message?:string;name?:string;content?:string}>;
+      writeConfigFile: (payload:{name:string;content:string}) => Promise<{ok:boolean;message:string;path?:string}>;
       saveModConfig: (payload: {modName:string;values:Record<string,string>}) => Promise<{ok:boolean;message:string;path?:string}>;
       installBepInEx: () => Promise<{ ok: boolean; message: string; path?: string }>;
     };
@@ -36,7 +39,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All Mods');
-  const [page, setPage] = useState<'Discover' | 'Library'>('Discover');
+  const [page, setPage] = useState<'Discover' | 'Library' | 'Configs'>('Discover');
   const [saved, setSaved] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('mmm-saved') || '[]') as string[]; } catch { return []; } });
   const [theme, setTheme] = useState(() => localStorage.getItem('mmm-theme') || 'dark');
   const [detail, setDetail] = useState<Mod | null>(null);
@@ -56,6 +59,17 @@ export default function App() {
   const [configValues, setConfigValues] = useState<Record<string,string>>({});
   const [advancedConfig, setAdvancedConfig] = useState('{}');
   const [detectedMods, setDetectedMods] = useState<string[]>([]);
+  const [configFiles, setConfigFiles] = useState<Array<{name:string;size:number;modified:string}>>([]);
+  const [selectedConfig, setSelectedConfig] = useState('');
+  const [configText, setConfigText] = useState('');
+  const [configBusy, setConfigBusy] = useState(false);
+  const [configError, setConfigError] = useState('');
+  const [renderVariables, setRenderVariables] = useState<Array<{key:string;hasValue:boolean}>>([]);
+  const [renderKey, setRenderKey] = useState('ADMIN_PASSWORD');
+  const [renderValue, setRenderValue] = useState('');
+  const [renderBusy, setRenderBusy] = useState(false);
+  const [renderError, setRenderError] = useState('');
+  const [showRenderSettings, setShowRenderSettings] = useState(false);
   const desktop = Boolean(window.monkeyModManager && window.monkeyModManager.isDesktop);
   const apiUrl = (path: string) => (desktop ? 'https://monkey-mod-hub.onrender.com' : '') + path;
 
@@ -180,6 +194,62 @@ export default function App() {
       const result = await window.monkeyModManager!.installBepInEx();
       notify(result.ok ? 'BepInEx installed. Launch Gorilla Tag once to finish setup.' : result.message);
     } catch { notify('BepInEx installation failed. Check your game folder and internet connection.'); }
+  };
+
+  const loadConfigFiles = async () => {
+    if (!desktop) { setConfigError('The CFG editor is available in the desktop app only.'); return; }
+    setConfigBusy(true); setConfigError('');
+    try {
+      const result = await window.monkeyModManager!.listConfigFiles();
+      if (!result.ok) throw new Error(result.message || 'Could not list config files.');
+      setConfigFiles(result.files);
+      if (selectedConfig && !result.files.some((file) => file.name === selectedConfig)) { setSelectedConfig(''); setConfigText(''); }
+    } catch (error) { setConfigError(error instanceof Error ? error.message : 'Could not list config files.'); }
+    finally { setConfigBusy(false); }
+  };
+  const openConfigFile = async (name: string) => {
+    setConfigBusy(true); setConfigError('');
+    try {
+      const result = await window.monkeyModManager!.readConfigFile(name);
+      if (!result.ok) throw new Error(result.message || 'Could not read config file.');
+      setSelectedConfig(name); setConfigText(result.content || '');
+    } catch (error) { setConfigError(error instanceof Error ? error.message : 'Could not read config file.'); }
+    finally { setConfigBusy(false); }
+  };
+  const saveConfigFile = async () => {
+    if (!selectedConfig) return;
+    setConfigBusy(true); setConfigError('');
+    try {
+      const result = await window.monkeyModManager!.writeConfigFile({ name: selectedConfig, content: configText });
+      if (!result.ok) throw new Error(result.message || 'Could not save config.');
+      notify(result.message); await loadConfigFiles();
+    } catch (error) { setConfigError(error instanceof Error ? error.message : 'Could not save config.'); }
+    finally { setConfigBusy(false); }
+  };
+  const loadRenderVariables = async () => {
+    setRenderBusy(true); setRenderError('');
+    try {
+      const response = await fetch(apiUrl('/api/admin/render-env'), { headers: { 'x-admin-password': adminPassword } });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Could not load Render variables.');
+      setRenderVariables(Array.isArray(result.variables) ? result.variables : []);
+    } catch (error) { setRenderError(error instanceof Error ? error.message : 'Could not load Render variables.'); }
+    finally { setRenderBusy(false); }
+  };
+  const saveRenderVariable = async (event: FormEvent) => {
+    event.preventDefault(); setRenderBusy(true); setRenderError('');
+    try {
+      const response = await fetch(apiUrl('/api/admin/render-env/' + encodeURIComponent(renderKey)), {
+        method: 'PUT', headers: { 'content-type': 'application/json', 'x-admin-password': adminPassword },
+        body: JSON.stringify({ value: renderValue })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Could not save Render variable.');
+      setRenderValue('');
+      notify(result.message || 'Render variable saved.');
+      await loadRenderVariables();
+    } catch (error) { setRenderError(error instanceof Error ? error.message : 'Could not save Render variable.'); }
+    finally { setRenderBusy(false); }
   };
 
   const unlockAdmin = async (event: FormEvent) => {
