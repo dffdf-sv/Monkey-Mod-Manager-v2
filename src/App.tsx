@@ -158,7 +158,7 @@ export default function App() {
   const uploadAsset = async (file: File, kind: 'image'|'video'|'mod') => {
     if (!account) throw new Error('Sign in with GitHub before uploading files.');
     const base64 = await new Promise<string>((resolve,reject)=>{ const reader=new FileReader(); reader.onload=()=>resolve(String(reader.result||'')); reader.onerror=()=>reject(new Error('Could not read file.')); reader.readAsDataURL(file); });
-    const response=await fetch(apiUrl('/api/assets'),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({modId:draft.name,fileName:file.name,mime:file.type||(kind==='mod'?'application/octet-stream':''),kind,base64})});
+    const response=await fetch(apiUrl('/api/assets'),{method:'POST',headers:{'content-type':'application/json','x-admin-password':adminPassword},body:JSON.stringify({modId:draft.name,fileName:file.name,mime:file.type||(kind==='mod'?'application/octet-stream':''),kind,base64})});
     const data=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(data.error||'Upload failed.');
     return String(data.url);
