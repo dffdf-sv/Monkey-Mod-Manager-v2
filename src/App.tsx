@@ -122,7 +122,7 @@ export default function App() {
         lastUpdateSignature = signature;
       } catch { /* A temporary network error should not interrupt installs. */ }
     };
-    const initial = window.setTimeout(() => { void pollUpdates(false); }, 8000);
+    const initial = window.setTimeout(() => { void pollUpdates(true); }, 8000);
     const interval = window.setInterval(() => { void pollUpdates(true); }, 120000);
     return () => { active = false; window.clearTimeout(initial); window.clearInterval(interval); };
   }, [desktop]);
