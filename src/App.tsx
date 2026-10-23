@@ -583,7 +583,7 @@ export default function App() {
 
   return <div className={"shell page-" + page.toLowerCase()}>
     <aside className="sidebar">
-      <div className="brand"><div className="brand-logo">🐒</div><div><b>MONKEY</b><small>MOD HUB <i>V2</i></small></div></div>
+      <div className="brand"><div className="brand-logo"><img src="/image.jpg" alt="Monkey Mod Manager" /></div><div><b>MONKEY</b><small>MOD HUB <i>V2</i></small></div></div>
       <label className="side-label">WORKSPACE</label>
       <button className={'nav ' + (page === 'Overview' ? 'chosen' : '')} onClick={() => goToPage('Overview')}>⌂ <span>Overview</span></button>
       <button className={'nav ' + (page === 'Discover' ? 'chosen' : '')} onClick={() => goToPage('Discover')}>▦ <span>Discover mods</span></button>
