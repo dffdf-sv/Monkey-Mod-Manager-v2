@@ -2,6 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -161,7 +162,60 @@ const server = http.createServer(async (req, res) => {
       catch(e){return reply(res,502,{error:e instanceof Error?e.message:'Upload failed.'});}
     }
 
-    if (url.pathname === '/healthz') return reply(res, 200, { ok: true, service: 'monkey-mod-hub' });
+    if (url.pathname === '/health' && req.method === 'GET') {
+      const memory = process.memoryUsage();
+      const totalMemory = os.totalmem();
+      const freeMemory = os.freemem();
+      const cpu = process.cpuUsage();
+      return reply(res, 200, {
+        status: 'healthy',
+        service: 'monkey-mod-hub',
+        timestamp: new Date().toISOString(),
+        uptime: {
+          seconds: Math.floor(process.uptime()),
+          human: (() => {
+            const seconds = Math.floor(process.uptime());
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const remainingSeconds = seconds % 60;
+            return [days ? days + 'd' : '', hours ? hours + 'h' : '', minutes ? minutes + 'm' : '', remainingSeconds + 's'].filter(Boolean).join(' ');
+          })()
+        },
+        process: {
+          pid: process.pid,
+          nodeVersion: process.version,
+          platform: process.platform,
+          architecture: process.arch,
+          cpuTime: { userMicroseconds: cpu.user, systemMicroseconds: cpu.system }
+        },
+        memory: {
+          process: {
+            rssBytes: memory.rss,
+            heapUsedBytes: memory.heapUsed,
+            heapTotalBytes: memory.heapTotal,
+            externalBytes: memory.external,
+            arrayBuffersBytes: memory.arrayBuffers
+          },
+          system: {
+            totalBytes: totalMemory,
+            freeBytes: freeMemory,
+            usedBytes: totalMemory - freeMemory,
+            usedPercent: Number((((totalMemory - freeMemory) / totalMemory) * 100).toFixed(1))
+          }
+        },
+        system: {
+          loadAverage: os.loadavg(),
+          cpuCount: os.cpus().length
+        },
+        configuration: {
+          githubTokenConfigured: Boolean(process.env.GITHUB_TOKEN),
+          githubOAuthConfigured: Boolean(process.env.GITHUB_OAUTH_CLIENT_ID && process.env.GITHUB_OAUTH_CLIENT_SECRET && process.env.SESSION_SECRET),
+          adminPasswordConfigured: Boolean(process.env.ADMIN_PASSWORD)
+        }
+      });
+    }
+    if (url.pathname === '/healthz' && req.method === 'GET') return reply(res, 200, { ok: true, service: 'monkey-mod-hub' });
     if (url.pathname === '/api/github-import' && req.method === 'GET') {
       const source = url.searchParams.get('url') || '';
       let parsed;
