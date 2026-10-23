@@ -1,5 +1,7 @@
 const { app, BrowserWindow, shell, dialog, ipcMain } = require('electron');
 app.setAsDefaultProtocolClient('monkeymodmanager');
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) app.quit();
 let mainWindow = null;
 let pendingAuthToken = null;
 function handleAuthDeepLink(value) {
