@@ -513,6 +513,7 @@ export default function App() {
   };
 
   const goToPage = (next:'Discover'|'Library'|'Configs'|'Profiles'|'Editor'|'Settings') => {
+    if (!desktop && (next === 'Settings' || next === 'Configs')) next = 'Discover';
     setPage(next); setShowAdmin(next === 'Editor');
     const route = next === 'Editor' ? '/editor' : next === 'Settings' ? '/settings' : '/';
     const target = desktop ? (next === 'Editor' ? '#/editor' : next === 'Settings' ? '#/settings' : '#/') : route;
@@ -520,7 +521,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    const onPop = () => { const p = window.location.pathname; const h = window.location.hash; const editor = p === '/editor' || h === '#/editor'; const settings = p === '/settings' || h === '#/settings'; setPage(editor ? 'Editor' : settings ? 'Settings' : 'Discover'); setShowAdmin(editor); };
+    const onPop = () => { const p = window.location.pathname; const h = window.location.hash; const editor = p === '/editor' || h === '#/editor'; const settings = desktop && (p === '/settings' || h === '#/settings'); setPage(editor ? 'Editor' : settings ? 'Settings' : 'Discover'); setShowAdmin(editor); if (!desktop && (p === '/settings' || h === '#/settings')) window.history.replaceState({}, '', '/'); };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
@@ -534,7 +535,7 @@ export default function App() {
       <button className={'nav ' + (page === 'Profiles' ? 'chosen' : '')} onClick={() => goToPage('Profiles')}>♙ <span>Account + profiles</span><b className="count">{accountData.profiles.length}</b></button>
       {desktop && <button className={'nav ' + (page === 'Configs' ? 'chosen' : '')} onClick={() => { goToPage('Configs'); void loadConfigFiles(); }}>⚙ <span>CFG editor</span></button>}
       <button className={'nav ' + (page === 'Editor' ? 'chosen' : '')} onClick={() => { if (!account) { notify('Sign in with GitHub to add and manage your own mods.'); return; } setEditingId(null); setDraft(blankDraft); goToPage('Editor'); }}>{showAdmin ? '×' : '＋'} <span>Mod editor ↗</span></button>
-      <button className={'nav ' + (page === 'Settings' ? 'chosen' : '')} onClick={() => goToPage('Settings')}>⚙ <span>Settings</span></button>\n      <label className="side-label">CATEGORIES</label>
+      {desktop && <button className={'nav ' + (page === 'Settings' ? 'chosen' : '')} onClick={() => goToPage('Settings')}>⚙ <span>Settings</span></button>}\n      <label className="side-label">CATEGORIES</label>
       {categories.map((item) => <button key={item} className={'nav catnav ' + (category === item ? 'chosen' : '')} onClick={() => setCategory(item)}><i className={'dot ' + item.toLowerCase().replace(' ', '-')} /><span>{item}</span></button>)}
       <div className="sidebottom">
         <div className="status"><i /><span><b>Mod base</b><small>{loading ? 'Loading catalogue…' : mods.length + ' listed mods'}</small></span></div>
@@ -570,7 +571,7 @@ export default function App() {
           <div className="admin-heading"><div><h2>{editingId ? 'Edit mod' : 'Mod editor'}</h2><p>Publish a mod or manage your own entries in the catalogue.</p></div></div>
           {!adminUnlocked && !account ? <form className="admin-unlock" onSubmit={unlockAdmin}><label>Admin password<input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} autoComplete="current-password" placeholder="Admin password" required /></label><button className="primary" disabled={adminBusy}>{adminBusy ? 'Checking…' : 'Unlock admin tools'}</button></form> :
           <>
-            <div className="admin-manage-heading admin-form-toolbar"><div><h3>{editingId ? 'Edit mod listing' : 'Add a mod'}</h3><p>Fill in the product details below. All optional media fields are visible.</p></div><div className="admin-toolbar-actions"><button className="secondary" type="button" onClick={() => void loadCatalog()} disabled={loading}>↻ Reload</button><button className="secondary" type="button" onClick={() => void installModFromDisk()}>＋ Install mod files from disk</button><button className="secondary" type="button" onClick={() => { setDraft(blankDraft); setEditingId(null); setAdminError(''); }}>＋ New mod</button></div></div>
+            <div className="admin-manage-heading admin-form-toolbar"><div><h3>{editingId ? 'Edit mod listing' : 'Add a mod'}</h3><p>Fill in the product details below. All optional media fields are visible.</p></div><div className="admin-toolbar-actions"><button className="secondary" type="button" onClick={() => void loadCatalog()} disabled={loading}>↻ Reload</button>{desktop && <button className="secondary" type="button" onClick={() => void installModFromDisk()}>＋ Install mod files from disk</button>}<button className="secondary" type="button" onClick={() => { setDraft(blankDraft); setEditingId(null); setAdminError(''); }}>＋ New mod</button></div></div>
             <form className="admin-form compact-admin-form add-mod-only-form" onSubmit={addMod}>
               <div className="github-import-box full">
                 <label className="github-import-toggle"><input type="checkbox" checked={useGitHubImport} onChange={(e) => { setUseGitHubImport(e.target.checked); if (!e.target.checked) setNotMyMod(false); }} /><span><b>Import a mod from GitHub</b></span></label>
