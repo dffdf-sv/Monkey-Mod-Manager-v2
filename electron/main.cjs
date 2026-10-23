@@ -75,6 +75,51 @@ ipcMain.handle('game:get-folder', async () => {
   if (found) { await writeSettings({ ...settings, gameFolder: found }); return found; }
   return settings.gameFolder || null;
 });
+ipcMain.handle('config:list-files', async () => {
+  try {
+    const settings = await readSettings();
+    if (!settings.gameFolder) return { ok: false, message: 'Gorilla Tag folder is not set.', files: [] };
+    const dir = path.join(path.resolve(settings.gameFolder), 'BepInEx', 'config');
+    const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => []);
+    const files = [];
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.cfg') || !/^[a-zA-Z0-9_. -]+\.cfg$/i.test(entry.name)) continue;
+      const info = await fs.stat(path.join(dir, entry.name)).catch(() => null);
+      if (info && info.size <= 2 * 1024 * 1024) files.push({ name: entry.name, size: info.size, modified: info.mtime.toISOString() });
+    }
+    return { ok: true, files: files.sort((a,b) => a.name.localeCompare(b.name)) };
+  } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Could not list config files.', files: [] }; }
+});
+ipcMain.handle('config:read-file', async (_event, name) => {
+  try {
+    if (typeof name !== 'string' || !/^[a-zA-Z0-9_. -]+\.cfg$/i.test(name) || name.includes('..')) throw new Error('Invalid config filename.');
+    const settings = await readSettings();
+    if (!settings.gameFolder) throw new Error('Gorilla Tag folder is not set.');
+    const dir = path.resolve(settings.gameFolder, 'BepInEx', 'config');
+    const file = path.resolve(dir, name);
+    if (!file.startsWith(dir + path.sep)) throw new Error('Invalid config path.');
+    const info = await fs.stat(file);
+    if (!info.isFile() || info.size > 2 * 1024 * 1024) throw new Error('Config file is too large or not a regular file.');
+    return { ok: true, name, content: await fs.readFile(file, 'utf8') };
+  } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Could not read config file.' }; }
+});
+ipcMain.handle('config:write-file', async (_event, payload) => {
+  try {
+    const name = payload && payload.name;
+    const content = payload && payload.content;
+    if (typeof name !== 'string' || !/^[a-zA-Z0-9_. -]+\.cfg$/i.test(name) || name.includes('..')) throw new Error('Invalid config filename.');
+    if (typeof content !== 'string' || Buffer.byteLength(content, 'utf8') > 2 * 1024 * 1024) throw new Error('Config content must be under 2 MB.');
+    const settings = await readSettings();
+    if (!settings.gameFolder) throw new Error('Gorilla Tag folder is not set.');
+    const dir = path.resolve(settings.gameFolder, 'BepInEx', 'config');
+    const file = path.resolve(dir, name);
+    if (!file.startsWith(dir + path.sep)) throw new Error('Invalid config path.');
+    await fs.mkdir(dir, { recursive: true });
+    try { await fs.copyFile(file, file + '.bak'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    await fs.writeFile(file, content, 'utf8');
+    return { ok: true, message: 'Saved ' + name + (await fs.stat(file + '.bak').then(() => ' (backup created)').catch(() => '')), path: file };
+  } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Could not save config.' }; }
+});
 ipcMain.handle('mods:get-installed', async () => (await readSettings()).installedMods || {});
 ipcMain.handle('config:save', async (_event, payload) => {
   try {
