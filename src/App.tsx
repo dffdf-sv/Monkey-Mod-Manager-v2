@@ -52,14 +52,15 @@ export default function App() {
   const apiUrl = (path: string) => (desktop ? 'https://monkey-mod-hub.onrender.com' : '') + path;
 
   const notify = (message: string) => { setNotice(message); window.setTimeout(() => setNotice(''), 3600); };
-  const loadCatalog = async () => {
+  const loadCatalog = async (): Promise<Mod[]> => {
     try {
       const response = await fetch(apiUrl('/api/mods'));
       if (!response.ok) throw new Error('Catalog unavailable');
       const data = await response.json() as { mods?: Mod[] };
-      if (Array.isArray(data.mods)) setMods(data.mods);
+      if (Array.isArray(data.mods)) { setMods(data.mods); return data.mods; }
     } catch { /* Baked-in fallback keeps local/offline preview usable. */ }
     finally { setLoading(false); }
+    return mods;
   };
 
   useEffect(() => { void loadCatalog(); }, []);
@@ -110,11 +111,11 @@ export default function App() {
   const checkForUpdates = async () => {
     setCheckingUpdates(true);
     try {
-      await loadCatalog();
+      const catalog = await loadCatalog();
       if (desktop) {
         const installed = await window.monkeyModManager!.getInstalledMods();
         setInstalledMods(installed);
-        const updates = mods.filter((mod) => installed[mod.id] && installed[mod.id] !== mod.version);
+        const updates = catalog.filter((mod) => installed[mod.id] && installed[mod.id] !== mod.version);
         notify(updates.length ? updates.length + ' mod update' + (updates.length === 1 ? '' : 's') + ' available.' : 'Update check complete. No updates found for tracked installs.');
       } else {
         notify('Catalogue refreshed. Installed-version checks are available in the desktop app.');
