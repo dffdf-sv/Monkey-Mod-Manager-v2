@@ -145,18 +145,22 @@ ipcMain.handle('mods:toggle-installed', async (_event, requestedName) => {
     const root = path.resolve(settings.gameFolder); const plugins = path.resolve(root,'BepInEx','plugins');
     if (!plugins.startsWith(root + path.sep)) throw new Error('Invalid plugins folder.');
     const entries = await fs.readdir(plugins,{withFileTypes:true}).catch(()=>[]);
-    const matched = entries.find(entry=>entry.name===requestedName || entry.name.replace(/\\.disabled$/i,'')===requestedName.replace(/\\.disabled$/i,''));
+    const cleanName = value => String(value).replace(/\.disabled$/i,'').replace(/\.dll$/i,'').toLowerCase();
+    const matched = entries.find(entry=>entry.name===requestedName || cleanName(entry.name)===cleanName(requestedName));
     if (!matched) throw new Error('That mod is no longer in the plugins folder. Refresh the installed-mod list.');
     const base = path.resolve(plugins,matched.name); if (!base.startsWith(plugins + path.sep)) throw new Error('Invalid mod path.');
     const paths = [];
     if (matched.isDirectory()) {
       const nested = await fs.readdir(base,{withFileTypes:true});
-      for (const entry of nested) if (entry.isFile() && (/\\.dll$/i.test(entry.name)||/\\.dll\\.disabled$/i.test(entry.name))) paths.push(path.join(base,entry.name));
-    } else if (matched.isFile() && (/\\.dll$/i.test(matched.name)||/\\.dll\\.disabled$/i.test(matched.name))) paths.push(base);
+      for (const entry of nested) if (entry.isFile() && (/\\.dll$/i.test(entry.name)||/\.dll\.disabled$/i.test(entry.name))) paths.push(path.join(base,entry.name));
+    } else if (matched.isFile() && (/\\.dll$/i.test(matched.name)||/\.dll\.disabled$/i.test(matched.name))) paths.push(base);
     if (!paths.length) throw new Error('No DLL files found for this mod. This toggle supports DLL-based BepInEx mods.');
     const disable = paths.some(file=>file.toLowerCase().endsWith('.dll'));
-    for (const file of paths) { const target = disable ? file+'.disabled' : file.replace(/\\.dll\\.disabled$/i,'.dll'); await fs.rename(file,target); }
-    const label = matched.name.replace(/\\.disabled$/i,'');
+    for (const file of paths) {
+      if (disable && file.toLowerCase().endsWith('.dll')) await fs.rename(file,file+'.disabled');
+      else if (!disable && file.toLowerCase().endsWith('.dll.disabled')) await fs.rename(file,file.replace(/\.dll\.disabled$/i,'.dll'));
+    }
+    const label = matched.name.replace(/\.disabled$/i,'');
     return {ok:true,enabled:!disable,message:label+(disable?' disabled.':' enabled.')};
   } catch(error) { return {ok:false,message:error instanceof Error?error.message:'Could not toggle mod.'}; }
 });
@@ -260,8 +264,8 @@ ipcMain.handle('mods:get-detected', async () => {
     const full = path.join(plugins, entry.name);
     if (entry.isDirectory()) {
       const nested = await fs.readdir(full, { withFileTypes: true }).catch(() => []);
-      if (nested.some(item => item.isFile() && item.name.toLowerCase().endsWith('.dll'))) detected.push(entry.name);
-    } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.dll')) detected.push(path.parse(entry.name).name);
+      if (nested.some(item => item.isFile() && /\\.dll(?:\\.disabled)?$/i.test(item.name))) detected.push(entry.name);
+    } else if (entry.isFile() && /\\.dll(?:\\.disabled)?$/i.test(entry.name)) detected.push(entry.name);
   }
   return [...new Set(detected)];
 });
