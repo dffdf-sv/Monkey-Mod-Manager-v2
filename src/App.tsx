@@ -268,11 +268,45 @@ export default function App() {
       notify('Download opened. Websites cannot write directly into game folders; use the desktop app to install automatically.');
       return;
     }
+    const visiting = new Set<string>();
+    const installedThisRun: string[] = [];
+    const installWithDependencies = async (target: Mod): Promise<string[]> => {
+      if (visiting.has(target.id)) return [];
+      visiting.add(target.id);
+      const messages: string[] = [];
+      for (const dependencyName of target.dependencies || []) {
+        if (/^bepinex$/i.test(dependencyName.trim())) {
+          if (!(await window.monkeyModManager!.hasBepInEx())) {
+            const bepinex = await window.monkeyModManager!.installBepInEx();
+            if (!bepinex.ok) throw new Error('Could not install required BepInEx for ' + target.name + ': ' + bepinex.message);
+          }
+          continue;
+        }
+        const dependency = mods.find(item => item.name.toLowerCase() === dependencyName.toLowerCase() || item.id.toLowerCase() === dependencyName.toLowerCase());
+        if (!dependency) { messages.push('Missing catalogue dependency: ' + dependencyName); continue; }
+        if (installedMods[dependency.id] === dependency.version) continue;
+        messages.push(...await installWithDependencies(dependency));
+        const depResult = await window.monkeyModManager!.installMod(dependency);
+        if (!depResult.ok) throw new Error('Dependency ' + dependency.name + ' failed: ' + depResult.message);
+        installedThisRun.push(dependency.name);
+      }
+      return messages;
+    };
     try {
+      if (!(await window.monkeyModManager!.hasBepInEx())) {
+        notify('Installing BepInEx prerequisite…');
+        const bepinex = await window.monkeyModManager!.installBepInEx();
+        if (!bepinex.ok) { notify(bepinex.message); return; }
+      }
+      const missing = await installWithDependencies(mod);
       const result = await window.monkeyModManager!.installMod(mod);
-      if (result.ok) { const installed = await window.monkeyModManager!.getInstalledMods(); setInstalledMods(installed); setDetectedMods(await window.monkeyModManager!.getDetectedMods()); }
-      notify(result.ok ? mod.name + ' installed successfully' : result.message);
-    } catch { notify('Install failed. Check the download link and selected Gorilla Tag folder.'); }
+      if (result.ok) {
+        setInstalledMods(await window.monkeyModManager!.getInstalledMods());
+        setDetectedMods(await window.monkeyModManager!.getDetectedMods());
+        const extra = [...new Set(installedThisRun)];
+        notify(mod.name + ' installed successfully' + (extra.length ? '. Dependencies installed: ' + extra.join(', ') : '') + (missing.length ? '. Check: ' + [...new Set(missing)].join(', ') : ''));
+      } else notify(result.message);
+    } catch (error) { notify(error instanceof Error ? error.message : 'Install failed. Check the download link and selected Gorilla Tag folder.'); }
   };
 
   const checkForUpdates = async () => {
