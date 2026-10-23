@@ -4,20 +4,52 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Version (examples v2, v2.0, v2.0.1, v2.0.1.4)
+        description: Release version (use vMAJOR.MINOR.PATCH, e.g. v2.0.2)
         required: true
-        default: "v2.0.1"
+        default: "v2.0.2"
         type: string
   push:
     tags:
-      - "v*"
+      - "v[0-9]+.[0-9]+.[0-9]+"
 
 permissions:
   contents: write
 
 jobs:
+  prepare-release:
+    name: Prepare GitHub Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Resolve and validate version
+        id: version
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+        run: |
+          VERSION="${INPUT_VERSION#v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid version '$INPUT_VERSION'. Use vMAJOR.MINOR.PATCH, for example v2.0.2."
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists; build assets will be uploaded to it."
+          else
+            gh release create "$RELEASE_TAG" --title "Monkey Mod Manager $RELEASE_TAG" --generate-notes --target main
+          fi
+
   build-windows:
-    name: Build Windows installer
+    name: Build Windows x64 installer
+    needs: prepare-release
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -27,32 +59,15 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Normalize version
-        shell: pwsh
-        env:
-          INPUT_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
-        run: |
-          $version = $env:INPUT_VERSION -replace '^v', ''
-          if ($version -notmatch '^\d+(\.\d+)*$') {
-            throw "Invalid version: $env:INPUT_VERSION. Use v2, v2.0, v2.0.1, or any dot-separated numeric version."
-          }
-          $parts = @($version.Split('.'))
-          while ($parts.Count -lt 3) { $parts += '0' }
-          if ($parts.Count -gt 3) {
-            $suffix = $parts[3..($parts.Count - 1)] -join '.'
-            $packageVersion = "$($parts[0]).$($parts[1]).$($parts[2])-$suffix"
-          } else {
-            $packageVersion = $parts -join '.'
-          }
-          Write-Host "Release version: v$version; package version: $packageVersion"
-          npm pkg set "version=$packageVersion"
+      - name: Set package version
+        run: npm pkg set "version=${{ needs.prepare-release.outputs.version }}"
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Build and publish Windows installer + update metadata
+      - name: Build and publish Windows installer + updater metadata
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run build && npx electron-builder --win nsis --publish always
-      - name: Upload Windows installer
+        run: npm run build && npx electron-builder --win nsis --x64 --publish always
+      - name: Upload Windows build artifact
         uses: actions/upload-artifact@v4
         with:
           name: Monkey-Mod-Manager-Windows
@@ -63,8 +78,8 @@ jobs:
           retention-days: 14
 
   build-linux:
-    name: Build and publish Linux packages
-    needs: build-windows
+    name: Build Linux x64 packages
+    needs: prepare-release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -74,30 +89,15 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Normalize version
-        shell: bash
-        env:
-          INPUT_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
-        run: |
-          VERSION="${INPUT_VERSION#v}"
-          [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+)*$ ]] || { echo "Invalid version: $INPUT_VERSION. Use v2, v2.0, v2.0.1, or any dot-separated numeric version."; exit 1; }
-          IFS='.' read -r -a PARTS <<< "$VERSION"
-          while (( ${#PARTS[@]} < 3 )); do PARTS+=(0); done
-          if (( ${#PARTS[@]} > 3 )); then
-            EXTRA="$(IFS='.'; echo "${PARTS[*]:3}")"
-            PACKAGE_VERSION="${PARTS[0]}.${PARTS[1]}.${PARTS[2]}-$EXTRA"
-          else
-            PACKAGE_VERSION="${PARTS[0]}.${PARTS[1]}.${PARTS[2]}"
-          fi
-          echo "Release version: v$VERSION; package version: $PACKAGE_VERSION"
-          npm pkg set "version=$PACKAGE_VERSION"
+      - name: Set package version
+        run: npm pkg set "version=${{ needs.prepare-release.outputs.version }}"
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Build and publish Linux packages + update metadata
+      - name: Build and publish Linux packages + updater metadata
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run build && npx electron-builder --linux AppImage deb --publish always
-      - name: Upload Linux packages
+        run: npm run build && npx electron-builder --linux AppImage deb --x64 --publish always
+      - name: Upload Linux build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Monkey-Mod-Manager-Linux
@@ -107,4 +107,3 @@ jobs:
             release/latest-linux.yml
           if-no-files-found: error
           retention-days: 14
-
