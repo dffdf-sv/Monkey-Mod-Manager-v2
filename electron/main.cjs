@@ -19,6 +19,7 @@ function createWindow() {
   win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
 }
 ipcMain.handle('game:get-folder', async () => (await readSettings()).gameFolder || null);
+ipcMain.handle('mods:get-installed', async () => (await readSettings()).installedMods || {});
 ipcMain.handle('game:choose-folder', async () => {
   const current = await readSettings();
   const result = await dialog.showOpenDialog({ title: 'Select your Gorilla Tag game folder', defaultPath: current.gameFolder || undefined, properties: ['openDirectory'] });
@@ -104,9 +105,13 @@ ipcMain.handle('mod:install', async (_event, mod) => {
         await fs.mkdir(pluginDir, { recursive: true });
         const installedPath = path.join(pluginDir, safeName);
         await fs.copyFile(tempFile, installedPath);
+        const latestSettings = await readSettings();
+        await writeSettings({ ...latestSettings, installedMods: { ...(latestSettings.installedMods || {}), [String(mod.id)]: String(mod.version) } });
         return { ok: true, path: installedPath, message: mod.name + ' installed to ' + installedPath };
       }
       await extractZip(tempFile, { dir: gameFolder });
+      const latestSettings = await readSettings();
+      await writeSettings({ ...latestSettings, installedMods: { ...(latestSettings.installedMods || {}), [String(mod.id)]: String(mod.version) } });
       return { ok: true, path: gameFolder, message: mod.name + ' archive extracted into ' + gameFolder };
     } finally { await fs.rm(tempFile, { force: true }).catch(() => {}); }
   } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Could not install this mod.' }; }
