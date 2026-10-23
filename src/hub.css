@@ -153,3 +153,6 @@ button:disabled{opacity:.55;cursor:wait}
 .product-page-modal .modal-links{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
 .product-page-modal .wide{max-width:320px}
 @media(max-width:700px){.add-mod-only-form{grid-template-columns:1fr}.add-mod-only-form>label.full,.add-mod-only-form>.full{grid-column:auto}.admin-form-toolbar{align-items:flex-start;flex-direction:column}.admin-toolbar-actions{width:100%}.product-page-modal{max-height:calc(100dvh - 16px);padding:16px}.product-page-modal .detail-picture{height:230px}.product-page-modal .detail-gallery img{height:130px}}
+
+.catalogue-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+@media(max-width:700px){.catalogue-actions{width:100%}.catalogue-actions>button{flex:1}}
