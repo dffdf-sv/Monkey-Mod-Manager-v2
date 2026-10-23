@@ -141,6 +141,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/account' && req.method === 'GET') { const u=sessionFor(req); return reply(res,200,{configured:Boolean(process.env.GITHUB_OAUTH_CLIENT_ID&&process.env.GITHUB_OAUTH_CLIENT_SECRET&&process.env.SESSION_SECRET),user:u?{id:u.id,login:u.login,avatar:u.avatar}:null}); }
     if (url.pathname === '/api/account/logout' && req.method === 'POST') { cookie(res,'mmm_session','',0); return reply(res,200,{ok:true}); }
     if (url.pathname === '/api/assets' && req.method === 'POST') {
+      if (!checkRate(req)) return reply(res,429,{error:'Too many uploads. Wait one minute and try again.'});
       const user=sessionFor(req); if(!user)return reply(res,401,{error:'Sign in with GitHub before uploading.'});
       const body=await readBody(req,35000000); const modId=slug(body.modId); const name=path.basename(String(body.fileName||'')).replace(/[^a-zA-Z0-9._-]/g,'_'); const kind=String(body.kind||'image'); const mime=String(body.mime||''); const allowed=kind==='image'?['image/png','image/jpeg','image/webp','image/gif']:kind==='video'?['video/mp4','video/webm']:kind==='mod'?['application/zip','application/x-zip-compressed','application/octet-stream','application/x-msdownload']:[];
       if(!modId||!name||!allowed.includes(mime))return reply(res,400,{error:'Unsupported upload type.'});
