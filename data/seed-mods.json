@@ -1,0 +1,28 @@
+[
+  {
+    "name": "Utilla",
+    "version": "1.6.27",
+    "author": "developer9998 & contributors",
+    "description": "A PC library for Gorilla Tag that supports room-related features and custom gamemodes. Many community mods depend on it.",
+    "category": "Core",
+    "download_url": "https://github.com/BRTeamYT/Utilla-GorillaTag/releases/download/1.6.27/Utilla.zip",
+    "image_url": "https://clan.akamai.steamstatic.com/images/39711486/b59ed47fa032145d3640199a7f610fbb6f0add86.png",
+    "source_url": "https://github.com/BRTeamYT/Utilla-GorillaTag/releases",
+    "dependencies": [],
+    "featured": true
+  },
+  {
+    "name": "MonkePhone",
+    "version": "1.0.9",
+    "author": "developer9998",
+    "description": "An in-game phone and photo tool for capturing moments while you play. Check the upstream page for features and requirements.",
+    "category": "Utility",
+    "download_url": "https://github.com/developer9998/MonkePhone/releases/download/1.0.9/MonkePhone.dll",
+    "image_url": "https://gorilla-tag-mods.com/wp-content/uploads/2025/09/MonkePhone-mod.webp",
+    "source_url": "https://github.com/developer9998/MonkePhone/releases",
+    "dependencies": [
+      "Utilla"
+    ],
+    "featured": true
+  }
+]
