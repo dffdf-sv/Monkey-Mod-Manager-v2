@@ -18,7 +18,63 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(({ url }) => { if (url.startsWith('https://')) shell.openExternal(url); return { action: 'deny' }; });
   win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
 }
-ipcMain.handle('game:get-folder', async () => (await readSettings()).gameFolder || null);
+function isGameFolder(folder) {
+  if (!folder) return false;
+  const names = require('node:fs').readdirSync(folder, { withFileTypes: true }).map((entry) => entry.name.toLowerCase());
+  return names.some((name) => ['gorilla tag.exe', 'gorilla tag.x86_64', 'gorilla tag.app'].includes(name)) ||
+    names.includes('gorilla tag_data');
+}
+async function autoDetectGameFolder() {
+  const candidates = [];
+  const add = (value) => { if (value && !candidates.includes(value)) candidates.push(value); };
+  const home = app.getPath('home');
+  if (process.platform === 'win32') {
+    for (const base of [
+      process.env['PROGRAMFILES(X86)'] && path.join(process.env['PROGRAMFILES(X86)'], 'Steam'),
+      process.env.PROGRAMFILES && path.join(process.env.PROGRAMFILES, 'Steam'),
+      process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Programs', 'Steam'),
+      path.join(home, 'Games', 'Steam')
+    ]) if (base) add(path.join(base, 'steamapps', 'common', 'Gorilla Tag'));
+    const steamRoots = candidates.map((candidate) => path.resolve(candidate, '..', '..', '..'));
+    for (const root of steamRoots) {
+      try {
+        const vdf = await fs.readFile(path.join(root, 'steamapps', 'libraryfolders.vdf'), 'utf8');
+        for (const match of vdf.matchAll(/"path"\s+"([^"]+)"/g)) {
+          const library = match[1].replace(/\\\\/g, '\\');
+          add(path.join(library, 'steamapps', 'common', 'Gorilla Tag'));
+        }
+      } catch {}
+    }
+  } else {
+    for (const root of [
+      path.join(home, '.steam', 'steam'),
+      path.join(home, '.local', 'share', 'Steam'),
+      path.join(home, '.var', 'app', 'com.valvesoftware.Steam', '.local', 'share', 'Steam')
+    ]) {
+      add(path.join(root, 'steamapps', 'common', 'Gorilla Tag'));
+      try {
+        const vdf = await fs.readFile(path.join(root, 'steamapps', 'libraryfolders.vdf'), 'utf8');
+        for (const match of vdf.matchAll(/"path"\s+"([^"]+)"/g)) {
+          const library = match[1].replace(/\\\\/g, '\\');
+          add(path.join(library, 'steamapps', 'common', 'Gorilla Tag'));
+        }
+      } catch {}
+    }
+  }
+  for (const candidate of candidates) {
+    try { if (isGameFolder(candidate)) return candidate; } catch {}
+  }
+  return null;
+}
+ipcMain.handle('game:get-folder', async () => {
+  const settings = await readSettings();
+  if (settings.gameFolder) {
+    try { if (isGameFolder(settings.gameFolder)) return settings.gameFolder; } catch {}
+  }
+  const found = await autoDetectGameFolder();
+  if (found) { await writeSettings({ ...settings, gameFolder: found }); return found; }
+  return settings.gameFolder || null;
+});
 ipcMain.handle('mods:get-installed', async () => (await readSettings()).installedMods || {});
 ipcMain.handle('config:save', async (_event, payload) => {
   try {
@@ -134,6 +190,7 @@ ipcMain.handle('mod:install', async (_event, mod) => {
     try {
       const safeModName = String(mod.name).replace(/[^a-zA-Z0-9 _.-]/g, '').trim().slice(0, 80) || 'Mod';
       const pluginDir = path.join(gameFolder, 'BepInEx', 'plugins', safeModName);
+      await fs.rm(pluginDir, { recursive: true, force: true });
       await fs.mkdir(pluginDir, { recursive: true });
       if (ext === '.dll') {
         const installedPath = path.join(pluginDir, safeName);
