@@ -7,5 +7,6 @@ contextBridge.exposeInMainWorld('monkeyModManager', {
   installMod: (mod) => ipcRenderer.invoke('mod:install', mod),
   getInstalledMods: () => ipcRenderer.invoke('mods:get-installed'),
   getDetectedMods: () => ipcRenderer.invoke('mods:get-detected'),
+  saveModConfig: (payload) => ipcRenderer.invoke('config:save', payload),
   installBepInEx: () => ipcRenderer.invoke('bepinex:install')
 });
