@@ -164,7 +164,7 @@ export default function App() {
     apiFetch(apiUrl('/api/mod-feedback/' + encodeURIComponent(detail.id)))
       .then(async response => { const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Feedback unavailable'); return data; })
       .then(data => { if (active) setModFeedback({upvotes:Number(data.upvotes||0),downvotes:Number(data.downvotes||0),myVote:Number(data.myVote||0),ratingAverage:Number(data.ratingAverage||0),ratingCount:Number(data.ratingCount||0),myRating:Number(data.myRating||0),comments:Array.isArray(data.comments)?data.comments:[]}); })
-      .catch(() => { if (active) setModFeedback({upvotes:0,downvotes:0,myVote:0,comments:[]}); });
+      .catch(() => { if (active) setModFeedback({upvotes:0,downvotes:0,myVote:0,ratingAverage:0,ratingCount:0,myRating:0,comments:[]}); });
     return () => { active = false; };
   }, [detail?.id, account?.id]);
 
