@@ -280,7 +280,7 @@ const server = http.createServer(async (req, res) => {
           if (repoUrl.protocol !== 'https:' || repoUrl.hostname.toLowerCase() !== 'github.com') return reply(res, 400, { error: 'Ownership transfer only works with a GitHub repository URL.' });
           const repoParts = repoUrl.pathname.split('/').filter(Boolean);
           if (repoParts.length < 2) return reply(res, 400, { error: 'Use a URL like https://github.com/owner/repository.' });
-          const ownerResponse = await fetch('https://api.github.com/repos/' + encodeURIComponent(repoParts[0]) + '/' + encodeURIComponent(repoParts[1].replace(/\\.git$/i, '')), { headers: { accept: 'application/vnd.github+json', 'user-agent': 'Monkey-Mod-Hub/2.1' }, signal: AbortSignal.timeout(12000) });
+          const ownerResponse = await fetch('https://api.github.com/repos/' + encodeURIComponent(repoParts[0]) + '/' + encodeURIComponent(repoParts[1].replace(/\.git$/i, '')), { headers: { accept: 'application/vnd.github+json', 'user-agent': 'Monkey-Mod-Hub/2.1' }, signal: AbortSignal.timeout(12000) });
           const ownerData = await ownerResponse.json().catch(() => ({}));
           if (!ownerResponse.ok || !ownerData.owner || !ownerData.owner.id || ownerData.private) return reply(res, 400, { error: 'Could not verify the public GitHub repository owner.' });
           ownerId = String(ownerData.owner.id);
@@ -304,7 +304,18 @@ const server = http.createServer(async (req, res) => {
         if(current.list.some((entry,i)=>i!==index&&slug(entry.name)===slug(name)))return reply(res,409,{error:'Another mod already uses that name.'});
         const deps=Array.isArray(body.dependencies)?body.dependencies:[];
         const websiteUrl=httpsUrl(body.websiteUrl||'',false),embedUrl=httpsUrl(body.embedUrl||'',false);if(websiteUrl===null||embedUrl===null)return reply(res,400,{error:'Website and embed URLs must use HTTPS.'});const additionalLinks=Array.isArray(body.additionalLinks)?body.additionalLinks.map((item)=>({label:String(item.label||'').trim().slice(0,80),url:httpsUrl(item.url,true)})).filter((item)=>item.label&&item.url).slice(0,20):[];
-        current.list[index]={...old,name,author,version,description,category:String(body.category||'Utility'),download_url:downloadUrl,image_url:imageUrl||'',gallery_urls:Array.isArray(body.galleryUrls)?body.galleryUrls.map(value=>httpsUrl(value,true)).filter(Boolean).slice(0,8):[],video_url:videoUrl||'',source_url:sourceUrl||'',website_url:websiteUrl||'',embed_url:embedUrl||'',requirements:String(body.requirements||'').slice(0,500),supported_os:Array.isArray(body.supportedOS)?body.supportedOS.map(String).slice(0,12):[],readme:String(body.readme||'').slice(0,12000),changelog:String(body.changelog||'').slice(0,6000),additional_links:additionalLinks,dependencies:deps.map(item=>String(item).trim()).filter(Boolean).slice(0,20)};
+        let ownerId = String(old.owner_id || user.id);
+         if (body.transferOwnership) {
+           let repoUrl; try { repoUrl = new URL(sourceUrl); } catch { return reply(res, 400, { error: 'Ownership transfer requires a valid GitHub repository URL.' }); }
+           if (repoUrl.protocol !== 'https:' || repoUrl.hostname.toLowerCase() !== 'github.com') return reply(res, 400, { error: 'Ownership transfer only works with a GitHub repository URL.' });
+           const repoParts = repoUrl.pathname.split('/').filter(Boolean);
+           if (repoParts.length < 2) return reply(res, 400, { error: 'Use a URL like https://github.com/owner/repository.' });
+           const ownerResponse = await fetch('https://api.github.com/repos/' + encodeURIComponent(repoParts[0]) + '/' + encodeURIComponent(repoParts[1].replace(/\.git$/i, '')), { headers: { accept: 'application/vnd.github+json', 'user-agent': 'Monkey-Mod-Hub/2.1' }, signal: AbortSignal.timeout(12000) });
+           const ownerData = await ownerResponse.json().catch(() => ({}));
+           if (!ownerResponse.ok || !ownerData.owner || !ownerData.owner.id || ownerData.private) return reply(res, 400, { error: 'Could not verify the public GitHub repository owner.' });
+           ownerId = String(ownerData.owner.id);
+         }
+         current.list[index]={...old,owner_id:ownerId,name,author,version,description,category:String(body.category||'Utility'),download_url:downloadUrl,image_url:imageUrl||'',gallery_urls:Array.isArray(body.galleryUrls)?body.galleryUrls.map(value=>httpsUrl(value,true)).filter(Boolean).slice(0,8):[],video_url:videoUrl||'',source_url:sourceUrl||'',website_url:websiteUrl||'',embed_url:embedUrl||'',requirements:String(body.requirements||'').slice(0,500),supported_os:Array.isArray(body.supportedOS)?body.supportedOS.map(String).slice(0,12):[],readme:String(body.readme||'').slice(0,12000),changelog:String(body.changelog||'').slice(0,6000),additional_links:additionalLinks,dependencies:deps.map(item=>String(item).trim()).filter(Boolean).slice(0,20)};
         try { await saveGithubList(current.list,current.sha,'Update mod '+name); } catch(error) { return reply(res,502,{error:error instanceof Error?error.message:'Could not update mod.'}); }
         return reply(res,200,{ok:true,mod:normalise(current.list[index])});
       }
