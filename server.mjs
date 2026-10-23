@@ -196,7 +196,7 @@ const server = http.createServer(async (req, res) => {
         if (repoData.releases_url) additionalLinks.push({ label: 'Releases', url: 'https://github.com/' + owner + '/' + repo + '/releases' });
         if (repoData.html_url && repoData.has_wiki) additionalLinks.push({ label: 'Wiki', url: 'https://github.com/' + owner + '/' + repo + '/wiki' });
         return reply(res, 200, {
-          name: String(repoData.name || repo).slice(0,90), author: String(repoData.owner && repoData.owner.login || owner).slice(0,90),
+          name: String(repoData.name || repo).slice(0,90), author: String(repoData.owner && repoData.owner.login || owner).slice(0,90), githubOwnerId: String(repoData.owner && repoData.owner.id || ''), githubOwnerLogin: String(repoData.owner && repoData.owner.login || owner),
           description: String(repoData.description || '').slice(0,1400), version: String(release.tag_name || repoData.default_branch || '1.0.0').slice(0,40),
           downloadUrl: asset && asset.browser_download_url || '', sourceUrl: repoData.html_url || source,
           websiteUrl: httpsUrl(repoData.homepage || '', false) || '', readme: String(readme).slice(0,20000),
@@ -274,7 +274,18 @@ const server = http.createServer(async (req, res) => {
         const deps = Array.isArray(body.dependencies) ? body.dependencies : [];
         const websiteUrl=httpsUrl(body.websiteUrl||'',false), embedUrl=httpsUrl(body.embedUrl||'',false); if(websiteUrl===null||embedUrl===null)return reply(res,400,{error:'Website and embed URLs must use HTTPS.'});
         const additionalLinks=Array.isArray(body.additionalLinks)?body.additionalLinks.map((item)=>({label:String(item.label||'').trim().slice(0,80),url:httpsUrl(item.url,true)})).filter((item)=>item.label&&item.url).slice(0,20):[];
-        const entry = { name, version, author, description, category, download_url: downloadUrl, image_url: imageUrl || '', gallery_urls: Array.isArray(body.galleryUrls) ? body.galleryUrls.map((value) => httpsUrl(value, true)).filter(Boolean).slice(0, 8) : [], video_url: videoUrl || '', source_url: sourceUrl || '', website_url:websiteUrl||'',embed_url:embedUrl||'',requirements:String(body.requirements||'').slice(0,500),supported_os:Array.isArray(body.supportedOS)?body.supportedOS.map(String).slice(0,12):[],readme:String(body.readme||'').slice(0,12000),changelog:String(body.changelog||'').slice(0,6000),additional_links:additionalLinks, dependencies: deps.map((item) => String(item).trim()).filter(Boolean).slice(0, 20), featured: false, owner_id: user.id };
+        let ownerId = user.id;
+        if (body.transferOwnership) {
+          let repoUrl; try { repoUrl = new URL(sourceUrl); } catch { return reply(res, 400, { error: 'Ownership transfer requires a valid GitHub repository URL.' }); }
+          if (repoUrl.protocol !== 'https:' || repoUrl.hostname.toLowerCase() !== 'github.com') return reply(res, 400, { error: 'Ownership transfer only works with a GitHub repository URL.' });
+          const repoParts = repoUrl.pathname.split('/').filter(Boolean);
+          if (repoParts.length < 2) return reply(res, 400, { error: 'Use a URL like https://github.com/owner/repository.' });
+          const ownerResponse = await fetch('https://api.github.com/repos/' + encodeURIComponent(repoParts[0]) + '/' + encodeURIComponent(repoParts[1].replace(/\\.git$/i, '')), { headers: { accept: 'application/vnd.github+json', 'user-agent': 'Monkey-Mod-Hub/2.1' }, signal: AbortSignal.timeout(12000) });
+          const ownerData = await ownerResponse.json().catch(() => ({}));
+          if (!ownerResponse.ok || !ownerData.owner || !ownerData.owner.id || ownerData.private) return reply(res, 400, { error: 'Could not verify the public GitHub repository owner.' });
+          ownerId = String(ownerData.owner.id);
+        }
+        const entry = { name, version, author, description, category, download_url: downloadUrl, image_url: imageUrl || '', gallery_urls: Array.isArray(body.galleryUrls) ? body.galleryUrls.map((value) => httpsUrl(value, true)).filter(Boolean).slice(0, 8) : [], video_url: videoUrl || '', source_url: sourceUrl || '', website_url:websiteUrl||'',embed_url:embedUrl||'',requirements:String(body.requirements||'').slice(0,500),supported_os:Array.isArray(body.supportedOS)?body.supportedOS.map(String).slice(0,12):[],readme:String(body.readme||'').slice(0,12000),changelog:String(body.changelog||'').slice(0,6000),additional_links:additionalLinks, dependencies: deps.map((item) => String(item).trim()).filter(Boolean).slice(0, 20), featured: false, owner_id: ownerId };
         current.list.push(entry);
         try { await saveGithubList(current.list, current.sha, 'Add ' + name + ' to mod hub'); }
         catch (error) { return reply(res, 502, { error: error instanceof Error ? error.message : 'Could not save mod to GitHub.' }); }
