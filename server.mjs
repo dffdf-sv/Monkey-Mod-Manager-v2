@@ -26,7 +26,7 @@ function applyCors(req, res) {
   res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Admin-Password');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Max-Age', '600');
 }
 function slug(value) { return String(value || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
@@ -107,7 +107,7 @@ function sessionFor(req) {
   try { const user=JSON.parse(Buffer.from(parts[0],'base64url').toString()); return user.exp>Date.now()?user:null; } catch { return null; }
 }
 function signedSession(user) { const body=Buffer.from(JSON.stringify(user)).toString('base64url'); return body+'.'+crypto.createHmac('sha256',process.env.SESSION_SECRET||'missing-session-secret').update(body).digest('base64url'); }
-function cookie(res,name,value,age) { res.setHeader('Set-Cookie',name+'='+encodeURIComponent(value)+'; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age='+age); }
+function cookie(res,name,value,age) { const current=res.getHeader('Set-Cookie'); const items=Array.isArray(current)?current:current?[String(current)]:[]; items.push(name+'='+encodeURIComponent(value)+'; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age='+age); res.setHeader('Set-Cookie',items); }
 async function githubContent(pathname, bytes, message) {
   const token=process.env.GITHUB_TOKEN; if(!token)throw new Error('GITHUB_TOKEN is not configured.');
   const response=await fetch('https://api.github.com/repos/'+MOD_REPO+'/contents/'+pathname,{method:'PUT',headers:{authorization:'Bearer '+token,accept:'application/vnd.github+json','content-type':'application/json','x-github-api-version':'2022-11-28','user-agent':'Monkey-Mod-Hub'},body:JSON.stringify({message,content:bytes.toString('base64'),branch:'main'}),signal:AbortSignal.timeout(20000)});
