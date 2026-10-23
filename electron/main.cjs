@@ -25,6 +25,50 @@ ipcMain.handle('game:choose-folder', async () => {
   if (result.canceled || !result.filePaths[0]) return null;
   const gameFolder = result.filePaths[0]; await writeSettings({ ...current, gameFolder }); return gameFolder;
 });
+ipcMain.handle('bepinex:install', async () => {
+  let tempFile = null;
+  try {
+    if (process.platform !== 'win32') {
+      return { ok: false, message: 'Automatic BepInEx setup currently supports Windows x64. Open the official releases page for the correct Linux/macOS package and instructions.' };
+    }
+    let settings = await readSettings();
+    if (!settings.gameFolder) {
+      const selected = await dialog.showOpenDialog({ title: 'Select your Gorilla Tag game folder', properties: ['openDirectory'] });
+      if (selected.canceled || !selected.filePaths[0]) return { ok: false, message: 'Installation cancelled. Select your Gorilla Tag folder first.' };
+      settings = { ...settings, gameFolder: selected.filePaths[0] };
+      await writeSettings(settings);
+    }
+    const gameFolder = path.resolve(settings.gameFolder);
+    const rootEntries = await fs.readdir(gameFolder).catch(() => []);
+    const rootNames = rootEntries.map((name) => name.toLowerCase());
+    const looksLikeGame = rootNames.some((name) => name === 'gorilla tag.exe' || name === 'gorilla tag_data');
+    if (!looksLikeGame) throw new Error('That folder does not look like a Windows Gorilla Tag installation. Choose the folder containing Gorilla Tag.exe and Gorilla Tag_Data.');
+    const existing = await fs.stat(path.join(gameFolder, 'BepInEx')).then(() => true).catch(() => false);
+    if (existing) {
+      const choice = await dialog.showMessageBox({
+        type: 'warning', buttons: ['Update / overwrite', 'Cancel'], defaultId: 1, cancelId: 1,
+        title: 'BepInEx is already installed',
+        message: 'BepInEx folder already exists.',
+        detail: 'This will merge the official BepInEx files into your game folder. Your plugins folder is not deliberately deleted, but back up your mods first.'
+      });
+      if (choice.response !== 0) return { ok: false, message: 'BepInEx installation cancelled.' };
+    }
+    const url = 'https://github.com/BepInEx/BepInEx/releases/download/v5.4.23.5/BepInEx_win_x64_5.4.23.5.zip';
+    const response = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(90000) });
+    if (!response.ok) throw new Error('Official BepInEx download failed with HTTP ' + response.status + '.');
+    if (new URL(response.url).protocol !== 'https:') throw new Error('BepInEx download redirected to an unsafe URL.');
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (!buffer.length || buffer.length > 100 * 1024 * 1024) throw new Error('BepInEx archive was empty or exceeded the 100 MB safety limit.');
+    tempFile = path.join(app.getPath('temp'), 'bepinex-win-x64-' + Date.now() + '.zip');
+    await fs.writeFile(tempFile, buffer);
+    await extractZip(tempFile, { dir: gameFolder });
+    return { ok: true, path: gameFolder, message: 'BepInEx 5.4.23.5 installed into ' + gameFolder };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Could not install BepInEx.' };
+  } finally {
+    if (tempFile) await fs.rm(tempFile, { force: true }).catch(() => {});
+  }
+});
 ipcMain.handle('mod:install', async (_event, mod) => {
   try {
     const downloadUrl = new URL(String(mod && mod.downloadUrl || ''));
