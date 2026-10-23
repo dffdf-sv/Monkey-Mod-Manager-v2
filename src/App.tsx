@@ -50,6 +50,8 @@ export default function App() {
   const [showAppFallback, setShowAppFallback] = useState(false);
   const [useGitHubImport, setUseGitHubImport] = useState(false);
   const [githubImportBusy, setGithubImportBusy] = useState(false);
+  const [githubRepoUrl, setGithubRepoUrl] = useState('');
+  const [notMyMod, setNotMyMod] = useState(false);
   const [notice, setNotice] = useState('');
   const [showAdmin, setShowAdmin] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
@@ -345,7 +347,7 @@ export default function App() {
   };
 
   const importFromGitHub = async () => {
-    const source = draft.sourceUrl?.trim();
+    const source = githubRepoUrl.trim();
     if (!source) { setAdminError('Paste a GitHub repository or releases URL into Source / release page first.'); return; }
     setGithubImportBusy(true); setAdminError('');
     try {
@@ -377,11 +379,11 @@ export default function App() {
     try {
       const response = await apiFetch(apiUrl(editingId ? '/api/mods/' + encodeURIComponent(editingId) : '/api/mods'), {
         method: editingId ? 'PUT' : 'POST', headers: { 'content-type': 'application/json', 'x-admin-password': adminPassword },
-        body: JSON.stringify(draft)
+        body: JSON.stringify({ ...draft, sourceUrl: useGitHubImport ? githubRepoUrl.trim() : draft.sourceUrl, transferOwnership: useGitHubImport && notMyMod })
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || 'Could not save mod.');
-      setDraft(blankDraft); setEditingId(null); await loadCatalog(); notify((result.mod && result.mod.name ? result.mod.name : 'Mod') + (editingId ? ' updated.' : ' added to the mod hub.'));
+      setDraft(blankDraft); setEditingId(null); setGithubRepoUrl(''); setNotMyMod(false); await loadCatalog(); notify((result.mod && result.mod.name ? result.mod.name : 'Mod') + (editingId ? ' updated.' : ' added to the mod hub.'));
     } catch (error) { setAdminError(error instanceof Error ? error.message : 'Could not save mod.'); }
     finally { setAdminBusy(false); }
   };
@@ -462,7 +464,7 @@ export default function App() {
               <label>Product video upload (MP4/WebM, 12 MB max)<input type="file" accept="video/mp4,video/webm" onChange={(e)=>void uploadVideo(e.target.files?.[0])} /></label>
               <label>Video URL (optional)<input type="url" pattern="https://.+" value={draft.videoUrl || ''} onChange={(e) => setDraft({ ...draft, videoUrl: e.target.value })} placeholder="https://…/preview.mp4" /></label>
               <label className="full">Host mod file (.dll/.zip, 24 MB max)<input type="file" accept=".dll,.zip,application/zip" onChange={(e)=>void uploadModFile(e.target.files?.[0])} /><small className="form-help">Select a mod file from disk to host it in the mod base. The hosted URL fills the direct download field.</small></label>
-              <label>Source / release page<input type="url" pattern="https://.+" value={draft.sourceUrl || ''} onChange={(e) => setDraft({ ...draft, sourceUrl: e.target.value })} placeholder="https://github.com/creator/project" /></label>
+              {!useGitHubImport && <label>Source / release page<input type="url" pattern="https://.+" value={draft.sourceUrl || ''} onChange={(e) => setDraft({ ...draft, sourceUrl: e.target.value })} placeholder="https://github.com/creator/project" /></label>}
               <label>Official website (optional)<input type="url" pattern="https://.+" value={draft.websiteUrl || ''} onChange={(e) => setDraft({ ...draft, websiteUrl: e.target.value })} placeholder="https://mod-site.example" /></label>
               <label>Supported operating systems (comma separated)<input value={(draft.supportedOS || []).join(', ')} onChange={(e) => setDraft({ ...draft, supportedOS: e.target.value.split(',').map((v) => v.trim()).filter(Boolean) })} placeholder="Windows, Linux, Steam Deck" /></label>
               <label>Requirements (game / loader / runtime)<input value={draft.requirements || ''} onChange={(e) => setDraft({ ...draft, requirements: e.target.value })} placeholder="Gorilla Tag PCVR, BepInEx 5" /></label>
