@@ -142,7 +142,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/account/logout' && req.method === 'POST') { cookie(res,'mmm_session','',0); return reply(res,200,{ok:true}); }
     if (url.pathname === '/api/assets' && req.method === 'POST') {
       if (!checkRate(req)) return reply(res,429,{error:'Too many uploads. Wait one minute and try again.'});
-      const user=sessionFor(req); if(!user)return reply(res,401,{error:'Sign in with GitHub before uploading.'});
+      const user=sessionFor(req); const admin=adminAllowed(req).ok; if(!user&&!admin)return reply(res,401,{error:'Sign in with GitHub or unlock admin tools before uploading.'});
       const body=await readBody(req,35000000); const modId=slug(body.modId); const name=path.basename(String(body.fileName||'')).replace(/[^a-zA-Z0-9._-]/g,'_'); const kind=String(body.kind||'image'); const mime=String(body.mime||''); const allowed=kind==='image'?['image/png','image/jpeg','image/webp','image/gif']:kind==='video'?['video/mp4','video/webm']:kind==='mod'?['application/zip','application/x-zip-compressed','application/octet-stream','application/x-msdownload']:[];
       if(!modId||!name||!allowed.includes(mime))return reply(res,400,{error:'Unsupported upload type.'});
       const raw=String(body.base64||'').replace(/^data:[^,]+,/,''); if(!raw||raw.length>33000000)return reply(res,413,{error:'Upload too large.'}); const bytes=Buffer.from(raw,'base64'); const max=kind==='video'?12000000:kind==='mod'?24000000:8000000;
