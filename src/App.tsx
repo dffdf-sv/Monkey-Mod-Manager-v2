@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import './fresh.css';
 import './hub.css';
 
@@ -104,6 +104,28 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleShortcuts);
   }, []);
   useEffect(() => { if (window.monkeyModManager) { void window.monkeyModManager.getGameFolder().then(setGameFolder).catch(() => setGameFolder(null)); void window.monkeyModManager.getInstalledMods().then(setInstalledMods).catch(() => setInstalledMods({})); void window.monkeyModManager.getDetectedMods().then(setDetectedMods).catch(() => setDetectedMods([])); } }, []);
+  useEffect(() => {
+    if (!desktop) return;
+    let lastUpdateSignature = '';
+    let active = true;
+    const pollUpdates = async (announce: boolean) => {
+      try {
+        const catalog = await loadCatalog();
+        const installed = await window.monkeyModManager!.getInstalledMods();
+        if (!active) return;
+        setInstalledMods(installed);
+        const updates = catalog.filter((mod) => Boolean(installed[mod.id]) && installed[mod.id] !== mod.version);
+        const signature = updates.map((mod) => mod.id + ':' + mod.version).sort().join('|');
+        if (announce && signature && signature !== lastUpdateSignature) {
+          notify('Updates available: ' + updates.map((mod) => mod.name + ' v' + mod.version).join(', ') + '. Use Install update on a mod.');
+        }
+        lastUpdateSignature = signature;
+      } catch { /* A temporary network error should not interrupt installs. */ }
+    };
+    const initial = window.setTimeout(() => { void pollUpdates(false); }, 8000);
+    const interval = window.setInterval(() => { void pollUpdates(true); }, 120000);
+    return () => { active = false; window.clearTimeout(initial); window.clearInterval(interval); };
+  }, [desktop]);
 
   const visibleMods = useMemo(() => mods.filter((mod) =>
     (page !== 'Library' || saved.includes(mod.id)) &&
@@ -310,7 +332,7 @@ export default function App() {
             <div className="card-title"><div><h3>{mod.name}</h3><p className="author">by <b>{mod.author}</b></p></div><button className={'bookmark ' + (saved.includes(mod.id) ? 'bookmarked' : '')} onClick={() => toggleSaved(mod)} aria-label={saved.includes(mod.id) ? 'Remove saved mod' : 'Save mod'}>{saved.includes(mod.id) ? '♥' : '♡'}</button></div>
             <p className="desc">{mod.description}</p>
             {mod.dependencies.length > 0 && <p className="dependencies"><span>Requires</span> {mod.dependencies.join(', ')}</p>}
-            <div className="cardfoot"><span className="version">v{mod.version}</span><button className="install" onClick={() => void installMod(mod)}>{desktop ? (installedMods[mod.id] ? (installedMods[mod.id] === mod.version ? '✓ Installed' : '↻ Update') : '↓ Install') : '↓ Download'}</button></div>
+            <div className="cardfoot"><span className="version">v{mod.version}</span><button className="install" onClick={() => void installMod(mod)}>{desktop ? (installedMods[mod.id] ? (installedMods[mod.id] === mod.version ? '✓ Installed' : '↻ Install update') : '↓ Install') : '↓ Download'}</button></div>
             <div className="card-links">{mod.sourceUrl && <a href={mod.sourceUrl} target="_blank" rel="noreferrer">Source / releases ↗</a>}{(adminUnlocked || (account && mod.ownerId === account.id)) && <button className="details" onClick={()=>beginEdit(mod)}>Edit</button>}{(adminUnlocked || (account && mod.ownerId === account.id)) && <button className="delete-mod" disabled={adminBusy} onClick={() => void deleteMod(mod)}>Remove</button>}<button className="details" onClick={() => setDetail(mod)}>View details</button></div>
           </div>
         </article>)}</div> : <div className="empty"><div>▣</div><h3>{page === 'Library' ? 'Your library is a blank canvas' : 'No mods found'}</h3><p>{page === 'Library' ? 'Save mods from Discover to get started.' : 'Try a different search or category.'}</p><button className="primary" onClick={() => { setQuery(''); setCategory('All Mods'); setPage('Discover'); }}>Explore mods ↗</button></div>}
@@ -341,7 +363,7 @@ export default function App() {
       </section>
       {detail.dependencies.length > 0 && <div className="warning">ⓘ <span><b>Required dependencies</b><small>{detail.dependencies.join(', ')}. Install prerequisites before this mod.</small></span></div>}
       <div className="modal-links">{detail.sourceUrl && <a href={detail.sourceUrl} target="_blank" rel="noreferrer">Open official source ↗</a>}<a href={detail.downloadUrl} target="_blank" rel="noreferrer">Open download link ↗</a></div>
-      <button className="primary wide" onClick={() => void installMod(detail)}>{desktop ? (installedMods[detail.id] && installedMods[detail.id] !== detail.version ? '↻ Update mod' : installedMods[detail.id] === detail.version ? '✓ Reinstall mod' : '↓ Install mod') : '↓ Download mod'}</button>
+      <button className="primary wide" onClick={() => void installMod(detail)}>{desktop ? (installedMods[detail.id] && installedMods[detail.id] !== detail.version ? '↻ Install update' : installedMods[detail.id] === detail.version ? '✓ Reinstall mod' : '↓ Install mod') : '↓ Download mod'}</button>
       {!desktop && <p className="web-install-note">In a browser this downloads the file only. The desktop app can install it into your selected Gorilla Tag folder.</p>}
     </section></div>}
     {notice && <div className="toast">✓ &nbsp; {notice}</div>}
