@@ -31,6 +31,7 @@ const path = require('node:path');
 const fs = require('node:fs/promises');
 const extractZip = require('extract-zip');
 const { spawn } = require('node:child_process');
+const os = require('node:os');
 
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
 async function readSettings() { try { return JSON.parse(await fs.readFile(settingsFile(), 'utf8')); } catch { return {}; } }
@@ -210,6 +211,40 @@ ipcMain.handle('config:write-file', async (_event, payload) => {
     if (savedContent !== content) throw new Error('The config file could not be verified after saving.');
     return { ok: true, message: 'Saved ' + name + (await fs.stat(file + '.bak').then(() => ' (backup created)').catch(() => '')), path: file };
   } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Could not save config.' }; }
+});
+ipcMain.handle('app:get-version', () => app.getVersion());
+ipcMain.handle('app:install-update', async (_event, assetUrl) => {
+  let tempFile = null;
+  try {
+    if (typeof assetUrl !== 'string' || !assetUrl.startsWith('https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/releases/download/')) {
+      throw new Error('Update download URL was not from the official Monkey Mod Manager releases.');
+    }
+    const response = await fetch(assetUrl, { redirect: 'follow', signal: AbortSignal.timeout(120000) });
+    if (!response.ok) throw new Error('Could not download the update (HTTP ' + response.status + ').');
+    const urlPath = new URL(assetUrl).pathname;
+    const name = path.basename(urlPath);
+    const platform = process.platform;
+    const supported = platform === 'win32' ? /-Setup-.*-x64\.exe$/i.test(name) : platform === 'linux' ? /\.AppImage$|\.deb$/i.test(name) : false;
+    if (!supported) throw new Error('No compatible update installer was found for this operating system.');
+    tempFile = path.join(os.tmpdir(), name.replace(/[^a-zA-Z0-9._-]/g, '_'));
+    await fs.writeFile(tempFile, Buffer.from(await response.arrayBuffer()));
+    if (platform === 'win32') {
+      const child = spawn(tempFile, [], { detached: true, stdio: 'ignore' });
+      child.unref();
+      return { ok: true, message: 'Update downloaded and installer launched. Follow the setup prompts to finish updating.' };
+    }
+    if (name.toLowerCase().endsWith('.appimage')) {
+      await fs.chmod(tempFile, 0o755);
+      const child = spawn(tempFile, [], { detached: true, stdio: 'ignore' });
+      child.unref();
+      return { ok: true, message: 'Update AppImage downloaded and launched. Follow its instructions to switch to the new version.' };
+    }
+    const openResult = await shell.openPath(tempFile);
+    if (openResult) throw new Error(openResult);
+    return { ok: true, message: 'Update package downloaded and opened. Follow your system installer prompts.' };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Could not install the app update.' };
+  }
 });
 ipcMain.handle('mods:get-installed', async () => (await readSettings()).installedMods || {});
 ipcMain.handle('bepinex:has-installed', async () => { const settings = await readSettings(); if (!settings.gameFolder) return false; return fs.stat(path.join(path.resolve(settings.gameFolder), 'BepInEx', 'core', 'BepInEx.dll')).then(() => true).catch(() => false); });
