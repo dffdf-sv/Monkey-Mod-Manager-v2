@@ -125,3 +125,31 @@ button:disabled{opacity:.55;cursor:wait}
 .render-env-form input{width:100%;min-width:0;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--text);padding:10px;font-size:12px}
 .render-env-panel>.cfg-muted{margin-top:11px}
 @media(max-width:800px){.cfg-layout{grid-template-columns:1fr}.cfg-files{max-height:220px;overflow:auto}.cfg-textarea{min-height:320px}.render-env-form{grid-template-columns:1fr}.cfg-heading{flex-direction:column}}
+
+
+/* Focused Add Mod form and full product-page view */
+.add-mod-only-form{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.add-mod-only-form>label{display:flex;flex-direction:column;gap:7px;min-width:0}
+.add-mod-only-form>label.full,.add-mod-only-form>.full{grid-column:1/-1}
+.add-mod-only-form input,.add-mod-only-form select,.add-mod-only-form textarea{width:100%;min-width:0}
+.add-mod-only-form input[type=file]{font-size:11px;padding:10px;border:1px dashed var(--line);border-radius:9px;background:var(--panel2)}
+.admin-form-toolbar{margin:12px 0 15px}
+.admin-form-toolbar p{font-size:11px;color:var(--muted);margin:5px 0 0}
+.admin-toolbar-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.visually-hidden-file{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+.clickable-product-picture{cursor:pointer}
+.clickable-product-picture:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.product-page-backdrop{padding:clamp(8px,2.5vw,28px);place-items:center}
+.product-page-modal{width:min(1120px,100%);max-height:calc(100dvh - 32px);overflow:auto;padding:clamp(18px,3vw,34px);border-radius:18px}
+.product-page-modal .detail-picture{height:clamp(210px,36vh,390px);border-radius:13px;background-size:cover;background-position:center;margin:0 0 22px}
+.product-page-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.product-page-heading h2{font-size:clamp(26px,4vw,42px);margin:8px 0 4px}
+.product-page-heading .version{flex-shrink:0;margin-top:12px}
+.product-page-modal .product-description{font-size:14px;max-width:850px;line-height:1.8;color:var(--text);white-space:pre-wrap}
+.product-page-modal .detail-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:20px 0}
+.product-page-modal .detail-gallery img{width:100%;height:180px;object-fit:cover;border-radius:10px;border:1px solid var(--line);cursor:zoom-in}
+.product-page-modal .mod-video{display:block;width:100%;max-height:460px;border-radius:12px;background:#000;margin:18px 0}
+.product-page-modal .config-panel{max-width:none}
+.product-page-modal .modal-links{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+.product-page-modal .wide{max-width:320px}
+@media(max-width:700px){.add-mod-only-form{grid-template-columns:1fr}.add-mod-only-form>label.full,.add-mod-only-form>.full{grid-column:auto}.admin-form-toolbar{align-items:flex-start;flex-direction:column}.admin-toolbar-actions{width:100%}.product-page-modal{max-height:calc(100dvh - 16px);padding:16px}.product-page-modal .detail-picture{height:230px}.product-page-modal .detail-gallery img{height:130px}}
