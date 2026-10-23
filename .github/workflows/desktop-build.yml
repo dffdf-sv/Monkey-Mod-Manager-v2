@@ -7,9 +7,6 @@ on:
       - main
     tags:
       - "v*"
-  push:
-    tags:
-      - "v*"
 
 permissions:
   contents: read
