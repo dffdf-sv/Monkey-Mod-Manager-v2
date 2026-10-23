@@ -1,5 +1,5 @@
 
-.hero-art-photo{right:4px;top:0;width:390px;height:100%;max-height:315px;overflow:hidden;border-radius:15px;opacity:1;place-items:stretch}
+.hero-art-photo{right:4px;top:0;width:clamp(390px,48%,720px);height:100%;max-height:none;overflow:hidden;border-radius:15px;opacity:1;place-items:stretch}
 .hero-art-photo img{width:100%;height:100%;object-fit:cover;object-position:45% center;filter:saturate(1.08);opacity:.9}
 .hero-shade{position:absolute;inset:0;background:linear-gradient(90deg,var(--panel) 0%,#11160dc4 12%,transparent 78%),linear-gradient(0deg,#0b0e1277,transparent 60%)}
 .hero-art-photo .float{backdrop-filter:blur(14px)}
@@ -50,7 +50,7 @@ button:disabled{opacity:.55;cursor:wait}
 .detail-picture span{font-size:58px}
 .modal-links{display:flex;gap:15px;flex-wrap:wrap;margin-top:17px}
 .web-install-note{font-size:10px!important;line-height:1.6;color:var(--muted);margin:12px 0 0!important}
-@media(max-width:1200px){.hero-art-photo{right:0;width:340px}.admin-panel{padding:19px}}
+@media(max-width:1200px){.hero-art-photo{right:0;width:clamp(340px,45%,560px)}.admin-panel{padding:19px}}
 @media(max-width:800px){.hero-art-photo{right:-95px;width:330px;opacity:.3}.hero-shade{background:linear-gradient(90deg,var(--panel) 0%,#11160d5c 40%,transparent)}.admin-form{grid-template-columns:1fr}.admin-form .full{grid-column:auto}.admin-unlock{align-items:stretch;flex-direction:column}.admin-heading{flex-direction:column}.admin-panel{padding:16px}.mod-picture{height:172px}}
 
 .bepinex-button small{font-size:9px;color:var(--accent);font-weight:700;margin-left:3px}
