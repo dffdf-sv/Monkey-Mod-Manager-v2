@@ -20,6 +20,20 @@ function createWindow() {
 }
 ipcMain.handle('game:get-folder', async () => (await readSettings()).gameFolder || null);
 ipcMain.handle('mods:get-installed', async () => (await readSettings()).installedMods || {});
+ipcMain.handle('mods:get-detected', async () => {
+  const settings = await readSettings(); if (!settings.gameFolder) return [];
+  const plugins = path.join(path.resolve(settings.gameFolder), 'BepInEx', 'plugins');
+  const entries = await fs.readdir(plugins, { withFileTypes: true }).catch(() => []);
+  const detected = [];
+  for (const entry of entries) {
+    const full = path.join(plugins, entry.name);
+    if (entry.isDirectory()) {
+      const nested = await fs.readdir(full, { withFileTypes: true }).catch(() => []);
+      if (nested.some(item => item.isFile() && item.name.toLowerCase().endsWith('.dll'))) detected.push(entry.name);
+    } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.dll')) detected.push(path.parse(entry.name).name);
+  }
+  return [...new Set(detected)];
+});
 ipcMain.handle('game:choose-folder', async () => {
   const current = await readSettings();
   const result = await dialog.showOpenDialog({ title: 'Select your Gorilla Tag game folder', defaultPath: current.gameFolder || undefined, properties: ['openDirectory'] });
@@ -100,19 +114,20 @@ ipcMain.handle('mod:install', async (_event, mod) => {
     const tempFile = path.join(app.getPath('temp'), 'monkey-mod-' + Date.now() + '-' + safeName);
     await fs.writeFile(tempFile, buffer);
     try {
+      const safeModName = String(mod.name).replace(/[^a-zA-Z0-9 _.-]/g, '').trim().slice(0, 80) || 'Mod';
+      const pluginDir = path.join(gameFolder, 'BepInEx', 'plugins', safeModName);
+      await fs.mkdir(pluginDir, { recursive: true });
       if (ext === '.dll') {
-        const pluginDir = path.join(gameFolder, 'BepInEx', 'plugins');
-        await fs.mkdir(pluginDir, { recursive: true });
         const installedPath = path.join(pluginDir, safeName);
         await fs.copyFile(tempFile, installedPath);
         const latestSettings = await readSettings();
         await writeSettings({ ...latestSettings, installedMods: { ...(latestSettings.installedMods || {}), [String(mod.id)]: String(mod.version) } });
-        return { ok: true, path: installedPath, message: mod.name + ' installed to ' + installedPath };
+        return { ok: true, path: installedPath, message: mod.name + ' installed to its own folder: ' + pluginDir };
       }
-      await extractZip(tempFile, { dir: gameFolder });
+      await extractZip(tempFile, { dir: pluginDir });
       const latestSettings = await readSettings();
       await writeSettings({ ...latestSettings, installedMods: { ...(latestSettings.installedMods || {}), [String(mod.id)]: String(mod.version) } });
-      return { ok: true, path: gameFolder, message: mod.name + ' archive extracted into ' + gameFolder };
+      return { ok: true, path: pluginDir, message: mod.name + ' ZIP extracted into its own plugin folder: ' + pluginDir };
     } finally { await fs.rm(tempFile, { force: true }).catch(() => {}); }
   } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Could not install this mod.' }; }
 });
