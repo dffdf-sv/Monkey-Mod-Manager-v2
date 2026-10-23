@@ -56,3 +56,7 @@ Download published installers from the repository's [Releases page](https://gith
 ## Data source and disclaimer
 
 The catalogue is backed by dffdf-sv/GORILA-TAG-MODBASE (modinfo.Json). The repository should contain one JSON array. No affiliation with or endorsement by Another Axiom is implied. Mod compatibility and safety are the responsibility of each mod's author; check the upstream release page before installing.
+
+
+### GitHub sign-in
+The desktop app opens GitHub sign-in in the operating system's default browser. After authorization, the callback sends a signed, expiring session to the installed app through the `monkeymodmanager://` protocol and attempts to close the browser tab. The website sign-in uses a popup and closes it after success where the browser allows it. The desktop app must be rebuilt and reinstalled for protocol registration to take effect.
