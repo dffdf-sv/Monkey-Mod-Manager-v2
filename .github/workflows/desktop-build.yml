@@ -6,6 +6,7 @@ on:
       version:
         description: Release version number (for example 2.0.1)
         required: true
+        default: "2.0.1"
         type: string
   push:
     tags:
@@ -34,7 +35,167 @@ jobs:
           } else {
             $version = "${{ github.ref_name }}".TrimStart("v")
           }
-          if ($version -notmatch '^\d+\.\d+\.\d+([-.][0-9A-Za-z.-]+)?$') { throw "Invalid version: $version" }
+          if ($version -match '^\d+\.\d+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build Windows installer
+        run: npm run dist:win
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Monkey-Mod-Manager-Windows
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  build-linux:
+    name: Build Linux packages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Set release version
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+$ ]]; then VERSION="$VERSION.0"; fi
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]] || { echo "Invalid version: $VERSION. Use a version like 2.0.1."; exit 1; }
+          echo "Resolved release version: $VERSION"
+          npm pkg set "version=$VERSION"
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build Linux packages
+        run: npm run dist:linux
+      - name: Upload Linux packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: Monkey-Mod-Manager-Linux
+          path: |
+            release/*.AppImage
+            release/*.deb
+          if-no-files-found: error
+          retention-days: 14
+
+  publish-release:
+    name: Publish direct downloads to GitHub Releases
+    runs-on: ubuntu-latest
+    needs:
+      - build-windows
+      - build-linux
+    steps:
+      - name: Download Windows installer
+        uses: actions/download-artifact@v4
+        with:
+          name: Monkey-Mod-Manager-Windows
+          path: release-files
+          merge-multiple: true
+      - name: Download Linux packages
+        uses: actions/download-artifact@v4
+        with:
+          name: Monkey-Mod-Manager-Linux
+          path: release-files
+          merge-multiple: true
+      - name: Publish direct installer files
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+          target_commitish: main
+          name: Monkey Mod Manager ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+          generate_release_notes: true
+          files: |
+            release-files/*.exe
+            release-files/*.AppImage
+            release-files/*.deb
+) { $version = "$version.0" }
+          if ($version -notmatch '^\d+\.\d+\.\d+([-.][0-9A-Za-z.-]+)?
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build Windows installer
+        run: npm run dist:win
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Monkey-Mod-Manager-Windows
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  build-linux:
+    name: Build Linux packages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Set release version
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]] || { echo "Invalid version: $VERSION"; exit 1; }
+          npm pkg set "version=$VERSION"
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build Linux packages
+        run: npm run dist:linux
+      - name: Upload Linux packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: Monkey-Mod-Manager-Linux
+          path: |
+            release/*.AppImage
+            release/*.deb
+          if-no-files-found: error
+          retention-days: 14
+
+  publish-release:
+    name: Publish direct downloads to GitHub Releases
+    runs-on: ubuntu-latest
+    needs:
+      - build-windows
+      - build-linux
+    steps:
+      - name: Download Windows installer
+        uses: actions/download-artifact@v4
+        with:
+          name: Monkey-Mod-Manager-Windows
+          path: release-files
+          merge-multiple: true
+      - name: Download Linux packages
+        uses: actions/download-artifact@v4
+        with:
+          name: Monkey-Mod-Manager-Linux
+          path: release-files
+          merge-multiple: true
+      - name: Publish direct installer files
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+          target_commitish: main
+          name: Monkey Mod Manager ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+          generate_release_notes: true
+          files: |
+            release-files/*.exe
+            release-files/*.AppImage
+            release-files/*.deb
+) { throw "Invalid version: $version. Use a version like 2.0.1." }
+          "Resolved release version: $version"
           npm pkg set "version=$version"
       - name: Install dependencies
         run: npm install --no-audit --no-fund
