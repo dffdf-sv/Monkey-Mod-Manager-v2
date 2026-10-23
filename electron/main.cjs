@@ -37,6 +37,10 @@ ipcMain.handle('mod:install', async (_event, mod) => {
       settings = { ...settings, gameFolder: selected.filePaths[0] }; await writeSettings(settings);
     }
     const gameFolder = path.resolve(settings.gameFolder);
+    const rootEntries = await fs.readdir(gameFolder).catch(() => []);
+    const rootNames = rootEntries.map((name) => name.toLowerCase());
+    const looksLikeGame = rootNames.some((name) => name === 'gorilla tag.exe' || name === 'gorilla tag.x86_64' || name === 'gorilla tag.app' || name === 'gorilla tag_data');
+    if (!looksLikeGame) throw new Error('That folder does not look like a Gorilla Tag installation. Choose the folder containing Gorilla Tag.exe or Gorilla Tag_Data.');
     const response = await fetch(downloadUrl.toString(), { redirect: 'follow', signal: AbortSignal.timeout(60_000) });
     if (!response.ok) throw new Error('Download failed with HTTP ' + response.status + '.');
     if (new URL(response.url).protocol !== 'https:') throw new Error('The download redirected to an unsafe URL.');
