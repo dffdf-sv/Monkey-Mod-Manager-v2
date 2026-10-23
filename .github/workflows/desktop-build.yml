@@ -54,7 +54,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Monkey-Mod-Manager-Windows
-          path: release/*.exe
+          path: |
+            release/*.exe
+            release/latest.yml
           if-no-files-found: error
           retention-days: 14
 
@@ -97,6 +99,7 @@ jobs:
           path: |
             release/*.AppImage
             release/*.deb
+            release/latest-linux.yml
           if-no-files-found: error
           retention-days: 14
 
@@ -140,3 +143,4 @@ jobs:
             release-files/*.exe
             release-files/*.AppImage
             release-files/*.deb
+            release-files/*.yml
