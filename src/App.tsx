@@ -264,27 +264,38 @@ export default function App() {
         </div>
 
         {showAdmin && <section className="admin-panel">
-          <div className="admin-heading"><div><label>CURATOR TOOLS</label><h2>Add a mod to the hub</h2><p>New entries are saved back into <b>GORILA-TAG-MODBASE</b> on GitHub.</p></div><span className="admin-pill">🔒 Admin only</span></div>
-          {!adminUnlocked && !account ? <form className="admin-unlock" onSubmit={unlockAdmin}><label>Admin password<input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} autoComplete="current-password" placeholder="Enter Render ADMIN_PASSWORD" required /></label><button className="primary" disabled={adminBusy}>{adminBusy ? 'Checking…' : 'Unlock admin tools'}</button></form> :
-          <form className="admin-form" onSubmit={addMod}>
-            <label>Mod name<input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required maxLength={90} placeholder="e.g. My new mod" /></label>
-            <label>Author<input value={draft.author} onChange={(e) => setDraft({ ...draft, author: e.target.value })} required maxLength={90} placeholder="Creator name" /></label>
-            <label>Version<input value={draft.version} onChange={(e) => setDraft({ ...draft, version: e.target.value })} required maxLength={40} placeholder="1.0.0" /></label>
-            <label>Category<select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })}>{categories.filter((item) => item !== 'All Mods').map((item) => <option key={item}>{item}</option>)}</select></label>
-            <label className="full">Description<textarea value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} required maxLength={1400} placeholder="What does this mod do? Mention known requirements." rows={3} /></label>
-            <label className="full">Direct download URL (HTTPS)<input type="url" value={draft.downloadUrl} onChange={(e) => setDraft({ ...draft, downloadUrl: e.target.value })} required placeholder="https://…/mod.dll or mod.zip" /></label>
-            <label>Picture URL (optional)<input type="url" value={draft.imageUrl || ''} onChange={(e) => setDraft({ ...draft, imageUrl: e.target.value })} placeholder="https://…/thumbnail.webp" /></label>
-            <label>Main product picture upload<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e)=>void uploadMainImage(e.target.files?.[0])} /></label>
-            <label>Gallery pictures (up to 8)<input type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e)=>void uploadImages(e.target.files)} /></label>
-            <label>Product video upload (MP4/WebM, 12 MB max)<input type="file" accept="video/mp4,video/webm" onChange={(e)=>void uploadVideo(e.target.files?.[0])} /></label>
-            <label>Video URL (optional)<input type="url" value={draft.videoUrl||''} onChange={(e)=>setDraft({...draft,videoUrl:e.target.value})} placeholder="https://…/preview.mp4" /></label>
-            <label>Host mod file (.dll/.zip, 24 MB max)<input type="file" accept=".dll,.zip,application/zip" onChange={(e)=>void uploadModFile(e.target.files?.[0])} /></label>
-            <label>Source / release page<input type="url" value={draft.sourceUrl || ''} onChange={(e) => setDraft({ ...draft, sourceUrl: e.target.value })} placeholder="https://github.com/creator/project" /></label>
-            <label className="full">Dependencies (comma separated)<input value={draft.dependencies.join(', ')} onChange={(e) => setDraft({ ...draft, dependencies: e.target.value.split(',').map((name) => name.trim()).filter(Boolean) })} placeholder="Utilla, BepInEx" /></label>
-            <label className="full">Configuration settings (JSON array)<textarea value={JSON.stringify(draft.configSettings||[],null,2)} onChange={(e)=>{try{const value=JSON.parse(e.target.value);if(Array.isArray(value))setDraft({...draft,configSettings:value});}catch{/* Keep last valid JSON until corrected. */}}} rows={3} placeholder={'[{"label":"Enable feature","key":"enabled","defaultValue":"true"}]'} /></label>
-            <div className="admin-actions full"><button className="primary" disabled={adminBusy}>{adminBusy ? 'Saving…' : editingId ? 'Save mod edits' : '＋ Publish mod'}</button><button type="button" className="secondary" onClick={() => {setDraft(blankDraft);setEditingId(null);}}>Clear form</button><button type="button" className="admin-lock" onClick={() => { setAdminUnlocked(false); setAdminPassword(''); }}>Lock admin</button></div>
-            <p className="form-help full">Only add mods you have permission to distribute. Use official releases and image URLs. The server validates HTTPS links; it does not upload mod binaries.</p>
-          </form>}
+          <div className="admin-heading"><div><label>ADMIN TOOLS</label><h2>{editingId ? 'Edit mod' : 'Add a mod'}</h2><p>Publish a mod or manage existing entries in the catalogue.</p></div><span className="admin-pill">🔒 Admin / creator</span></div>
+          {!adminUnlocked && !account ? <form className="admin-unlock" onSubmit={unlockAdmin}><label>Admin password<input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} autoComplete="current-password" placeholder="Admin password" required /></label><button className="primary" disabled={adminBusy}>{adminBusy ? 'Checking…' : 'Unlock admin tools'}</button></form> :
+          <>
+            <form className="admin-form compact-admin-form" onSubmit={addMod}>
+              <label>Mod name<input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required maxLength={90} placeholder="e.g. MonkePhone" /></label>
+              <label>Author<input value={draft.author} onChange={(e) => setDraft({ ...draft, author: e.target.value })} required maxLength={90} placeholder="Creator name" /></label>
+              <label>Version<input value={draft.version} onChange={(e) => setDraft({ ...draft, version: e.target.value })} required maxLength={40} placeholder="1.0.0" /></label>
+              <label>Category<select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })}>{categories.filter((item) => item !== 'All Mods').map((item) => <option key={item}>{item}</option>)}</select></label>
+              <label className="full">What does it do?<textarea value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} required maxLength={1400} placeholder="Short description of the mod" rows={2} /></label>
+              <label className="full">Download link (or upload a DLL/ZIP below)<input type="url" value={draft.downloadUrl} onChange={(e) => setDraft({ ...draft, downloadUrl: e.target.value })} placeholder="https://…/mod.dll or mod.zip" required /></label>
+              <label className="full">Upload mod file (.dll or .zip)<input type="file" accept=".dll,.zip,application/zip" onChange={(e)=>void uploadModFile(e.target.files?.[0])} /></label>
+              <label>Cover image URL <input type="url" value={draft.imageUrl || ''} onChange={(e) => setDraft({ ...draft, imageUrl: e.target.value })} placeholder="Optional image URL" /></label>
+              <label>Upload cover image<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e)=>void uploadMainImage(e.target.files?.[0])} /></label>
+              <details className="admin-advanced full">
+                <summary>Optional details — source, gallery, video, dependencies and settings</summary>
+                <div className="admin-advanced-grid">
+                  <label>Source / release page<input type="url" value={draft.sourceUrl || ''} onChange={(e) => setDraft({ ...draft, sourceUrl: e.target.value })} placeholder="https://github.com/creator/project" /></label>
+                  <label>Dependencies (comma separated)<input value={draft.dependencies.join(', ')} onChange={(e) => setDraft({ ...draft, dependencies: e.target.value.split(',').map((name) => name.trim()).filter(Boolean) })} placeholder="Utilla, BepInEx" /></label>
+                  <label>Gallery images (up to 8)<input type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e)=>void uploadImages(e.target.files)} /></label>
+                  <label>Preview video (MP4/WebM, max 12 MB)<input type="file" accept="video/mp4,video/webm" onChange={(e)=>void uploadVideo(e.target.files?.[0])} /></label>
+                  <label>Video URL<input type="url" value={draft.videoUrl||''} onChange={(e)=>setDraft({...draft,videoUrl:e.target.value})} placeholder="Optional video URL" /></label>
+                  <label className="full">Configuration settings (JSON array)<textarea value={JSON.stringify(draft.configSettings||[],null,2)} onChange={(e)=>{try{const value=JSON.parse(e.target.value);if(Array.isArray(value))setDraft({...draft,configSettings:value});}catch{/* Keep last valid JSON until corrected. */}}} rows={3} placeholder={'[{"label":"Enable feature","key":"enabled","defaultValue":"true"}]'} /></label>
+                </div>
+              </details>
+              <div className="admin-actions full"><button className="primary" disabled={adminBusy}>{adminBusy ? 'Saving…' : editingId ? 'Save changes' : '＋ Add mod'}</button><button type="button" className="secondary" onClick={() => {setDraft(blankDraft);setEditingId(null);}}>Clear</button>{account && <button type="button" className="admin-lock" onClick={() => {setShowAdmin(false);setAdminError('');}}>Close</button>}<button type="button" className="admin-lock" onClick={() => { setAdminUnlocked(false); setAdminPassword(''); }}>Lock admin</button></div>
+              <p className="form-help full">Use a direct HTTPS download link or upload a DLL/ZIP. Only publish files you have permission to distribute.</p>
+            </form>
+            <div className="admin-manage">
+              <div className="admin-manage-heading"><h3>Manage mods</h3><span>{mods.length} total</span></div>
+              {mods.map((mod) => <div className="admin-mod-row" key={mod.id}><div><b>{mod.name}</b><small>v{mod.version} · {mod.category}</small></div><div className="admin-mod-actions"><button className="details" type="button" onClick={()=>beginEdit(mod)}>Edit</button><button className="delete-mod" type="button" disabled={adminBusy} onClick={()=>void deleteMod(mod)}>Remove</button></div></div>)}
+            </div>
+          </>}
           {adminError && <div className="admin-error" role="alert">{adminError}</div>}
         </section>}
 
