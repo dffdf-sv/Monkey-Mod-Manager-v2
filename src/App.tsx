@@ -17,6 +17,7 @@ declare global {
       installMod: (mod: Mod) => Promise<{ ok: boolean; message: string; path?: string }>;
       getInstalledMods: () => Promise<Record<string, string>>;
       getDetectedMods: () => Promise<string[]>;
+      saveModConfig: (payload: {modName:string;values:Record<string,string>}) => Promise<{ok:boolean;message:string;path?:string}>;
       installBepInEx: () => Promise<{ ok: boolean; message: string; path?: string }>;
     };
   }
@@ -243,7 +244,7 @@ export default function App() {
 
         {showAdmin && <section className="admin-panel">
           <div className="admin-heading"><div><label>CURATOR TOOLS</label><h2>Add a mod to the hub</h2><p>New entries are saved back into <b>GORILA-TAG-MODBASE</b> on GitHub.</p></div><span className="admin-pill">🔒 Admin only</span></div>
-          {!adminUnlocked ? <form className="admin-unlock" onSubmit={unlockAdmin}><label>Admin password<input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} autoComplete="current-password" placeholder="Enter Render ADMIN_PASSWORD" required /></label><button className="primary" disabled={adminBusy}>{adminBusy ? 'Checking…' : 'Unlock admin tools'}</button></form> :
+          {!adminUnlocked && !account ? <form className="admin-unlock" onSubmit={unlockAdmin}><label>Admin password<input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} autoComplete="current-password" placeholder="Enter Render ADMIN_PASSWORD" required /></label><button className="primary" disabled={adminBusy}>{adminBusy ? 'Checking…' : 'Unlock admin tools'}</button></form> :
           <form className="admin-form" onSubmit={addMod}>
             <label>Mod name<input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required maxLength={90} placeholder="e.g. My new mod" /></label>
             <label>Author<input value={draft.author} onChange={(e) => setDraft({ ...draft, author: e.target.value })} required maxLength={90} placeholder="Creator name" /></label>
@@ -291,7 +292,7 @@ export default function App() {
       <span className="category">{detail.category}</span><h2>{detail.name}</h2><p className="author">by {detail.author} · v{detail.version}</p><p>{detail.description}</p>
       {(detail.galleryUrls||[]).length>0 && <div className="detail-gallery">{(detail.galleryUrls||[]).map((url,i)=><img key={url+i} src={url} alt={detail.name+' screenshot '+(i+1)} />)}</div>}
       {detail.videoUrl && <video className="mod-video" controls preload="metadata" src={detail.videoUrl} />}
-      {(detail.configSettings||[]).length>0 && <section className="config-panel"><h3>Mod configuration</h3>{detail.configSettings!.map((item,i)=><label key={item.key||item.label||i}>{item.label||item.key}<input value={configValues[detail.id+':'+(item.key||i)]??item.defaultValue??''} onChange={e=>setConfigValues(current=>({...current,[detail.id+':'+(item.key||i)]:e.target.value}))} /></label>)}<button className="secondary" onClick={()=>{localStorage.setItem('mmm-config-'+detail.id,JSON.stringify(Object.fromEntries(Object.entries(configValues).filter(([key])=>key.startsWith(detail.id+':')))));notify('Configuration preferences saved on this device.');}}>Save settings</button></section>}
+      {(detail.configSettings||[]).length>0 && <section className="config-panel"><h3>Mod configuration</h3>{detail.configSettings!.map((item,i)=><label key={item.key||item.label||i}>{item.label||item.key}<input value={configValues[detail.id+':'+(item.key||i)]??item.defaultValue??''} onChange={e=>setConfigValues(current=>({...current,[detail.id+':'+(item.key||i)]:e.target.value}))} /></label>)}<button className="secondary" onClick={async()=>{const values=Object.fromEntries(Object.entries(configValues).filter(([key])=>key.startsWith(detail.id+':')).map(([key,value])=>[key.slice((detail.id+':').length),value]));localStorage.setItem('mmm-config-'+detail.id,JSON.stringify(values));if(desktop){const result=await window.monkeyModManager!.saveModConfig({modName:detail.name,values});notify(result.message);}else notify('Settings saved in this browser. The desktop app can also write a BepInEx config file.');}}>Save settings</button></section>}
       {detail.dependencies.length > 0 && <div className="warning">ⓘ <span><b>Required dependencies</b><small>{detail.dependencies.join(', ')}. Install prerequisites before this mod.</small></span></div>}
       <div className="modal-links">{detail.sourceUrl && <a href={detail.sourceUrl} target="_blank" rel="noreferrer">Open official source ↗</a>}<a href={detail.downloadUrl} target="_blank" rel="noreferrer">Open download link ↗</a></div>
       <button className="primary wide" onClick={() => void installMod(detail)}>{desktop ? (installedMods[detail.id] && installedMods[detail.id] !== detail.version ? '↻ Update mod' : installedMods[detail.id] === detail.version ? '✓ Reinstall mod' : '↓ Install mod') : '↓ Download mod'}</button>
