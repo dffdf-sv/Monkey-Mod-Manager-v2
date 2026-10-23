@@ -53,9 +53,9 @@ function checkRate(req) {
   const recent = (rateMap.get(key) || []).filter((at) => now - at < 60_000); recent.push(now); rateMap.set(key, recent);
   return recent.length <= 25;
 }
-async function readBody(req) {
+async function readBody(req, limit = 1_000_000) {
   let data = '';
-  for await (const chunk of req) { data += chunk; if (data.length > 1_000_000) throw new Error('Request body is too large.'); }
+  for await (const chunk of req) { data += chunk; if (data.length > limit) throw new Error('Request body is too large.'); }
   try { return JSON.parse(data || '{}'); } catch { throw new Error('Request body must be valid JSON.'); }
 }
 async function readGitHubFile() {
