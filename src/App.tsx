@@ -152,16 +152,36 @@ export default function App() {
     finally { setAdminBusy(false); }
   };
 
+  const uploadAsset = async (file: File, kind: 'image'|'video'|'mod') => {
+    if (!account) throw new Error('Sign in with GitHub before uploading files.');
+    const base64 = await new Promise<string>((resolve,reject)=>{ const reader=new FileReader(); reader.onload=()=>resolve(String(reader.result||'')); reader.onerror=()=>reject(new Error('Could not read file.')); reader.readAsDataURL(file); });
+    const response=await fetch(apiUrl('/api/assets'),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({modId:draft.name,fileName:file.name,mime:file.type||(kind==='mod'?'application/octet-stream':''),kind,base64})});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(data.error||'Upload failed.');
+    return String(data.url);
+  };
+  const uploadImages = async (files: FileList|null) => {
+    if(!files?.length)return; setAdminBusy(true);setAdminError('');
+    try { const urls:string[]=[]; for(const file of Array.from(files).slice(0,8)) urls.push(await uploadAsset(file,'image')); setDraft(current=>({...current,imageUrl:current.imageUrl||urls[0],galleryUrls:[...(current.galleryUrls||[]),...urls].slice(0,8)})); notify(urls.length+' image(s) uploaded to GitHub.'); }
+    catch(error){setAdminError(error instanceof Error?error.message:'Image upload failed.');} finally{setAdminBusy(false);}
+  };
+  const uploadVideo = async (file: File|undefined) => { if(!file)return;setAdminBusy(true);setAdminError('');try{const url=await uploadAsset(file,'video');setDraft(current=>({...current,videoUrl:url}));notify('Video uploaded to GitHub.');}catch(error){setAdminError(error instanceof Error?error.message:'Video upload failed.');}finally{setAdminBusy(false);} };
+  const uploadModFile = async (file: File|undefined) => { if(!file)return;setAdminBusy(true);setAdminError('');try{const url=await uploadAsset(file,'mod');setDraft(current=>({...current,downloadUrl:url}));notify('Mod file uploaded and hosted on GitHub.');}catch(error){setAdminError(error instanceof Error?error.message:'Mod upload failed.');}finally{setAdminBusy(false);} };
+  const beginEdit = (mod: Mod) => {
+    setEditingId(mod.id);setDraft({name:mod.name,author:mod.author,category:mod.category,description:mod.description,version:mod.version,downloadUrl:mod.downloadUrl,imageUrl:mod.imageUrl||'',sourceUrl:mod.sourceUrl||'',dependencies:mod.dependencies||[],galleryUrls:mod.galleryUrls||[],videoUrl:mod.videoUrl||'',configSettings:mod.configSettings||[]});
+    setShowAdmin(true);setAdminError('');
+  };
+
   const addMod = async (event: FormEvent) => {
     event.preventDefault(); setAdminBusy(true); setAdminError('');
     try {
-      const response = await fetch(apiUrl('/api/mods'), {
-        method: 'POST', headers: { 'content-type': 'application/json', 'x-admin-password': adminPassword },
+      const response = await fetch(apiUrl(editingId ? '/api/mods/' + encodeURIComponent(editingId) : '/api/mods'), {
+        method: editingId ? 'PUT' : 'POST', headers: { 'content-type': 'application/json', 'x-admin-password': adminPassword },
         body: JSON.stringify(draft)
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || 'Could not save mod.');
-      setDraft(blankDraft); await loadCatalog(); notify((result.mod && result.mod.name ? result.mod.name : 'Mod') + ' added to the mod hub.');
+      setDraft(blankDraft); setEditingId(null); await loadCatalog(); notify((result.mod && result.mod.name ? result.mod.name : 'Mod') + (editingId ? ' updated.' : ' added to the mod hub.'));
     } catch (error) { setAdminError(error instanceof Error ? error.message : 'Could not save mod.'); }
     finally { setAdminBusy(false); }
   };
@@ -232,7 +252,7 @@ export default function App() {
             <label>Picture URL (optional)<input type="url" value={draft.imageUrl || ''} onChange={(e) => setDraft({ ...draft, imageUrl: e.target.value })} placeholder="https://…/thumbnail.webp" /></label>
             <label>Source / release page<input type="url" value={draft.sourceUrl || ''} onChange={(e) => setDraft({ ...draft, sourceUrl: e.target.value })} placeholder="https://github.com/creator/project" /></label>
             <label className="full">Dependencies (comma separated)<input value={draft.dependencies.join(', ')} onChange={(e) => setDraft({ ...draft, dependencies: e.target.value.split(',').map((name) => name.trim()).filter(Boolean) })} placeholder="Utilla, BepInEx" /></label>
-            <div className="admin-actions full"><button className="primary" disabled={adminBusy}>{adminBusy ? 'Saving…' : '＋ Publish mod'}</button><button type="button" className="secondary" onClick={() => setDraft(blankDraft)}>Clear form</button><button type="button" className="admin-lock" onClick={() => { setAdminUnlocked(false); setAdminPassword(''); }}>Lock admin</button></div>
+            <div className="admin-actions full"><button className="primary" disabled={adminBusy}>{adminBusy ? 'Saving…' : '＋ Publish mod'}</button><button type="button" className="secondary" onClick={() => {setDraft(blankDraft);setEditingId(null);}}>Clear form</button><button type="button" className="admin-lock" onClick={() => { setAdminUnlocked(false); setAdminPassword(''); }}>Lock admin</button></div>
             <p className="form-help full">Only add mods you have permission to distribute. Use official releases and image URLs. The server validates HTTPS links; it does not upload mod binaries.</p>
           </form>}
           {adminError && <div className="admin-error" role="alert">{adminError}</div>}
