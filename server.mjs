@@ -361,11 +361,12 @@ const server = http.createServer(async (req, res) => {
         if(req.method==='POST'&&match[2]==='rating'){
           if(!checkRate(req))return reply(res,429,{error:'Too many ratings. Wait a minute.'});
           const body=await readBody(req,5000);const rating=Number(body.rating);
-          if(!Number.isInteger(rating)||rating<1||rating>5)return reply(res,400,{error:'Rating must be a whole number from 1 to 5.'});
-          item.ratings[user.id]=rating;file.data[modId]=item;
-          await saveFeedbackFile(file.data,file.sha,'Rate mod '+modId);
+          if(!Number.isInteger(rating)||rating<0||rating>5)return reply(res,400,{error:'Rating must be 0 (remove) or a whole number from 1 to 5.'});
+          if(rating===0)delete item.ratings[user.id];else item.ratings[user.id]=rating;
+          file.data[modId]=item;
+          await saveFeedbackFile(file.data,file.sha,(rating===0?'Remove rating for ':'Rate mod ')+modId);
           const ratings=Object.values(item.ratings).map(Number).filter(v=>Number.isInteger(v)&&v>=1&&v<=5);
-          return reply(res,200,{ratingAverage:Math.round((ratings.reduce((sum,v)=>sum+v,0)/ratings.length)*10)/10,ratingCount:ratings.length,myRating:rating});
+          return reply(res,200,{ratingAverage:ratings.length?Math.round((ratings.reduce((sum,v)=>sum+v,0)/ratings.length)*10)/10:0,ratingCount:ratings.length,myRating:rating===0?0:rating});
         }
         if(req.method==='POST'&&match[2]==='comments'){
           if(!checkRate(req))return reply(res,429,{error:'Too many comments. Wait a minute.'});
