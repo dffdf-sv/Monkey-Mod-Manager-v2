@@ -54,6 +54,7 @@ export default function App() {
   const [accountConfigured, setAccountConfigured] = useState(false);
   const [editingId, setEditingId] = useState<string|null>(null);
   const [configValues, setConfigValues] = useState<Record<string,string>>({});
+  const [advancedConfig, setAdvancedConfig] = useState('{}');
   const [detectedMods, setDetectedMods] = useState<string[]>([]);
   const desktop = Boolean(window.monkeyModManager && window.monkeyModManager.isDesktop);
   const apiUrl = (path: string) => (desktop ? 'https://monkey-mod-hub.onrender.com' : '') + path;
@@ -73,6 +74,21 @@ export default function App() {
   useEffect(() => { void loadCatalog(); void fetch(apiUrl('/api/account')).then(r=>r.json()).then(data=>{setAccount(data.user||null);setAccountConfigured(Boolean(data.configured));}).catch(()=>{}); }, []);
   useEffect(() => { localStorage.setItem('mmm-saved', JSON.stringify(saved)); }, [saved]);
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem('mmm-theme', theme); }, [theme]);
+  useEffect(() => {
+    if (!detail) return;
+    try {
+      const savedConfig = JSON.parse(localStorage.getItem('mmm-config-' + detail.id) || '{}') as Record<string, unknown>;
+      const knownKeys = new Set((detail.configSettings || []).map((item) => item.key));
+      const knownValues: Record<string,string> = {};
+      for (const item of detail.configSettings || []) {
+        const value = savedConfig[item.key];
+        if (value !== undefined) knownValues[detail.id + ':' + item.key] = String(value);
+      }
+      setConfigValues((current) => ({ ...current, ...knownValues }));
+      const customValues = Object.fromEntries(Object.entries(savedConfig).filter(([key]) => !knownKeys.has(key)));
+      setAdvancedConfig(JSON.stringify(customValues, null, 2));
+    } catch { setAdvancedConfig('{}'); }
+  }, [detail?.id]);
   useEffect(() => {
     const handleShortcuts = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
@@ -297,7 +313,21 @@ export default function App() {
       <span className="category">{detail.category}</span><h2>{detail.name}</h2><p className="author">by {detail.author} · v{detail.version}</p><p>{detail.description}</p>
       {(detail.galleryUrls||[]).length>0 && <div className="detail-gallery">{(detail.galleryUrls||[]).map((url,i)=><img key={url+i} src={url} alt={detail.name+' screenshot '+(i+1)} />)}</div>}
       {detail.videoUrl && <video className="mod-video" controls preload="metadata" src={detail.videoUrl} />}
-      {(detail.configSettings||[]).length>0 && <section className="config-panel"><h3>Mod configuration</h3>{detail.configSettings!.map((item,i)=><label key={item.key||item.label||i}>{item.label||item.key}<input value={configValues[detail.id+':'+(item.key||i)]??item.defaultValue??''} onChange={e=>setConfigValues(current=>({...current,[detail.id+':'+(item.key||i)]:e.target.value}))} /></label>)}<button className="secondary" onClick={async()=>{const values=Object.fromEntries((detail.configSettings||[]).map((item,i)=>[item.key||String(i),configValues[detail.id+':'+(item.key||i)]??item.defaultValue??'']));localStorage.setItem('mmm-config-'+detail.id,JSON.stringify(values));if(desktop){const result=await window.monkeyModManager!.saveModConfig({modName:detail.name,values});notify(result.message);}else notify('Settings saved in this browser. The desktop app can also write a BepInEx config file.');}}>Save settings</button></section>}
+      <section className="config-panel"><h3>Mod configuration</h3>
+        {(detail.configSettings||[]).length>0 ? detail.configSettings!.map((item,i)=><label key={item.key||item.label||i}>{item.label||item.key}<input value={configValues[detail.id+':'+(item.key||i)]??item.defaultValue??''} onChange={e=>setConfigValues(current=>({...current,[detail.id+':'+(item.key||i)]:e.target.value}))} /></label>) : <p className="form-help">This mod has no published settings profile yet. Add its documented configuration keys below; setting names must match the mod's own documentation to affect the mod.</p>}
+        <label className="full">Advanced settings (JSON object)<textarea value={advancedConfig} onChange={e=>setAdvancedConfig(e.target.value)} rows={5} spellCheck={false} placeholder={'{\n  "ExampleSetting": "value"\n}'} /></label>
+        <button className="secondary" onClick={async()=>{
+          try {
+            const custom = JSON.parse(advancedConfig || '{}');
+            if (!custom || typeof custom !== 'object' || Array.isArray(custom)) throw new Error('Advanced settings must be a JSON object.');
+            const values:Record<string,string> = Object.fromEntries(Object.entries(custom).map(([key,value])=>[key,typeof value==='string'?value:JSON.stringify(value)]));
+            for (const item of detail.configSettings || []) values[item.key] = configValues[detail.id+':'+item.key] ?? item.defaultValue ?? '';
+            localStorage.setItem('mmm-config-'+detail.id,JSON.stringify(values));
+            if(desktop){const result=await window.monkeyModManager!.saveModConfig({modName:detail.name,values});notify(result.message);}
+            else notify('Configuration saved in this browser. Use the desktop app to write a config file.');
+          } catch(error) { notify(error instanceof Error ? error.message : 'Invalid configuration JSON.'); }
+        }}>Save settings</button>
+      </section>
       {detail.dependencies.length > 0 && <div className="warning">ⓘ <span><b>Required dependencies</b><small>{detail.dependencies.join(', ')}. Install prerequisites before this mod.</small></span></div>}
       <div className="modal-links">{detail.sourceUrl && <a href={detail.sourceUrl} target="_blank" rel="noreferrer">Open official source ↗</a>}<a href={detail.downloadUrl} target="_blank" rel="noreferrer">Open download link ↗</a></div>
       <button className="primary wide" onClick={() => void installMod(detail)}>{desktop ? (installedMods[detail.id] && installedMods[detail.id] !== detail.version ? '↻ Update mod' : installedMods[detail.id] === detail.version ? '✓ Reinstall mod' : '↓ Install mod') : '↓ Download mod'}</button>
