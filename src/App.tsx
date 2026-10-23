@@ -16,6 +16,7 @@ declare global {
       chooseGameFolder: () => Promise<string | null>;
       installMod: (mod: Mod) => Promise<{ ok: boolean; message: string; path?: string }>;
       getInstalledMods: () => Promise<Record<string, string>>;
+      getDetectedMods: () => Promise<string[]>;
       installBepInEx: () => Promise<{ ok: boolean; message: string; path?: string }>;
     };
   }
@@ -52,6 +53,7 @@ export default function App() {
   const [accountConfigured, setAccountConfigured] = useState(false);
   const [editingId, setEditingId] = useState<string|null>(null);
   const [configValues, setConfigValues] = useState<Record<string,string>>({});
+  const [detectedMods, setDetectedMods] = useState<string[]>([]);
   const desktop = Boolean(window.monkeyModManager && window.monkeyModManager.isDesktop);
   const apiUrl = (path: string) => (desktop ? 'https://monkey-mod-hub.onrender.com' : '') + path;
 
@@ -107,7 +109,7 @@ export default function App() {
     }
     try {
       const result = await window.monkeyModManager!.installMod(mod);
-      if (result.ok) { const installed = await window.monkeyModManager!.getInstalledMods(); setInstalledMods(installed); }
+      if (result.ok) { const installed = await window.monkeyModManager!.getInstalledMods(); setInstalledMods(installed); setDetectedMods(await window.monkeyModManager!.getDetectedMods()); }
       notify(result.ok ? mod.name + ' installed successfully' : result.message);
     } catch { notify('Install failed. Check the download link and selected Gorilla Tag folder.'); }
   };
@@ -236,7 +238,7 @@ export default function App() {
         <div className="stats">
           <div><span className="staticon purple">▣</span><small>IN CATALOG</small><b>{String(mods.length).padStart(2, '0')} <i>mods</i></b><label>From your mod base</label></div>
           <div><span className="staticon green">✓</span><small>YOUR LIBRARY</small><b>{String(saved.length).padStart(2, '0')} <i>saved</i></b><label>{saved.length ? 'Collection started' : 'Ready to build'}</label></div>
-          <div><span className="staticon orange">↓</span><small>INSTALL OPTIONS</small><b>{desktop ? 'One-click' : 'Downloads'} <i>{desktop ? 'desktop' : 'web'}</i></b><label>{desktop ? (gameFolder ? 'Game folder selected' : 'Select game folder') : 'Open downloads safely'}</label></div>
+          <div><span className="staticon orange">↓</span><small>INSTALL OPTIONS</small><b>{desktop ? 'One-click' : 'Downloads'} <i>{desktop ? 'desktop' : 'web'}</i></b><label>{desktop ? (gameFolder ? 'Game folder selected · '+detectedMods.length+' detected' : 'Select game folder') : 'Open downloads safely'}</label></div>
         </div>
 
         {showAdmin && <section className="admin-panel">
@@ -257,6 +259,7 @@ export default function App() {
             <label>Host mod file (.dll/.zip, 24 MB max)<input type="file" accept=".dll,.zip,application/zip" onChange={(e)=>void uploadModFile(e.target.files?.[0])} /></label>
             <label>Source / release page<input type="url" value={draft.sourceUrl || ''} onChange={(e) => setDraft({ ...draft, sourceUrl: e.target.value })} placeholder="https://github.com/creator/project" /></label>
             <label className="full">Dependencies (comma separated)<input value={draft.dependencies.join(', ')} onChange={(e) => setDraft({ ...draft, dependencies: e.target.value.split(',').map((name) => name.trim()).filter(Boolean) })} placeholder="Utilla, BepInEx" /></label>
+            <label className="full">Configuration settings (JSON array)<textarea value={JSON.stringify(draft.configSettings||[],null,2)} onChange={(e)=>{try{const value=JSON.parse(e.target.value);if(Array.isArray(value))setDraft({...draft,configSettings:value});}catch{/* Keep last valid JSON until corrected. */}}} rows={3} placeholder={'[{"label":"Enable feature","key":"enabled","defaultValue":"true"}]'} /></label>
             <div className="admin-actions full"><button className="primary" disabled={adminBusy}>{adminBusy ? 'Saving…' : editingId ? 'Save mod edits' : '＋ Publish mod'}</button><button type="button" className="secondary" onClick={() => {setDraft(blankDraft);setEditingId(null);}}>Clear form</button><button type="button" className="admin-lock" onClick={() => { setAdminUnlocked(false); setAdminPassword(''); }}>Lock admin</button></div>
             <p className="form-help full">Only add mods you have permission to distribute. Use official releases and image URLs. The server validates HTTPS links; it does not upload mod binaries.</p>
           </form>}
