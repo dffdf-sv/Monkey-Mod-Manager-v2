@@ -1,118 +1,19 @@
-import { useState, useEffect, useMemo } from 'react';
-import { fetchMods } from './api';
-import { Mod } from './types';
-import Header from './components/Header';
-import Sidebar from './components/Sidebar';
-import ModGrid from './components/ModGrid';
-import ModDetail from './components/ModDetail';
-import styles from './App.module.css';
-
-export default function App() {
-  const [mods, setMods] = useState<Mod[]>([]);
-  const [installed, setInstalled] = useState<Set<string>>(() => {
-    try {
-      return new Set(JSON.parse(localStorage.getItem('installed') || '[]'));
-    } catch {
-      return new Set();
-    }
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [activeCategory, setActiveCategory] = useState('All');
-  const [selectedMod, setSelectedMod] = useState<Mod | null>(null);
-  const [activeTab, setActiveTab] = useState<'all' | 'installed'>('all');
-
-  useEffect(() => {
-    fetchMods()
-      .then(setMods)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('installed', JSON.stringify([...installed]));
-  }, [installed]);
-
-  const categories = useMemo(() => {
-    const cats = new Set(mods.map((m) => m.category));
-    return ['All', ...Array.from(cats)];
-  }, [mods]);
-
-  const filtered = useMemo(() => {
-    let list = mods;
-    if (activeTab === 'installed') list = list.filter((m) => installed.has(m.name));
-    if (activeCategory !== 'All') list = list.filter((m) => m.category === activeCategory);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (m) =>
-          m.name.toLowerCase().includes(q) ||
-          m.author.toLowerCase().includes(q) ||
-          m.description.toLowerCase().includes(q)
-      );
-    }
-    return list;
-  }, [mods, installed, activeCategory, search, activeTab]);
-
-  function handleTab(tab: 'all' | 'installed') {
-    setActiveTab(tab);
-    setActiveCategory('All');
-  }
-
-  function toggleInstall(mod: Mod) {
-    setInstalled((prev) => {
-      const next = new Set(prev);
-      if (next.has(mod.name)) {
-        next.delete(mod.name);
-      } else {
-        next.add(mod.name);
-        mod.dependencies.forEach((dep) => next.add(dep));
-      }
-      return next;
-    });
-  }
-
-  return (
-    <div className={styles.layout}>
-      <Header
-        search={search}
-        onSearch={setSearch}
-        installedCount={installed.size}
-        totalCount={mods.length}
-      />
-      <div className={styles.body}>
-        <Sidebar
-          categories={categories}
-          activeCategory={activeCategory}
-          onCategory={setActiveCategory}
-          activeTab={activeTab}
-          onTab={handleTab}
-          installedCount={installed.size}
-        />
-        <main className={styles.main}>
-          <ModGrid
-            mods={filtered}
-            installed={installed}
-            loading={loading}
-            error={error}
-            search={search}
-            activeTab={activeTab}
-            onSelect={setSelectedMod}
-            onToggleInstall={toggleInstall}
-            onClearSearch={() => setSearch('')}
-          />
-        </main>
-      </div>
-      {selectedMod && (
-        <ModDetail
-          mod={selectedMod}
-          installed={installed.has(selectedMod.name)}
-          onClose={() => setSelectedMod(null)}
-          onToggleInstall={() => toggleInstall(selectedMod)}
-          mods={mods}
-        />
-      )}
-    </div>
-  );
-}
+import {useEffect,useMemo,useState} from 'react';
+import './fresh.css';
+type Mod={id:string;name:string;author:string;category:string;description:string;version:string;color:string};
+const mods:Mod[]=[
+{id:'bepinex',name:'BepInEx',author:'BepInEx Team',category:'Core',description:'A plugin framework used by many Unity game mods.',version:'5.4.22',color:'#a78bfa'},
+{id:'utilla',name:'Utilla',author:'legoandmars',category:'Core',description:'Shared utilities and compatibility helpers for Gorilla Tag mods.',version:'1.6.0',color:'#60a5fa'},
+{id:'maps',name:'Monke Map Loader',author:'Community',category:'Gameplay',description:'Tools for loading community-made maps in supported versions.',version:'1.4.0',color:'#34d399'},
+{id:'cosmetics',name:'Cosmetics Framework',author:'Community',category:'Cosmetic',description:'A framework for compatible community cosmetics.',version:'2.1.0',color:'#f472b6'},
+{id:'computer',name:'Computer Interface',author:'Community',category:'Utility',description:'Quality-of-life tools for supported modded sessions.',version:'1.3.2',color:'#fbbf24'},
+{id:'materials',name:'Material Tools',author:'Community',category:'Cosmetic',description:'Additional visual customization for compatible setups.',version:'1.1.0',color:'#c084fc'},
+{id:'ghost',name:'Ghost Monke',author:'Community',category:'Gameplay',description:'A playful add-on intended for private modded sessions.',version:'1.2.1',color:'#fb923c'},
+{id:'tracker',name:'Player Tracker',author:'Community',category:'Utility',description:'Player information helpers for supported private environments.',version:'1.0.4',color:'#38bdf8'}];
+const cats=['All Mods','Core','Gameplay','Cosmetic','Utility'];
+export default function App(){
+const [q,Sq]=useState(''),[cat,Sc]=useState('All Mods'),[page,Sp]=useState('Discover'),[saved,Ss]=useState<string[]>(()=>{try{return JSON.parse(localStorage.getItem('mmm-saved')||'[]')}catch{return []}}),[theme,St]=useState(localStorage.getItem('mmm-theme')||'dark'),[detail,Sd]=useState<Mod|null>(null),[notice,Sn]=useState('');
+useEffect(()=>{localStorage.setItem('mmm-saved',JSON.stringify(saved))},[saved]);useEffect(()=>{document.documentElement.dataset.theme=theme;localStorage.setItem('mmm-theme',theme)},[theme]);
+const list=useMemo(()=>mods.filter(m=>(page!=='Library'||saved.includes(m.id))&&(cat==='All Mods'||m.category===cat)&&(m.name+' '+m.author+' '+m.category).toLowerCase().includes(q.toLowerCase())),[q,cat,page,saved]);
+function toggle(m:Mod){const add=!saved.includes(m.id);Ss(v=>add?[...v,m.id]:v.filter(x=>x!==m.id));Sn(add?'Saved '+m.name:'Removed '+m.name);window.setTimeout(()=>Sn(''),2300)}
+return <div className="shell"><aside className="sidebar"><div className="brand"><div className="brand-logo">🐒</div><div><b>MONKEY</b><small>MOD MANAGER <i>V2</i></small></div></div><label className="side-label">WORKSPACE</label><button className={'nav '+(page==='Discover'?'chosen':'')} onClick={()=>Sp('Discover')}>▦ <span>Discover mods</span></button><button className={'nav '+(page==='Library'?'chosen':'')} onClick={()=>Sp('Library')}>▣ <span>My library</span><b className="count">{saved.length}</b></button><label className="side-label">CATEGORIES</label>{cats.map(c=><button key={c} className={'nav catnav '+(cat===c?'chosen':'')} onClick={()=>Sc(c)}><i className={'dot '+c.toLowerCase().replace(' ','-')}/><span>{c}</span></button>)}<div className="sidebottom"><div className="status"><i/> <span><b>Manager status</b><small>Web preview mode</small></span></div><button className="themebtn" onClick={()=>St(theme==='dark'?'light':'dark')}>{theme==='dark'?'☼':'☾'} <span>{theme==='dark'?'Light appearance':'Dark appearance'}</span><b>↗</b></button><small className="version">MONKEY MOD MANAGER · V2.0.0</small></div></aside><main className="main"><header className="topbar"><span>Workspace <b>/</b> <strong>{page}</strong></span><div><span className="gamepill"><i/> Gorilla Tag</span><button className="roundbtn" onClick={()=>St(theme==='dark'?'light':'dark')}>{theme==='dark'?'☼':'☾'}</button><span className="avatar">M</span></div></header><div className="content"><section className="hero"><div className="eyebrow">✳ &nbsp; YOUR MODDING HUB</div><h1>{page==='Discover'?<>Make it your<br/><em>own jungle.</em></>:<>Your mods.<br/><em>Your rules.</em></>}</h1><p>{page==='Discover'?'Discover community mods, organize your collection, and shape your Gorilla Tag experience.':'Everything you saved, together in one place.'}</p><div className="heroactions"><button className="primary" onClick={()=>{Sp('Discover');document.getElementById('modsearch')?.focus()}}>⌕ &nbsp; Explore mods ↗</button><button className="secondary" onClick={()=>Sp('Library')}>▣ &nbsp; My library <b>{saved.length}</b></button></div><div className="hero-art"><div className="orbit orbit1"/><div className="orbit orbit2"/><span className="monkey">🐒</span><div className="float float1">✦ <span><b>Make it yours</b><small>Build your collection</small></span></div><div className="float float2">✓ <span><b>{saved.length} mods saved</b><small>Your personal library</small></span></div></div></section><div className="stats"><div><span className="staticon purple">▣</span><small>IN CATALOG</small><b>{String(mods.length).padStart(2,'0')} <i>mods</i></b><label>Community picks</label></div><div><span className="staticon green">✓</span><small>YOUR LIBRARY</small><b>{String(saved.length).padStart(2,'0')} <i>saved</i></b><label>{saved.length?'Collection started':'Ready to build'}</label></div><div><span className="staticon orange">⌘</span><small>MOD CATEGORIES</small><b>04 <i>types</i></b><label>Find your style</label></div></div><div className="sectionhead"><div><label>THE COLLECTION</label><h2>{page==='Discover'?'Find your next favorite':'Your mod library'} <span>{list.length}</span></h2><p>{page==='Discover'?'A starting point for your modded setup.':'Your saved mods.'}</p></div><button className="reset" onClick={()=>{Sq('');Sc('All Mods')}}>⟳ Reset filters</button></div><div className="toolbar"><label className="search">⌕ <input id="modsearch" value={q} onChange={e=>Sq(e.target.value)} placeholder="Search mods, creators, categories..."/>{q&&<button onClick={()=>Sq('')}>×</button>}<kbd>⌘ K</kbd></label><div className="pills">{cats.map(c=><button key={c} className={cat===c?'pillactive':''} onClick={()=>Sc(c)}>{c==='All Mods'?'All':c}</button>)}</div></div>{list.length?<div className="grid">{list.map(m=><article className="modcard" key={m.id}><div className="cardtop"><div className="modlogo" style={{color:m.color,background:m.color+'20'}}>{m.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div><span className="category">{m.category}</span><button className="more" onClick={()=>Sd(m)}>···</button></div><h3>{m.name}</h3><p className="author">by <b>{m.author}</b></p><p className="desc">{m.description}</p><div className="cardfoot"><span className="version">v{m.version}</span><button className={saved.includes(m.id)?'saved install':'install'} onClick={()=>toggle(m)}>{saved.includes(m.id)?'✓ Saved':'+ Add mod'}</button></div><button className="details" onClick={()=>Sd(m)}>View details ↗</button></article>)}</div>:<div className="empty"><div>▣</div><h3>{page==='Library'?'Your library is a blank canvas':'No mods found'}</h3><p>{page==='Library'?'Save a few mods from Discover to get started.':'Try a different search or category.'}</p><button className="primary" onClick={()=>{Sq('');Sc('All Mods');Sp('Discover')}}>Explore mods ↗</button></div>}<footer><span><b>MONKEY MOD MANAGER</b> · Built for the community</span><span>Stay curious. Stay monke. ✳</span></footer></div></main>{detail&&<div className="backdrop" onClick={()=>Sd(null)}><section className="modal" onClick={e=>e.stopPropagation()}><button className="modalclose" onClick={()=>Sd(null)}>×</button><div className="modlogo big" style={{color:detail.color,background:detail.color+'20'}}>{detail.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div><span className="category">{detail.category}</span><h2>{detail.name}</h2><p className="author">by {detail.author} · v{detail.version}</p><p>{detail.description}</p><div className="warning">ⓘ <span><b>Web preview</b><small>This prototype saves your library in this browser. Installing files into Gorilla Tag requires a desktop installer and a verified mod source.</small></span></div><button className="primary wide" onClick={()=>toggle(detail)}>{saved.includes(detail.id)?'Remove from library':'Add to library'} ↗</button></section></div>}{notice&&<div className="toast">✓ &nbsp; {notice}</div>}</div>}
