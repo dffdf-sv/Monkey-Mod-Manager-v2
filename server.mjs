@@ -25,7 +25,7 @@ function applyCors(req, res) {
   if (!allowed) return;
   res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Vary', 'Origin');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Admin-Password');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Admin-Password, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Max-Age', '600');
 }
@@ -101,7 +101,7 @@ function adminAllowed(req) {
 
 function parseCookies(req) { return Object.fromEntries(String(req.headers.cookie || '').split(';').map(x => x.trim()).filter(Boolean).map(x => { const i=x.indexOf('='); return i<0?[x,'']:[x.slice(0,i),decodeURIComponent(x.slice(i+1))]; })); }
 function sessionFor(req) {
-  const token=parseCookies(req).mmm_session||''; const parts=token.split('.'); if(parts.length!==2)return null;
+  const auth=String(req.headers.authorization||''); const bearer=auth.startsWith('Bearer ')?auth.slice(7):''; const token=bearer||parseCookies(req).mmm_session||''; const parts=token.split('.'); if(parts.length!==2)return null;
   const expected=crypto.createHmac('sha256',process.env.SESSION_SECRET||'missing-session-secret').update(parts[0]).digest();
   const actual=Buffer.from(parts[1],'base64url'); if(actual.length!==expected.length||!crypto.timingSafeEqual(actual,expected))return null;
   try { const user=JSON.parse(Buffer.from(parts[0],'base64url').toString()); return user.exp>Date.now()?user:null; } catch { return null; }
@@ -125,7 +125,8 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === '/auth/github' && req.method === 'GET') {
       if (!process.env.GITHUB_OAUTH_CLIENT_ID || !process.env.GITHUB_OAUTH_CLIENT_SECRET || !process.env.SESSION_SECRET) return reply(res,503,{error:'GitHub account login is not configured in Render yet.'});
-      const state=crypto.randomBytes(24).toString('hex'); cookie(res,'mmm_state',state,600);
+      const desktopMode=url.searchParams.get('desktop')==='1';
+      const state=crypto.randomBytes(24).toString('hex'); cookie(res,'mmm_state',state,600); cookie(res,'mmm_auth_mode',desktopMode?'desktop':'web',600);
       const auth=new URL('https://github.com/login/oauth/authorize'); auth.searchParams.set('client_id',process.env.GITHUB_OAUTH_CLIENT_ID); auth.searchParams.set('redirect_uri','https://monkey-mod-hub.onrender.com/auth/github/callback'); auth.searchParams.set('scope','read:user'); auth.searchParams.set('state',state);
       res.writeHead(302,{location:auth.toString()}); return res.end();
     }
@@ -135,8 +136,16 @@ const server = http.createServer(async (req, res) => {
       const td=await tr.json(); if(!tr.ok||!td.access_token)return reply(res,401,{error:'GitHub sign-in failed.'});
       const pr=await fetch('https://api.github.com/user',{headers:{authorization:'Bearer '+td.access_token,accept:'application/vnd.github+json','user-agent':'Monkey-Mod-Hub'},signal:AbortSignal.timeout(10000)}); const p=await pr.json();
       if(!pr.ok||!p.id||!p.login)return reply(res,401,{error:'Could not verify GitHub account.'});
-      cookie(res,'mmm_session',signedSession({id:String(p.id),login:String(p.login),avatar:String(p.avatar_url||''),exp:Date.now()+604800000}),604800); cookie(res,'mmm_state','',0);
-      res.writeHead(302,{location:'https://monkey-mod-hub.onrender.com/?signed_in=1'}); return res.end();
+      const sessionToken=signedSession({id:String(p.id),login:String(p.login),avatar:String(p.avatar_url||''),exp:Date.now()+604800000});
+      cookie(res,'mmm_session',sessionToken,604800); cookie(res,'mmm_state','',0);
+      const desktopMode=parseCookies(req).mmm_auth_mode==='desktop'; cookie(res,'mmm_auth_mode','',0);
+      if(desktopMode){
+        const deepLink='monkeymodmanager://auth?token='+encodeURIComponent(sessionToken);
+        res.writeHead(200,{'content-type':'text/html; charset=utf-8','cache-control':'no-store','content-security-policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'","x-content-type-options":"nosniff"});
+        res.end('<!doctype html><meta charset="utf-8"><title>Signed in · Monkey Mod Manager</title><style>body{font:16px system-ui;background:#10150f;color:#f4f6f0;display:grid;place-items:center;min-height:90vh;text-align:center}main{max-width:440px;padding:32px;border:1px solid #3a4937;border-radius:18px}p{color:#b9c5b4}</style><main><h1>GitHub sign-in complete</h1><p>You can return to Monkey Mod Manager. This tab will close if your browser permits it.</p></main><script>location.href='+JSON.stringify(deepLink)+';setTimeout(()=>window.close(),700);</script>'); return;
+      }
+      res.writeHead(200,{'content-type':'text/html; charset=utf-8','cache-control':'no-store','content-security-policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'","x-content-type-options":"nosniff"});
+      res.end('<!doctype html><meta charset="utf-8"><title>Signed in · Monkey Mod Hub</title><style>body{font:16px system-ui;background:#10150f;color:#f4f6f0;display:grid;place-items:center;min-height:90vh;text-align:center}main{max-width:440px;padding:32px;border:1px solid #3a4937;border-radius:18px}p{color:#b9c5b4}</style><main><h1>GitHub sign-in complete</h1><p>You can return to Monkey Mod Hub. This tab will close automatically.</p></main><script>try{if(window.opener)window.opener.postMessage({type:"mmm-github-auth-complete"},"https://monkey-mod-hub.onrender.com")}catch{}setTimeout(()=>window.close(),350);setTimeout(()=>{location.href="https://monkey-mod-hub.onrender.com/?signed_in=1"},900);</script>'); return;
     }
     if (url.pathname === '/api/account' && req.method === 'GET') { const u=sessionFor(req); return reply(res,200,{configured:Boolean(process.env.GITHUB_OAUTH_CLIENT_ID&&process.env.GITHUB_OAUTH_CLIENT_SECRET&&process.env.SESSION_SECRET),user:u?{id:u.id,login:u.login,avatar:u.avatar}:null}); }
     if (url.pathname === '/api/account/logout' && req.method === 'POST') { cookie(res,'mmm_session','',0); return reply(res,200,{ok:true}); }
