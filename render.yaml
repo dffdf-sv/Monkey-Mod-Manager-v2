@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: monkey-mod-hub
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install && npm run build
+    startCommand: node server.mjs
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: MOD_REPO
+        value: dffdf-sv/GORILA-TAG-MODBASE
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
