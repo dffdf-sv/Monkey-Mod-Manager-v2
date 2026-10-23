@@ -162,6 +162,49 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === '/healthz') return reply(res, 200, { ok: true, service: 'monkey-mod-hub' });
+    if (url.pathname === '/api/github-import' && req.method === 'GET') {
+      const source = url.searchParams.get('url') || '';
+      let parsed;
+      try { parsed = new URL(source); } catch { return reply(res, 400, { error: 'Enter a valid GitHub repository URL.' }); }
+      if (parsed.protocol !== 'https:' || parsed.hostname.toLowerCase() !== 'github.com') return reply(res, 400, { error: 'Only public github.com repository URLs are supported.' });
+      const parts = parsed.pathname.split('/').filter(Boolean);
+      if (parts.length < 2 || !/^[A-Za-z0-9_.-]{1,100}$/.test(parts[0]) || !/^[A-Za-z0-9_.-]{1,100}$/.test(parts[1])) return reply(res, 400, { error: 'URL must point to a GitHub repository, e.g. https://github.com/owner/repository.' });
+      const owner = parts[0], repo = parts[1].replace(/\.git$/i, '');
+      const apiHeaders = { accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'Monkey-Mod-Hub/2.1' };
+      try {
+        const repoResponse = await fetch('https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo), { headers: apiHeaders, signal: AbortSignal.timeout(12000) });
+        const repoData = await repoResponse.json().catch(() => ({}));
+        if (!repoResponse.ok || repoData.private) return reply(res, repoResponse.status === 404 ? 404 : 502, { error: repoData.message || 'Could not read this public GitHub repository.' });
+        const readmeResponse = await fetch('https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo) + '/readme', { headers: { ...apiHeaders, accept: 'application/vnd.github.raw+json' }, signal: AbortSignal.timeout(12000) });
+        let readme = '';
+        if (readmeResponse.ok) {
+          const contentType = readmeResponse.headers.get('content-type') || '';
+          if (contentType.includes('json')) {
+            const readmeData = await readmeResponse.json().catch(() => ({}));
+            if (readmeData.content) readme = Buffer.from(String(readmeData.content).replace(/\n/g, ''), 'base64').toString('utf8');
+          } else readme = await readmeResponse.text();
+        }
+        const releaseResponse = await fetch('https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo) + '/releases/latest', { headers: apiHeaders, signal: AbortSignal.timeout(12000) });
+        const release = releaseResponse.ok ? await releaseResponse.json().catch(() => ({})) : {};
+        const assets = Array.isArray(release.assets) ? release.assets : [];
+        const asset = assets.find((item) => /\.(dll|zip)$/i.test(String(item.name || ''))) || assets[0];
+        const topics = Array.isArray(repoData.topics) ? repoData.topics : [];
+        const topicText = topics.join(' ').toLowerCase();
+        const category = /core|library|framework|dependency/.test(topicText) ? 'Core' : /map|level/.test(topicText) ? 'Maps' : /cosmetic|skin|appearance/.test(topicText) ? 'Cosmetic' : /gameplay|menu|cheat/.test(topicText) ? 'Gameplay' : /utility|tool|helper/.test(topicText) ? 'Utility' : '';
+        const additionalLinks = [];
+        if (repoData.html_url) additionalLinks.push({ label: 'GitHub repository', url: repoData.html_url });
+        if (repoData.releases_url) additionalLinks.push({ label: 'Releases', url: 'https://github.com/' + owner + '/' + repo + '/releases' });
+        if (repoData.html_url && repoData.has_wiki) additionalLinks.push({ label: 'Wiki', url: 'https://github.com/' + owner + '/' + repo + '/wiki' });
+        return reply(res, 200, {
+          name: String(repoData.name || repo).slice(0,90), author: String(repoData.owner && repoData.owner.login || owner).slice(0,90),
+          description: String(repoData.description || '').slice(0,1400), version: String(release.tag_name || repoData.default_branch || '1.0.0').slice(0,40),
+          downloadUrl: asset && asset.browser_download_url || '', sourceUrl: repoData.html_url || source,
+          websiteUrl: httpsUrl(repoData.homepage || '', false) || '', readme: String(readme).slice(0,20000),
+          changelog: String(release.body || '').slice(0,12000), dependencies: [], category,
+          additionalLinks, topics, stars: Number(repoData.stargazers_count || 0)
+        });
+      } catch (error) { return reply(res, 502, { error: error instanceof Error ? error.message : 'GitHub import failed.' }); }
+    }
     if (url.pathname === '/api/mods' && req.method === 'GET') return reply(res, 200, { mods: await getMods() });
     if (url.pathname === '/api/admin/check' && req.method === 'POST') {
       if (!checkRate(req)) return reply(res, 429, { error: 'Too many admin attempts. Wait one minute.' });
