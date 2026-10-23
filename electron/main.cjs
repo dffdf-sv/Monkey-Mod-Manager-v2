@@ -109,7 +109,7 @@ ipcMain.handle('game:set-platform', async (_event, platform) => {
   const safePlatform = platform === 'Meta' ? 'Meta' : 'Steam';
   const settings = await readSettings();
   const found = await autoDetectGameFolder(safePlatform);
-  const next = { ...settings, gamePlatform: safePlatform, gameFolder: found || settings.gameFolder || null };
+  const next = { ...settings, gamePlatform: safePlatform, gameFolder: found || null };
   await writeSettings(next);
   return { ok: true, platform: safePlatform, gameFolder: next.gameFolder };
 });
