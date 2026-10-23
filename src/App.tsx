@@ -163,6 +163,11 @@ export default function App() {
     if(!response.ok)throw new Error(data.error||'Upload failed.');
     return String(data.url);
   };
+  const uploadMainImage = async (file: File|undefined) => {
+    if(!file)return;setAdminBusy(true);setAdminError('');
+    try{const url=await uploadAsset(file,'image');setDraft(current=>({...current,imageUrl:url, galleryUrls:[...(current.galleryUrls||[]).filter(item=>item!==current.imageUrl),url].slice(0,8)}));notify('Main product picture uploaded to GitHub.');}
+    catch(error){setAdminError(error instanceof Error?error.message:'Image upload failed.');}finally{setAdminBusy(false);}
+  };
   const uploadImages = async (files: FileList|null) => {
     if(!files?.length)return; setAdminBusy(true);setAdminError('');
     try { const urls:string[]=[]; for(const file of Array.from(files).slice(0,8)) urls.push(await uploadAsset(file,'image')); setDraft(current=>({...current,imageUrl:current.imageUrl||urls[0],galleryUrls:[...(current.galleryUrls||[]),...urls].slice(0,8)})); notify(urls.length+' image(s) uploaded to GitHub.'); }
@@ -253,7 +258,7 @@ export default function App() {
             <label className="full">Description<textarea value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} required maxLength={1400} placeholder="What does this mod do? Mention known requirements." rows={3} /></label>
             <label className="full">Direct download URL (HTTPS)<input type="url" value={draft.downloadUrl} onChange={(e) => setDraft({ ...draft, downloadUrl: e.target.value })} required placeholder="https://…/mod.dll or mod.zip" /></label>
             <label>Picture URL (optional)<input type="url" value={draft.imageUrl || ''} onChange={(e) => setDraft({ ...draft, imageUrl: e.target.value })} placeholder="https://…/thumbnail.webp" /></label>
-            <label>Main product picture upload<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e)=>void uploadImages(e.target.files)} /></label>
+            <label>Main product picture upload<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e)=>void uploadMainImage(e.target.files?.[0])} /></label>
             <label>Gallery pictures (up to 8)<input type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e)=>void uploadImages(e.target.files)} /></label>
             <label>Product video upload (MP4/WebM, 12 MB max)<input type="file" accept="video/mp4,video/webm" onChange={(e)=>void uploadVideo(e.target.files?.[0])} /></label>
             <label>Video URL (optional)<input type="url" value={draft.videoUrl||''} onChange={(e)=>setDraft({...draft,videoUrl:e.target.value})} placeholder="https://…/preview.mp4" /></label>
