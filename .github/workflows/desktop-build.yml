@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Version (examples: v2, v2.0, v2.0.1, v2.0.1.4)
+        description: Version (examples v2, v2.0, v2.0.1, v2.0.1.4)
         required: true
         default: "v2.0.1"
         type: string
@@ -20,34 +20,32 @@ jobs:
     name: Build Windows installer
     runs-on: windows-latest
     steps:
-      - name: Check out repository
+      - name: Checkout
         uses: actions/checkout@v4
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - name: Set release version
+      - name: Normalize version
         shell: pwsh
+        env:
+          INPUT_VERSION: \${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
         run: |
-          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-            $version = "${{ inputs.version }}"
-          } else {
-            $version = "${{ github.ref_name }}"
-          }
-          $version = $version -replace '^v', ''
+          $version = $env:INPUT_VERSION -replace '^v', ''
           if ($version -notmatch '^\d+(\.\d+)*$') {
-            throw "Invalid version: $version. Use v2, v2.0, v2.0.1, or any dot-separated numeric version."
+            throw "Invalid version: $env:INPUT_VERSION. Use v2, v2.0, v2.0.1, or any dot-separated numeric version."
           }
           $parts = @($version.Split('.'))
           while ($parts.Count -lt 3) { $parts += '0' }
           if ($parts.Count -gt 3) {
-            $npmVersion = "$($parts[0]).$($parts[1]).$($parts[2])-$($parts[3..($parts.Count - 1)] -join '.')"
+            $suffix = $parts[3..($parts.Count - 1)] -join '.'
+            $packageVersion = "$($parts[0]).$($parts[1]).$($parts[2])-$suffix"
           } else {
-            $npmVersion = $parts -join '.'
+            $packageVersion = $parts -join '.'
           }
-          Write-Host "Release version: v$version; package version: $npmVersion"
-          npm pkg set "version=$npmVersion"
+          Write-Host "Release version: v$version; package version: $packageVersion"
+          npm pkg set "version=$packageVersion"
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Build Windows installer
@@ -64,30 +62,27 @@ jobs:
     name: Build Linux packages
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
+      - name: Checkout
         uses: actions/checkout@v4
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - name: Set release version
+      - name: Normalize version
         shell: bash
+        env:
+          INPUT_VERSION: \${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            VERSION="${{ inputs.version }}"
-          else
-            VERSION="$GITHUB_REF_NAME"
-          fi
-          VERSION="${VERSION#v}"
-          [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+)*$ ]] || { echo "Invalid version: $VERSION. Use v2, v2.0, v2.0.1, or any dot-separated numeric version."; exit 1; }
+          VERSION="\${INPUT_VERSION#v}"
+          [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+)*$ ]] || { echo "Invalid version: $INPUT_VERSION. Use v2, v2.0, v2.0.1, or any dot-separated numeric version."; exit 1; }
           IFS='.' read -r -a PARTS <<< "$VERSION"
-          while (( ${#PARTS[@]} < 3 )); do PARTS+=(0); done
-          if (( ${#PARTS[@]} > 3 )); then
-            EXTRA="$(IFS='.'; echo "${PARTS[*]:3}")"
-            PACKAGE_VERSION="${PARTS[0]}.${PARTS[1]}.${PARTS[2]}-$EXTRA"
+          while (( \${#PARTS[@]} < 3 )); do PARTS+=(0); done
+          if (( \${#PARTS[@]} > 3 )); then
+            EXTRA="$(IFS='.'; echo "\${PARTS[*]:3}")"
+            PACKAGE_VERSION="\${PARTS[0]}.\${PARTS[1]}.\${PARTS[2]}-$EXTRA"
           else
-            PACKAGE_VERSION="${PARTS[0]}.${PARTS[1]}.${PARTS[2]}"
+            PACKAGE_VERSION="\${PARTS[0]}.\${PARTS[1]}.\${PARTS[2]}"
           fi
           echo "Release version: v$VERSION; package version: $PACKAGE_VERSION"
           npm pkg set "version=$PACKAGE_VERSION"
@@ -124,25 +119,22 @@ jobs:
           name: Monkey-Mod-Manager-Linux
           path: release-files
           merge-multiple: true
-      - name: Set release tag
+      - name: Set release metadata
         id: release
         shell: bash
+        env:
+          INPUT_VERSION: \${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            VERSION="${{ inputs.version }}"
-          else
-            VERSION="$GITHUB_REF_NAME"
-          fi
-          VERSION="${VERSION#v}"
-          [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+)*$ ]] || { echo "Invalid release version: $VERSION"; exit 1; }
+          VERSION="\${INPUT_VERSION#v}"
+          [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+)*$ ]] || { echo "Invalid release version: $INPUT_VERSION"; exit 1; }
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           echo "name=Monkey Mod Manager v$VERSION" >> "$GITHUB_OUTPUT"
       - name: Publish direct installer files
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.release.outputs.tag }}
+          tag_name: \${{ steps.release.outputs.tag }}
           target_commitish: main
-          name: ${{ steps.release.outputs.name }}
+          name: \${{ steps.release.outputs.name }}
           generate_release_notes: true
           files: |
             release-files/*.exe
