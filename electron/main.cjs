@@ -43,7 +43,7 @@ async function writeSettings(settings) {
 function createWindow() {
   const win = new BrowserWindow({
     width: 1440, height: 960, minWidth: 780, minHeight: 600,
-    title: 'Monkey Mod Manager', icon: path.join(__dirname, '..', 'dist', 'image.jpg'), backgroundColor: '#0b0e12', autoHideMenuBar: true,
+    title: 'Monkey Mod Manager', icon: path.join(__dirname, '..', 'build', 'icon.png'), backgroundColor: '#0b0e12', autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true }
   });
   mainWindow = win;
