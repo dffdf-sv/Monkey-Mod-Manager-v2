@@ -35,7 +35,7 @@ const fallbackMods: Mod[] = [
   { id: 'monkephone', name: 'MonkePhone', author: 'developer9998', category: 'Utility', description: 'An in-game phone and photo tool for capturing moments while you play. Check the upstream page for features and requirements.', version: '1.0.9', downloadUrl: 'https://github.com/developer9998/MonkePhone/releases/download/1.0.9/MonkePhone.dll', imageUrl: 'https://gorilla-tag-mods.com/wp-content/uploads/2025/09/MonkePhone-mod.webp', sourceUrl: 'https://github.com/developer9998/MonkePhone/releases', dependencies: ['Utilla'], featured: true },
   { id: 'ii-stupid', name: 'II stupid', author: 'iiDk-the-actual', category: 'Gameplay', description: 'A community mod menu with many gameplay options. Review its source and use gameplay-changing features only where they are permitted, such as compatible modded/private sessions.', version: '8.3.0', downloadUrl: 'https://sourceforge.net/projects/ii-s-stupid-menu.mirror/files/8.3.0/iis_Stupid_Menu.dll/download', imageUrl: 'https://images.gamebanana.com/img/ss/mods/sgi_sd_image_664cd6e384dd5.webp', sourceUrl: 'https://sourceforge.net/projects/ii-s-stupid-menu.mirror/files/8.3.0/', dependencies: ['Utilla'] }
 ];
-const categories = ['All Mods', 'Core', 'Utility', 'Cosmetic', 'Maps', 'Gameplay'];
+const categories = ['All Mods', 'Core', 'Utility', 'Cosmetic', 'Maps', 'Gameplay', 'Your Mods'];
 const blankDraft: Draft = { name: '', author: '', category: 'Utility', description: '', version: '1.0.0', downloadUrl: '', imageUrl: '', sourceUrl: '', websiteUrl: '', embedUrl: '', requirements: '', supportedOS: ['Windows'], readme: '', changelog: '', additionalLinks: [], dependencies: [], galleryUrls: [], videoUrl: '', configSettings: [] };
 
 export default function App() {
@@ -192,9 +192,9 @@ export default function App() {
 
   const visibleMods = useMemo(() => mods.filter((mod) =>
     (page !== 'Library' || saved.includes(mod.id)) &&
-    (category === 'All Mods' || mod.category.toLowerCase() === category.toLowerCase()) &&
+    (category === 'All Mods' || (category === 'Your Mods' ? Boolean(account && mod.ownerId === account.id) : mod.category.toLowerCase() === category.toLowerCase())) &&
     [mod.name, mod.author, mod.category, mod.description].join(' ').toLowerCase().includes(query.toLowerCase())
-  ), [mods, page, saved, category, query]);
+  ), [mods, page, saved, category, query, account]);
 
   const toggleSaved = (mod: Mod) => {
     const adding = !saved.includes(mod.id);
@@ -340,7 +340,7 @@ export default function App() {
   const uploadVideo = async (file: File|undefined) => { if(!file)return;setAdminBusy(true);setAdminError('');try{const url=await uploadAsset(file,'video');setDraft(current=>({...current,videoUrl:url}));notify('Video uploaded to GitHub.');}catch(error){setAdminError(error instanceof Error?error.message:'Video upload failed.');}finally{setAdminBusy(false);} };
   const uploadModFile = async (file: File|undefined) => { if(!file)return; if(!/\.(dll|zip)$/i.test(file.name)){setAdminError('Choose a .dll or .zip file.');return;} if(file.size>24*1024*1024){setAdminError('Mod files must be 24 MB or smaller.');return;} setAdminBusy(true);setAdminError('');try{const url=await uploadAsset(file,'mod');const inferredName=file.name.replace(/\.(dll|zip)$/i,'').replace(/[_-]+/g,' ').trim();setDraft(current=>({...current,downloadUrl:url,name:current.name.trim()||inferredName}));notify('Mod file uploaded from disk and hosted on GitHub.');}catch(error){setAdminError(error instanceof Error?error.message:'Mod upload failed.');}finally{setAdminBusy(false);} };
   const beginEdit = (mod: Mod) => {
-    setEditingId(mod.id);setDraft({name:mod.name,author:mod.author,category:mod.category,description:mod.description,version:mod.version,downloadUrl:mod.downloadUrl,imageUrl:mod.imageUrl||'',sourceUrl:mod.sourceUrl||'',dependencies:mod.dependencies||[],galleryUrls:mod.galleryUrls||[],videoUrl:mod.videoUrl||'',configSettings:mod.configSettings||[]});
+    setEditingId(mod.id);setDraft({name:mod.name,author:mod.author,category:mod.category,description:mod.description,version:mod.version,downloadUrl:mod.downloadUrl,imageUrl:mod.imageUrl||'',sourceUrl:mod.sourceUrl||'',websiteUrl:mod.websiteUrl||'',embedUrl:mod.embedUrl||'',requirements:mod.requirements||'',supportedOS:mod.supportedOS||[],readme:mod.readme||'',changelog:mod.changelog||'',additionalLinks:mod.additionalLinks||[],dependencies:mod.dependencies||[],galleryUrls:mod.galleryUrls||[],videoUrl:mod.videoUrl||'',configSettings:mod.configSettings||[]});
     setShowAdmin(true);setAdminError('');
   };
 
@@ -412,7 +412,7 @@ export default function App() {
       <div className="sidebottom">
         <div className="status"><i /><span><b>Mod base</b><small>{loading ? 'Loading catalogue…' : mods.length + ' listed mods'}</small></span></div>
         <button className="themebtn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☼' : '☾'} <span>{theme === 'dark' ? 'Light appearance' : 'Dark appearance'}</span><b>↗</b></button>
-        <button className="admin-nav" onClick={() => setShowAdmin((open) => !open)}>{showAdmin ? '×' : '⚙'} <span>{showAdmin ? 'Close admin tools' : 'Admin · Add mods'}</span></button>
+        <button className="admin-nav" onClick={() => { if (!account) { notify('Sign in with GitHub to add and manage your own mods.'); return; } setShowAdmin((open) => !open); setEditingId(null); setDraft(blankDraft); }}>{showAdmin ? '×' : '＋'} <span>{showAdmin ? 'Close mod editor' : 'Add your mod'}</span></button>
         <small className="version">MONKEY MOD HUB · V2.1</small>
       </div>
     </aside>
@@ -441,7 +441,7 @@ export default function App() {
         </div>
 
         {showAdmin && <section className="admin-panel">
-          <div className="admin-heading"><div><label>ADMIN TOOLS</label><h2>{editingId ? 'Edit mod' : 'Add a mod'}</h2><p>Publish a mod or manage existing entries in the catalogue.</p></div><span className="admin-pill">🔒 Admin / creator</span></div>
+          <div className="admin-heading"><div><label>ADMIN TOOLS</label><h2>{editingId ? 'Edit mod' : 'Add a mod'}</h2><p>Publish a mod or manage existing entries in the catalogue.</p></div><span className="admin-pill">🔒 Your mods only</span></div>
           {!adminUnlocked && !account ? <form className="admin-unlock" onSubmit={unlockAdmin}><label>Admin password<input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} autoComplete="current-password" placeholder="Admin password" required /></label><button className="primary" disabled={adminBusy}>{adminBusy ? 'Checking…' : 'Unlock admin tools'}</button></form> :
           <>
             <div className="admin-manage-heading admin-form-toolbar"><div><h3>{editingId ? 'Edit mod listing' : 'Add a mod'}</h3><p>Fill in the product details below. All optional media fields are visible.</p></div><div className="admin-toolbar-actions"><button className="secondary" type="button" onClick={() => void loadCatalog()} disabled={loading}>↻ Reload</button><button className="secondary" type="button" onClick={() => document.getElementById('add-mod-from-disk')?.click()}>＋ Add mod from disk</button><input id="add-mod-from-disk" className="visually-hidden-file" type="file" accept=".dll,.zip,application/zip" onChange={(event) => { void uploadModFile(event.target.files?.[0]); event.currentTarget.value=''; }} /><button className="secondary" type="button" onClick={() => { setDraft(blankDraft); setEditingId(null); setAdminError(''); }}>＋ New mod</button></div></div>
@@ -475,8 +475,8 @@ export default function App() {
               <p className="form-help full">Only submit files you have permission to distribute. Direct links and media URLs must use HTTPS.</p>
             </form>
             <div className="admin-manage">
-              <div className="admin-manage-heading"><h3>Manage mods</h3><span>{mods.length} total</span></div>
-              {mods.map((mod) => <div className="admin-mod-row" key={mod.id}><div><b>{mod.name}</b><small>v{mod.version} · {mod.category}</small></div><div className="admin-mod-actions"><button className="details" type="button" onClick={()=>beginEdit(mod)}>Edit</button><button className="delete-mod" type="button" disabled={adminBusy} onClick={()=>void deleteMod(mod)}>Remove</button></div></div>)}
+              <div className="admin-manage-heading"><h3>Your published mods</h3><span>{mods.filter((mod) => Boolean(account && mod.ownerId === account.id)).length} owned</span></div>
+              {mods.filter((mod) => Boolean(account && mod.ownerId === account.id)).map((mod) => <div className="admin-mod-row" key={mod.id}><div><b>{mod.name}</b><small>v{mod.version} · {mod.category}</small></div><div className="admin-mod-actions"><button className="details" type="button" onClick={()=>beginEdit(mod)}>Edit</button><button className="delete-mod" type="button" disabled={adminBusy} onClick={()=>void deleteMod(mod)}>Remove</button></div></div>)}{!mods.some((mod) => Boolean(account && mod.ownerId === account.id)) && <p className="form-help">You haven’t added any mods yet. Use “Add your mod” to publish your first one.</p>}
             </div>
             {adminUnlocked && <section className="render-env-panel">
               <div className="admin-manage-heading"><div><h3>Render environment variables</h3><p>Change service variables such as ADMIN_PASSWORD without exposing existing secret values.</p></div><button className="secondary" type="button" onClick={() => { setShowRenderSettings((value) => !value); if (!showRenderSettings) void loadRenderVariables(); }}>{showRenderSettings ? 'Hide' : 'Manage variables'}</button></div>
