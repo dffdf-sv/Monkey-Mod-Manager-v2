@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   build-windows:
-    name: Build Windows installer
+    name: Build Windows ZIP
     runs-on: windows-latest
     steps:
       - name: Check out repository
@@ -24,7 +24,8 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+          cache: npm
       - name: Set release version
         shell: pwsh
         run: |
@@ -34,21 +35,27 @@ jobs:
             $version = "${{ github.ref_name }}".TrimStart("v")
           }
           if ($version -notmatch '^\d+\.\d+\.\d+([-.][0-9A-Za-z.-]+)?$') { throw "Invalid version: $version" }
-          npm version $version --no-git-tag-version
+          npm pkg set "version=$version"
       - name: Install dependencies
-        run: npm install
-      - name: Build installer
+        run: npm ci
+      - name: Build Windows installer
         run: npm run dist:win
-      - name: Upload Windows installer
+      - name: Package Windows build as ZIP
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem release -Filter "*.exe" | Select-Object -First 1
+          if (-not $installer) { throw "No Windows installer was created in release/" }
+          Compress-Archive -Path $installer.FullName -DestinationPath "Monkey-Mod-Manager-Windows-v${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}.zip" -Force
+      - name: Upload Windows ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: Monkey-Mod-Manager-Windows
-          path: release/*.exe
+          name: Monkey-Mod-Manager-Windows-ZIP
+          path: Monkey-Mod-Manager-Windows-*.zip
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 14
 
   build-linux:
-    name: Build Linux packages
+    name: Build Linux ZIP
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -56,7 +63,8 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+          cache: npm
       - name: Set release version
         shell: bash
         run: |
@@ -65,47 +73,51 @@ jobs:
           else
             VERSION="${GITHUB_REF_NAME#v}"
           fi
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]] || { echo "Invalid version: $VERSION"; exit 1; }
-          npm version "$VERSION" --no-git-tag-version
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]] || { echo "Invalid version: $VERSION"; exit 1; }
+          npm pkg set "version=$VERSION"
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Build Linux packages
         run: npm run dist:linux
-      - name: Upload Linux packages
+      - name: Package Linux builds as ZIP
+        shell: bash
+        run: |
+          VERSION="${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}"
+          VERSION="${VERSION#v}"
+          shopt -s nullglob
+          FILES=(release/*.AppImage release/*.deb)
+          (("${#FILES[@]}" > 0)) || { echo "No Linux packages were created in release/"; exit 1; }
+          zip -j "Monkey-Mod-Manager-Linux-v${VERSION}.zip" "${FILES[@]}"
+      - name: Upload Linux ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: Monkey-Mod-Manager-Linux
-          path: |
-            release/*.AppImage
-            release/*.deb
+          name: Monkey-Mod-Manager-Linux-ZIP
+          path: Monkey-Mod-Manager-Linux-*.zip
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 14
 
   publish-release:
-    name: Publish numbered GitHub release
+    name: Publish ZIP downloads to GitHub Releases
     runs-on: ubuntu-latest
     needs:
       - build-windows
       - build-linux
     steps:
-      - name: Download Windows installer
+      - name: Download Windows ZIP
         uses: actions/download-artifact@v4
         with:
-          name: Monkey-Mod-Manager-Windows
+          name: Monkey-Mod-Manager-Windows-ZIP
           path: release-files
-      - name: Download Linux packages
+      - name: Download Linux ZIP
         uses: actions/download-artifact@v4
         with:
-          name: Monkey-Mod-Manager-Linux
+          name: Monkey-Mod-Manager-Linux-ZIP
           path: release-files
-      - name: Publish release with installers
+      - name: Publish release with ZIP files
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
           target_commitish: main
           name: Monkey Mod Manager ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
           generate_release_notes: true
-          files: |
-            release-files/*.exe
-            release-files/*.AppImage
-            release-files/*.deb
+          files: release-files/*.zip
