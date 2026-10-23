@@ -18,6 +18,17 @@ function reply(res, status, payload) {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
   res.end(JSON.stringify(payload));
 }
+function applyCors(req, res) {
+  const origin = String(req.headers.origin || '');
+  if (!origin) return;
+  const allowed = origin === 'null' || origin === 'https://monkey-mod-hub.onrender.com' || origin === process.env.DESKTOP_ALLOWED_ORIGIN;
+  if (!allowed) return;
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Admin-Password');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Max-Age', '600');
+}
 function slug(value) { return String(value || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
 function httpsUrl(value, required = false) {
   if (!value && !required) return '';
@@ -91,6 +102,10 @@ function contentType(file) { return MIME[path.extname(file).toLowerCase()] || 'a
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || '/', 'http://localhost');
+  if (url.pathname.startsWith('/api/')) {
+    applyCors(req, res);
+    if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
+  }
   try {
     if (url.pathname === '/healthz') return reply(res, 200, { ok: true, service: 'monkey-mod-hub' });
     if (url.pathname === '/api/mods' && req.method === 'GET') return reply(res, 200, { mods: await getMods() });
