@@ -37,15 +37,20 @@ jobs:
           if ($version -notmatch '^\d+\.\d+\.\d+([-.][0-9A-Za-z.-]+)?$') { throw "Invalid version: $version" }
           npm pkg set "version=$version"
       - name: Install dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
       - name: Build Windows installer
         run: npm run dist:win
       - name: Package Windows build as ZIP
         shell: pwsh
         run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $version = "${{ inputs.version }}"
+          } else {
+            $version = "${{ github.ref_name }}".TrimStart("v")
+          }
           $installer = Get-ChildItem release -Filter "*.exe" | Select-Object -First 1
           if (-not $installer) { throw "No Windows installer was created in release/" }
-          Compress-Archive -Path $installer.FullName -DestinationPath "Monkey-Mod-Manager-Windows-v${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}.zip" -Force
+          Compress-Archive -Path $installer.FullName -DestinationPath "Monkey-Mod-Manager-Windows-v$version.zip" -Force
       - name: Upload Windows ZIP
         uses: actions/upload-artifact@v4
         with:
@@ -76,7 +81,7 @@ jobs:
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]] || { echo "Invalid version: $VERSION"; exit 1; }
           npm pkg set "version=$VERSION"
       - name: Install dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
       - name: Build Linux packages
         run: npm run dist:linux
       - name: Package Linux builds as ZIP
