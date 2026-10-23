@@ -321,7 +321,7 @@ export default function App() {
       <div className="brand"><div className="brand-logo">🐒</div><div><b>MONKEY</b><small>MOD HUB <i>V2</i></small></div></div>
       <label className="side-label">WORKSPACE</label>
       <button className={'nav ' + (page === 'Discover' ? 'chosen' : '')} onClick={() => setPage('Discover')}>▦ <span>Discover mods</span></button>
-      <button className={'nav ' + (page === 'Library' ? 'chosen' : '')} onClick={() => setPage('Library')}>▣ <span>My library</span><b className="count">{saved.length}</b></button>
+      <button className={'nav ' + (page === 'Library' ? 'chosen' : '')} onClick={() => setPage('Library')}>▣ <span>Your mods</span><b className="count">{saved.length}</b></button>
       {desktop && <button className={'nav ' + (page === 'Configs' ? 'chosen' : '')} onClick={() => { setPage('Configs'); void loadConfigFiles(); }}>⚙ <span>CFG editor</span></button>}
       <label className="side-label">CATEGORIES</label>
       {categories.map((item) => <button key={item} className={'nav catnav ' + (category === item ? 'chosen' : '')} onClick={() => setCategory(item)}><i className={'dot ' + item.toLowerCase().replace(' ', '-')} /><span>{item}</span></button>)}
@@ -360,29 +360,24 @@ export default function App() {
           <div className="admin-heading"><div><label>ADMIN TOOLS</label><h2>{editingId ? 'Edit mod' : 'Add a mod'}</h2><p>Publish a mod or manage existing entries in the catalogue.</p></div><span className="admin-pill">🔒 Admin / creator</span></div>
           {!adminUnlocked && !account ? <form className="admin-unlock" onSubmit={unlockAdmin}><label>Admin password<input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} autoComplete="current-password" placeholder="Admin password" required /></label><button className="primary" disabled={adminBusy}>{adminBusy ? 'Checking…' : 'Unlock admin tools'}</button></form> :
           <>
-            <form className="admin-form compact-admin-form" onSubmit={addMod}>
+            <div className="admin-manage-heading admin-form-toolbar"><div><h3>{editingId ? 'Edit mod listing' : 'Add a mod'}</h3><p>Fill in the product details below. All optional media fields are visible.</p></div><div className="admin-toolbar-actions"><button className="secondary" type="button" onClick={() => void loadCatalog()} disabled={loading}>↻ Reload</button><button className="secondary" type="button" onClick={() => { setDraft(blankDraft); setEditingId(null); setAdminError(''); }}>＋ New mod</button></div></div>
+            <form className="admin-form compact-admin-form add-mod-only-form" onSubmit={addMod}>
               <label>Mod name<input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required maxLength={90} placeholder="e.g. MonkePhone" /></label>
               <label>Author<input value={draft.author} onChange={(e) => setDraft({ ...draft, author: e.target.value })} required maxLength={90} placeholder="Creator name" /></label>
               <label>Version<input value={draft.version} onChange={(e) => setDraft({ ...draft, version: e.target.value })} required maxLength={40} placeholder="1.0.0" /></label>
               <label>Category<select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })}>{categories.filter((item) => item !== 'All Mods').map((item) => <option key={item}>{item}</option>)}</select></label>
-              <label className="full">What does it do?<textarea value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} required maxLength={1400} placeholder="Short description of the mod" rows={2} /></label>
-              <label className="full">Download link (or upload a DLL/ZIP below)<input type="url" value={draft.downloadUrl} onChange={(e) => setDraft({ ...draft, downloadUrl: e.target.value })} placeholder="https://…/mod.dll or mod.zip" required /></label>
-              <label className="full">Upload mod file (.dll or .zip)<input type="file" accept=".dll,.zip,application/zip" onChange={(e)=>void uploadModFile(e.target.files?.[0])} /></label>
-              <label>Cover image URL <input type="url" value={draft.imageUrl || ''} onChange={(e) => setDraft({ ...draft, imageUrl: e.target.value })} placeholder="Optional image URL" /></label>
-              <label>Upload cover image<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e)=>void uploadMainImage(e.target.files?.[0])} /></label>
-              <details className="admin-advanced full">
-                <summary>Optional details — source, gallery, video, dependencies and settings</summary>
-                <div className="admin-advanced-grid">
-                  <label>Source / release page<input type="url" value={draft.sourceUrl || ''} onChange={(e) => setDraft({ ...draft, sourceUrl: e.target.value })} placeholder="https://github.com/creator/project" /></label>
-                  <label>Dependencies (comma separated)<input value={draft.dependencies.join(', ')} onChange={(e) => setDraft({ ...draft, dependencies: e.target.value.split(',').map((name) => name.trim()).filter(Boolean) })} placeholder="Utilla, BepInEx" /></label>
-                  <label>Gallery images (up to 8)<input type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e)=>void uploadImages(e.target.files)} /></label>
-                  <label>Preview video (MP4/WebM, max 12 MB)<input type="file" accept="video/mp4,video/webm" onChange={(e)=>void uploadVideo(e.target.files?.[0])} /></label>
-                  <label>Video URL<input type="url" value={draft.videoUrl||''} onChange={(e)=>setDraft({...draft,videoUrl:e.target.value})} placeholder="Optional video URL" /></label>
-                  <label className="full">Configuration settings (JSON array)<textarea value={JSON.stringify(draft.configSettings||[],null,2)} onChange={(e)=>{try{const value=JSON.parse(e.target.value);if(Array.isArray(value))setDraft({...draft,configSettings:value});}catch{/* Keep last valid JSON until corrected. */}}} rows={3} placeholder={'[{"label":"Enable feature","key":"enabled","defaultValue":"true"}]'} /></label>
-                </div>
-              </details>
-              <div className="admin-actions full"><button className="primary" disabled={adminBusy}>{adminBusy ? 'Saving…' : editingId ? 'Save changes' : '＋ Add mod'}</button><button type="button" className="secondary" onClick={() => {setDraft(blankDraft);setEditingId(null);}}>Clear</button>{account && <button type="button" className="admin-lock" onClick={() => {setShowAdmin(false);setAdminError('');}}>Close</button>}<button type="button" className="admin-lock" onClick={() => { setAdminUnlocked(false); setAdminPassword(''); }}>Lock admin</button></div>
-              <p className="form-help full">Use a direct HTTPS download link or upload a DLL/ZIP. Only publish files you have permission to distribute.</p>
+              <label className="full">Description<textarea value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} required maxLength={1400} placeholder="Describe what the mod does" rows={3} /></label>
+              <label className="full">Direct download URL (HTTPS)<input type="url" pattern="https://.+" value={draft.downloadUrl} onChange={(e) => setDraft({ ...draft, downloadUrl: e.target.value })} placeholder="https://…/mod.dll or mod.zip" required /></label>
+              <label>Picture URL (optional)<input type="url" pattern="https://.+" value={draft.imageUrl || ''} onChange={(e) => setDraft({ ...draft, imageUrl: e.target.value })} placeholder="https://…/cover.webp" /></label>
+              <label>Main product picture upload<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e)=>void uploadMainImage(e.target.files?.[0])} /></label>
+              <label className="full">Gallery pictures (up to 8)<input type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e)=>void uploadImages(e.target.files)} /><small className="form-help">Choose up to 8 images. Gallery uploads are hosted in the mod base.</small></label>
+              <label>Product video upload (MP4/WebM, 12 MB max)<input type="file" accept="video/mp4,video/webm" onChange={(e)=>void uploadVideo(e.target.files?.[0])} /></label>
+              <label>Video URL (optional)<input type="url" pattern="https://.+" value={draft.videoUrl || ''} onChange={(e) => setDraft({ ...draft, videoUrl: e.target.value })} placeholder="https://…/preview.mp4" /></label>
+              <label className="full">Host mod file (.dll/.zip, 24 MB max)<input type="file" accept=".dll,.zip,application/zip" onChange={(e)=>void uploadModFile(e.target.files?.[0])} /><small className="form-help">Select a mod file from disk to host it in the mod base. The hosted URL fills the direct download field.</small></label>
+              <label>Source / release page<input type="url" pattern="https://.+" value={draft.sourceUrl || ''} onChange={(e) => setDraft({ ...draft, sourceUrl: e.target.value })} placeholder="https://github.com/creator/project" /></label>
+              <label>Dependencies (comma separated)<input value={draft.dependencies.join(', ')} onChange={(e) => setDraft({ ...draft, dependencies: e.target.value.split(',').map((name) => name.trim()).filter(Boolean) })} placeholder="Utilla, BepInEx" /></label>
+              <div className="admin-actions full"><button className="primary" disabled={adminBusy}>{adminBusy ? 'Saving…' : editingId ? 'Save changes' : '＋ Add mod'}</button><button type="button" className="secondary" onClick={() => {setDraft(blankDraft);setEditingId(null);setAdminError('');}}>Clear form</button>{account && <button type="button" className="admin-lock" onClick={() => {setShowAdmin(false);setAdminError('');}}>Close</button>}<button type="button" className="admin-lock" onClick={() => { setAdminUnlocked(false); setAdminPassword(''); }}>Lock admin</button></div>
+              <p className="form-help full">Only submit files you have permission to distribute. Direct links and media URLs must use HTTPS.</p>
             </form>
             <div className="admin-manage">
               <div className="admin-manage-heading"><h3>Manage mods</h3><span>{mods.length} total</span></div>
@@ -420,12 +415,12 @@ export default function App() {
           </div>
           {configError && <div className="admin-error" role="alert">{configError}</div>}
         </section> : <>
-        <div className="sectionhead"><div><label>THE COLLECTION</label><h2>{page === 'Discover' ? 'Explore community mods' : 'Your saved library'} <span>{visibleMods.length}</span></h2><p>{page === 'Discover' ? 'Browse the current catalogue and open the source before installing.' : 'Your saved mods, ready when you are.'}</p></div><button className="reset" onClick={() => { setQuery(''); setCategory('All Mods'); }}>⟳ Reset filters</button></div>
+        <div className="sectionhead"><div><label>THE COLLECTION</label><h2>{page === 'Discover' ? 'Explore community mods' : 'Your mods'} <span>{visibleMods.length}</span></h2><p>{page === 'Discover' ? 'Browse the current catalogue and open the source before installing.' : 'Your saved mods, ready when you are.'}</p></div><button className="reset" onClick={() => { setQuery(''); setCategory('All Mods'); }}>⟳ Reset filters</button></div>
         <div className="toolbar"><label className="search">⌕ <input id="modsearch" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search mods, creators, categories…" />{query && <button onClick={() => setQuery('')}>×</button>}<kbd>Ctrl K</kbd></label><div className="pills">{categories.map((item) => <button key={item} className={category === item ? 'pillactive' : ''} onClick={() => setCategory(item)}>{item === 'All Mods' ? 'All' : item}</button>)}</div></div>
 
         {visibleMods.length ? <div className="grid">{visibleMods.map((mod) => <article className="modcard" key={mod.id}>
-          <div className="mod-picture" style={mod.imageUrl ? { backgroundImage: 'linear-gradient(180deg, #0a110522 0%, #0a1105b5 100%), url("' + mod.imageUrl + '")' } : undefined}>
-            <span className="picture-tag">{mod.category}</span>{mod.featured && <span className="featured-tag">✦ Featured</span>}{desktop && detectedMods.some(name=>name.toLowerCase()===mod.name.toLowerCase()||name.toLowerCase()===mod.id.toLowerCase()) && <span className="detected-tag">✓ Detected</span>}<button className="picture-details" onClick={() => setDetail(mod)} aria-label={'Details for ' + mod.name}>↗</button>{!mod.imageUrl && <b>{mod.name.slice(0, 1).toUpperCase()}</b>}
+          <div className="mod-picture clickable-product-picture" role="button" tabIndex={0} onClick={() => setDetail(mod)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setDetail(mod); } }} aria-label={'Open product page for ' + mod.name} style={mod.imageUrl ? { backgroundImage: 'linear-gradient(180deg, #0a110522 0%, #0a1105b5 100%), url("' + mod.imageUrl + '")' } : undefined}>
+            <span className="picture-tag">{mod.category}</span>{mod.featured && <span className="featured-tag">✦ Featured</span>}{desktop && detectedMods.some(name=>name.toLowerCase()===mod.name.toLowerCase()||name.toLowerCase()===mod.id.toLowerCase()) && <span className="detected-tag">✓ Detected</span>}<button className="picture-details" onClick={(event) => { event.stopPropagation(); setDetail(mod); }} aria-label={'Open product page for ' + mod.name}>↗</button>{!mod.imageUrl && <b>{mod.name.slice(0, 1).toUpperCase()}</b>}
           </div>
           <div className="card-body">
             <div className="card-title"><div><h3>{mod.name}</h3><p className="author">by <b>{mod.author}</b></p></div><button className={'bookmark ' + (saved.includes(mod.id) ? 'bookmarked' : '')} onClick={() => toggleSaved(mod)} aria-label={saved.includes(mod.id) ? 'Remove saved mod' : 'Save mod'}>{saved.includes(mod.id) ? '♥' : '♡'}</button></div>
@@ -434,7 +429,7 @@ export default function App() {
             <div className="cardfoot"><span className="version">v{mod.version}</span><button className="install" onClick={() => void installMod(mod)}>{desktop ? (installedMods[mod.id] ? (installedMods[mod.id] === mod.version ? '✓ Installed' : '↻ Install update') : '↓ Install') : '↓ Download'}</button></div>
             <div className="card-links">{mod.sourceUrl && <a href={mod.sourceUrl} target="_blank" rel="noreferrer">Source / releases ↗</a>}{(adminUnlocked || (account && mod.ownerId === account.id)) && <button className="details" onClick={()=>beginEdit(mod)}>Edit</button>}{(adminUnlocked || (account && mod.ownerId === account.id)) && <button className="delete-mod" disabled={adminBusy} onClick={() => void deleteMod(mod)}>Remove</button>}<button className="details" onClick={() => setDetail(mod)}>View details</button></div>
           </div>
-        </article>)}</div> : <div className="empty"><div>▣</div><h3>{page === 'Library' ? 'Your library is a blank canvas' : 'No mods found'}</h3><p>{page === 'Library' ? 'Save mods from Discover to get started.' : 'Try a different search or category.'}</p><button className="primary" onClick={() => { setQuery(''); setCategory('All Mods'); setPage('Discover'); }}>Explore mods ↗</button></div>}
+        </article>)}</div> : <div className="empty"><div>▣</div><h3>{page === 'Library' ? 'Your mods list is empty' : 'No mods found'}</h3><p>{page === 'Library' ? 'Save mods from Discover to add them to Your mods.' : 'Try a different search or category.'}</p><button className="primary" onClick={() => { setQuery(''); setCategory('All Mods'); setPage('Discover'); }}>Explore mods ↗</button></div>}
 
         </>}
 
@@ -442,9 +437,9 @@ export default function App() {
       </div>
     </main>
 
-    {detail && <div className="backdrop" onClick={() => setDetail(null)}><section className="modal" onClick={(event) => event.stopPropagation()}><button className="modalclose" onClick={() => setDetail(null)}>×</button>
+    {detail && <div className="backdrop product-page-backdrop" onClick={() => setDetail(null)}><section className="modal product-page-modal" role="dialog" aria-modal="true" aria-label={detail.name + ' product page'} onClick={(event) => event.stopPropagation()}><button className="modalclose" onClick={() => setDetail(null)}>×</button>
       <div className="detail-picture" style={detail.imageUrl ? { backgroundImage: 'linear-gradient(180deg, #07100611, #071006bb), url("' + detail.imageUrl + '")' } : undefined}>{!detail.imageUrl && <span>🐒</span>}</div>
-      <span className="category">{detail.category}</span><h2>{detail.name}</h2><p className="author">by {detail.author} · v{detail.version}</p><p>{detail.description}</p>
+      <div className="product-page-heading"><div><span className="category">{detail.category}</span><h2>{detail.name}</h2></div><span className="version">v{detail.version}</span></div><p className="author">by {detail.author} · v{detail.version}</p><p className="product-description">{detail.description}</p>
       {(detail.galleryUrls||[]).length>0 && <div className="detail-gallery">{(detail.galleryUrls||[]).map((url,i)=><img key={url+i} src={url} alt={detail.name+' screenshot '+(i+1)} />)}</div>}
       {detail.videoUrl && <video className="mod-video" controls preload="metadata" src={detail.videoUrl} />}
       <section className="config-panel"><h3>Mod configuration</h3>
