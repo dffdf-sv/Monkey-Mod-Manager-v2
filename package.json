@@ -19,7 +19,8 @@
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "extract-zip": "^2.0.1"
+    "extract-zip": "^2.0.1",
+    "electron-updater": "^6.6.2"
   },
   "devDependencies": {
     "@types/react": "^18.3.1",
@@ -83,6 +84,14 @@
         "schemes": [
           "monkeymodmanager"
         ]
+      }
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "dffdf-sv",
+        "repo": "Monkey-Mod-Manager-v2",
+        "releaseType": "release"
       }
     ]
   },
