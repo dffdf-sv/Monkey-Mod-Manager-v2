@@ -76,7 +76,15 @@
         }
       ],
       "artifactName": "${productName}-${version}-${arch}.${ext}"
-    }
+    },
+    "protocols": [
+      {
+        "name": "Monkey Mod Manager GitHub sign-in",
+        "schemes": [
+          "monkeymodmanager"
+        ]
+      }
+    ]
   },
   "author": {
     "name": "Monkey Mod Hub Contributors",
