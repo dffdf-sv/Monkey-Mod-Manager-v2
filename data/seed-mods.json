@@ -24,5 +24,18 @@
       "Utilla"
     ],
     "featured": true
+  },
+  {
+    "name": "II stupid",
+    "version": "8.3.0",
+    "author": "iiDk-the-actual",
+    "description": "A community mod menu with many gameplay options. Review its source and use gameplay-changing features only where they are permitted, such as compatible modded/private sessions.",
+    "category": "Gameplay",
+    "download_url": "https://sourceforge.net/projects/ii-s-stupid-menu.mirror/files/8.3.0/iis_Stupid_Menu.dll/download",
+    "image_url": "https://images.gamebanana.com/img/ss/mods/sgi_sd_image_664cd6e384dd5.webp",
+    "source_url": "https://sourceforge.net/projects/ii-s-stupid-menu.mirror/files/8.3.0/",
+    "dependencies": [
+      "Utilla"
+    ]
   }
 ]
