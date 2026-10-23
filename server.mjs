@@ -224,7 +224,7 @@ const server = http.createServer(async (req, res) => {
       const parts = parsed.pathname.split('/').filter(Boolean);
       if (parts.length < 2 || !/^[A-Za-z0-9_.-]{1,100}$/.test(parts[0]) || !/^[A-Za-z0-9_.-]{1,100}$/.test(parts[1])) return reply(res, 400, { error: 'URL must point to a GitHub repository, e.g. https://github.com/owner/repository.' });
       const owner = parts[0], repo = parts[1].replace(/\.git$/i, '');
-      const apiHeaders = { accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'Monkey-Mod-Hub/2.1' };
+      const apiHeaders = { ...(process.env.GITHUB_TOKEN ? { authorization: 'Bearer ' + process.env.GITHUB_TOKEN } : {}), accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'Monkey-Mod-Hub/2.1' };
       try {
         const repoResponse = await fetch('https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo), { headers: apiHeaders, signal: AbortSignal.timeout(12000) });
         const repoData = await repoResponse.json().catch(() => ({}));
@@ -334,7 +334,7 @@ const server = http.createServer(async (req, res) => {
           if (repoUrl.protocol !== 'https:' || repoUrl.hostname.toLowerCase() !== 'github.com') return reply(res, 400, { error: 'Ownership transfer only works with a GitHub repository URL.' });
           const repoParts = repoUrl.pathname.split('/').filter(Boolean);
           if (repoParts.length < 2) return reply(res, 400, { error: 'Use a URL like https://github.com/owner/repository.' });
-          const ownerResponse = await fetch('https://api.github.com/repos/' + encodeURIComponent(repoParts[0]) + '/' + encodeURIComponent(repoParts[1].replace(/\.git$/i, '')), { headers: { accept: 'application/vnd.github+json', 'user-agent': 'Monkey-Mod-Hub/2.1' }, signal: AbortSignal.timeout(12000) });
+          const ownerResponse = await fetch('https://api.github.com/repos/' + encodeURIComponent(repoParts[0]) + '/' + encodeURIComponent(repoParts[1].replace(/\.git$/i, '')), { headers: { ...(process.env.GITHUB_TOKEN ? { authorization: 'Bearer ' + process.env.GITHUB_TOKEN } : {}), accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'Monkey-Mod-Hub/2.1' }, signal: AbortSignal.timeout(12000) });
           const ownerData = await ownerResponse.json().catch(() => ({}));
           if (!ownerResponse.ok || !ownerData.owner || !ownerData.owner.id || ownerData.private) return reply(res, 400, { error: 'Could not verify the public GitHub repository owner.' });
           ownerId = String(ownerData.owner.id);
@@ -364,7 +364,7 @@ const server = http.createServer(async (req, res) => {
            if (repoUrl.protocol !== 'https:' || repoUrl.hostname.toLowerCase() !== 'github.com') return reply(res, 400, { error: 'Ownership transfer only works with a GitHub repository URL.' });
            const repoParts = repoUrl.pathname.split('/').filter(Boolean);
            if (repoParts.length < 2) return reply(res, 400, { error: 'Use a URL like https://github.com/owner/repository.' });
-           const ownerResponse = await fetch('https://api.github.com/repos/' + encodeURIComponent(repoParts[0]) + '/' + encodeURIComponent(repoParts[1].replace(/\.git$/i, '')), { headers: { accept: 'application/vnd.github+json', 'user-agent': 'Monkey-Mod-Hub/2.1' }, signal: AbortSignal.timeout(12000) });
+           const ownerResponse = await fetch('https://api.github.com/repos/' + encodeURIComponent(repoParts[0]) + '/' + encodeURIComponent(repoParts[1].replace(/\.git$/i, '')), { headers: { ...(process.env.GITHUB_TOKEN ? { authorization: 'Bearer ' + process.env.GITHUB_TOKEN } : {}), accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'Monkey-Mod-Hub/2.1' }, signal: AbortSignal.timeout(12000) });
            const ownerData = await ownerResponse.json().catch(() => ({}));
            if (!ownerResponse.ok || !ownerData.owner || !ownerData.owner.id || ownerData.private) return reply(res, 400, { error: 'Could not verify the public GitHub repository owner.' });
            ownerId = String(ownerData.owner.id);
