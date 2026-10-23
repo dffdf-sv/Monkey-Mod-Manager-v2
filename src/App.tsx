@@ -15,6 +15,7 @@ declare global {
       isDesktop: boolean;
       signInWithGitHub: () => Promise<{ok:boolean}>;
       onAuthToken: (callback:(token:string)=>void) => () => void;
+      onOpenMod: (callback:(modId:string)=>void) => () => void;
       getGameFolder: () => Promise<string | null>;
       chooseGameFolder: () => Promise<string | null>;
       installMod: (mod: Mod) => Promise<{ ok: boolean; message: string; path?: string }>;
@@ -46,6 +47,7 @@ export default function App() {
   const [saved, setSaved] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('mmm-saved') || '[]') as string[]; } catch { return []; } });
   const [theme, setTheme] = useState(() => localStorage.getItem('mmm-theme') || 'dark');
   const [detail, setDetail] = useState<Mod | null>(null);
+  const [showAppFallback, setShowAppFallback] = useState(false);
   const [notice, setNotice] = useState('');
   const [showAdmin, setShowAdmin] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
@@ -106,7 +108,14 @@ export default function App() {
       void refreshAccount();
       notify('Signed in with GitHub.');
     });
-    return () => { window.removeEventListener('message', handleMessage); stopListening?.(); };
+    const stopModListening = window.monkeyModManager?.onOpenMod((modId) => {
+      void loadCatalog().then((catalog) => {
+        const found = catalog.find((mod) => mod.id === modId || mod.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') === modId);
+        if (found) { setDetail(found); notify('Opened ' + found.name + ' from the web link.'); }
+        else notify('That mod was not found in the current catalogue.');
+      });
+    });
+    return () => { window.removeEventListener('message', handleMessage); stopListening?.(); stopModListening?.(); };
   }, []);
   useEffect(() => { localStorage.setItem('mmm-saved', JSON.stringify(saved)); }, [saved]);
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem('mmm-theme', theme); }, [theme]);
@@ -173,6 +182,13 @@ export default function App() {
     const adding = !saved.includes(mod.id);
     setSaved((current) => adding ? [...current, mod.id] : current.filter((id) => id !== mod.id));
     notify(adding ? mod.name + ' saved to your library' : mod.name + ' removed from your library');
+  };
+
+  const openModInApp = (mod: Mod) => {
+    if (desktop) { void installMod(mod); return; }
+    setShowAppFallback(false);
+    window.location.href = 'monkeymodmanager://mod/' + encodeURIComponent(mod.id);
+    window.setTimeout(() => setShowAppFallback(true), 5000);
   };
 
   const installMod = async (mod: Mod) => {
@@ -473,6 +489,7 @@ export default function App() {
       {detail.videoUrl && <video className="mod-video" controls preload="metadata" src={detail.videoUrl} />}
       <div className="product-page-layout">
         <aside className="product-sidebar"><button className="product-side-action primary" onClick={() => void installMod(detail)}>{desktop ? (installedMods[detail.id] && installedMods[detail.id] !== detail.version ? '↻ Update mod' : installedMods[detail.id] === detail.version ? '✓ Reinstall mod' : '↓ Install mod') : '↓ Download mod'}</button>
+          {!desktop && <><button className="product-side-action secondary" onClick={() => openModInApp(detail)}>↗ Open / download in app</button>{showAppFallback && <div className="app-download-fallback"><p>Monkey Mod Manager did not open? Install the desktop app to download and install mods directly.</p><a href="https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/releases/latest" target="_blank" rel="noreferrer">Download app ↗</a></div>}</>}
           <a href={detail.downloadUrl} target="_blank" rel="noreferrer">Direct download ↗</a>
           {detail.sourceUrl && <a href={detail.sourceUrl} target="_blank" rel="noreferrer">Source / releases ↗</a>}
           {detail.websiteUrl && <a href={detail.websiteUrl} target="_blank" rel="noreferrer">Official website ↗</a>}
