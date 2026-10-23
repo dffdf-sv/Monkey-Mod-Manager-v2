@@ -33,7 +33,7 @@ declare global {
     };
   }
 }
-const jungleArt = 'https://clan.akamai.steamstatic.com/images/39711486/b59ed47fa032145d3640199a7f610fbb6f0add86.png';
+const jungleArt = 'https://clan.akamai.steamstatic.com/images/39711486/dc62f773bc346540e86ab45a360ad777843a9bc3.png';
 const fallbackMods: Mod[] = [
   { id: 'utilla', name: 'Utilla', author: 'developer9998 & contributors', category: 'Core', description: 'A PC library for Gorilla Tag that supports room-related features and custom gamemodes. Many community mods depend on it.', version: '1.6.27', downloadUrl: 'https://github.com/BRTeamYT/Utilla-GorillaTag/releases/download/1.6.27/Utilla.zip', imageUrl: jungleArt, sourceUrl: 'https://github.com/BRTeamYT/Utilla-GorillaTag/releases', dependencies: [], featured: true },
   { id: 'monkephone', name: 'MonkePhone', author: 'developer9998', category: 'Utility', description: 'An in-game phone and photo tool for capturing moments while you play. Check the upstream page for features and requirements.', version: '1.0.9', downloadUrl: 'https://github.com/developer9998/MonkePhone/releases/download/1.0.9/MonkePhone.dll', imageUrl: 'https://gorilla-tag-mods.com/wp-content/uploads/2025/09/MonkePhone-mod.webp', sourceUrl: 'https://github.com/developer9998/MonkePhone/releases', dependencies: ['Utilla'], featured: true },
@@ -615,7 +615,7 @@ export default function App() {
             {desktop && <button className="secondary" onClick={async () => { const folder = await window.monkeyModManager!.chooseGameFolder(); setGameFolder(folder); if (folder) {setDetectedMods(await window.monkeyModManager!.getDetectedMods());notify('Gorilla Tag folder saved.');} }}>📁 &nbsp; {gameFolder ? 'Change game folder' : 'Choose game folder'}</button>}
             <button className="secondary bepinex-button" onClick={() => void installBepInEx()}>⬇ &nbsp; Install BepInEx <small>{desktop ? 'Auto setup' : 'Official download'}</small></button>
           </div>
-          <div className="hero-art hero-art-photo"><img src={jungleArt} alt="Colourful Gorilla Tag characters in a jungle scene" /><div className="hero-shade" /><div className="float float1">✦ <span><b>Built for the community</b><small>Discover useful add-ons</small></span></div><div className="float float2">↓ <span><b>{mods.length} catalogue entries</b><small>Fed by your mod base</small></span></div></div>
+          <div className="hero-art hero-art-photo"><img src={jungleArt} alt="Gorilla Tag Halloween update artwork" /><div className="hero-shade" /><div className="float float1">✦ <span><b>Built for the community</b><small>Discover useful add-ons</small></span></div><div className="float float2">↓ <span><b>{mods.length} catalogue entries</b><small>Fed by your mod base</small></span></div></div>
         </section>
 
         <div className="stats">
