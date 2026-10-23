@@ -56,11 +56,17 @@ function isGameFolder(folder) {
   return names.some((name) => ['gorilla tag.exe', 'gorilla tag.x86_64', 'gorilla tag.app'].includes(name)) ||
     names.includes('gorilla tag_data');
 }
-async function autoDetectGameFolder() {
+async function autoDetectGameFolder(platform = 'Steam') {
   const candidates = [];
   const add = (value) => { if (value && !candidates.includes(value)) candidates.push(value); };
   const home = app.getPath('home');
-  if (process.platform === 'win32') {
+  if (process.platform === 'win32' && platform === 'Meta') {
+    const roots = [process.env['PROGRAMFILES'] && path.join(process.env['PROGRAMFILES'], 'Oculus', 'Software'), process.env['PROGRAMFILES(X86)'] && path.join(process.env['PROGRAMFILES(X86)'], 'Oculus', 'Software')].filter(Boolean);
+    for (const root of roots) {
+      try { for (const entry of await fs.readdir(root, { withFileTypes: true })) if (entry.isDirectory() && /gorilla.*tag|tag.*gorilla/i.test(entry.name)) add(path.join(root, entry.name)); } catch {}
+    }
+  }
+  if (process.platform === 'win32' && platform === 'Steam') {
     for (const base of [
       process.env['PROGRAMFILES(X86)'] && path.join(process.env['PROGRAMFILES(X86)'], 'Steam'),
       process.env.PROGRAMFILES && path.join(process.env.PROGRAMFILES, 'Steam'),
@@ -98,12 +104,21 @@ async function autoDetectGameFolder() {
   }
   return null;
 }
+ipcMain.handle('game:get-platform', async () => (await readSettings()).gamePlatform === 'Meta' ? 'Meta' : 'Steam');
+ipcMain.handle('game:set-platform', async (_event, platform) => {
+  const safePlatform = platform === 'Meta' ? 'Meta' : 'Steam';
+  const settings = await readSettings();
+  const found = await autoDetectGameFolder(safePlatform);
+  const next = { ...settings, gamePlatform: safePlatform, gameFolder: found || settings.gameFolder || null };
+  await writeSettings(next);
+  return { ok: true, platform: safePlatform, gameFolder: next.gameFolder };
+});
 ipcMain.handle('game:get-folder', async () => {
   const settings = await readSettings();
   if (settings.gameFolder) {
     try { if (isGameFolder(settings.gameFolder)) return settings.gameFolder; } catch {}
   }
-  const found = await autoDetectGameFolder();
+  const found = await autoDetectGameFolder(settings.gamePlatform === 'Meta' ? 'Meta' : 'Steam');
   if (found) { await writeSettings({ ...settings, gameFolder: found }); return found; }
   return settings.gameFolder || null;
 });
@@ -153,6 +168,33 @@ ipcMain.handle('config:write-file', async (_event, payload) => {
   } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Could not save config.' }; }
 });
 ipcMain.handle('mods:get-installed', async () => (await readSettings()).installedMods || {});
+ipcMain.handle('bepinex:has-installed', async () => { const settings = await readSettings(); if (!settings.gameFolder) return false; return fs.stat(path.join(path.resolve(settings.gameFolder), 'BepInEx', 'core', 'BepInEx.dll')).then(() => true).catch(() => false); });
+ipcMain.handle('mods:install-from-disk', async () => {
+  try {
+    let settings = await readSettings();
+    if (!settings.gameFolder) {
+      const selected = await dialog.showOpenDialog({ title: 'Select your Gorilla Tag game folder', properties: ['openDirectory'] });
+      if (selected.canceled || !selected.filePaths[0]) return { ok:false, message:'Installation cancelled. Select your game folder first.' };
+      settings = { ...settings, gameFolder:selected.filePaths[0] }; await writeSettings(settings);
+    }
+    const gameFolder = path.resolve(settings.gameFolder);
+    if (!isGameFolder(gameFolder)) throw new Error('The selected folder does not look like Gorilla Tag. Choose the folder containing Gorilla Tag.exe / Gorilla Tag_Data.');
+    const picked = await dialog.showOpenDialog({ title:'Choose Gorilla Tag mod files', properties:['openFile','multiSelections'], filters:[{name:'BepInEx mods',extensions:['dll','zip']}] });
+    if (picked.canceled || !picked.filePaths.length) return { ok:false, message:'No mod files selected.' };
+    const pluginRoot = path.join(gameFolder,'BepInEx','plugins'); await fs.mkdir(pluginRoot,{recursive:true});
+    const installed = { ...(settings.installedMods || {}) }; const paths = [];
+    for (const source of picked.filePaths) {
+      const ext = path.extname(source).toLowerCase(); if (!['.dll','.zip'].includes(ext)) continue;
+      const base = path.basename(source,ext).replace(/[^a-zA-Z0-9 _.-]/g,'').trim().slice(0,80) || 'Local Mod';
+      const target = path.join(pluginRoot,base); await fs.mkdir(target,{recursive:true});
+      if (ext === '.dll') { const destination = path.join(target,path.basename(source).replace(/[^a-zA-Z0-9._-]/g,'_')); await fs.copyFile(source,destination); paths.push(destination); }
+      else { await extractZip(source,{dir:target}); paths.push(target); }
+      installed['local:'+base] = 'local';
+    }
+    await writeSettings({ ...settings, installedMods:installed });
+    return { ok:true, paths, message: paths.length + ' mod file(s) installed into ' + pluginRoot + '. Check each mod’s README for required dependencies.' };
+  } catch (error) { return { ok:false, message:error instanceof Error ? error.message : 'Could not install local mod files.' }; }
+});
 ipcMain.handle('config:save', async (_event, payload) => {
   try {
     const settings = await readSettings();
