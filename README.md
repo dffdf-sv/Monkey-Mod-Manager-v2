@@ -1,4 +1,4 @@
-# Monkey Mod Hub V2
+# Monkey Mod Manager
 
 A compact Gorilla Tag PC mod hub with a web catalogue, thumbnails, source links, browser downloads, a protected curator panel, and an Electron desktop installer.
 
