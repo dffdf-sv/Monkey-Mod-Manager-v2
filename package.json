@@ -1,6 +1,6 @@
 {
   "name": "monkey-mod-manager",
-  "productName": "Monkey Mod Manager V2",
+  "productName": "Monkey Mod Manager",
   "version": "2.0.0",
   "private": true,
   "type": "module",
@@ -32,7 +32,7 @@
   },
   "build": {
     "appId": "com.dffdfsv.monkeymodmanagerv2",
-    "productName": "Monkey Mod Manager V2",
+    "productName": "Monkey Mod Manager",
     "asar": true,
     "directories": {
       "output": "release"
@@ -82,5 +82,5 @@
     "name": "Monkey Mod Hub Contributors",
     "email": "295628523+dffdf-sv@users.noreply.github.com"
   },
-  "description": "A Gorilla Tag PC mod hub with a web catalogue and desktop installer."
+  "description": "Monkey Mod Manager for Gorilla Tag PC mods."
 }
