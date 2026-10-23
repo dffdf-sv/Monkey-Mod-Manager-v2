@@ -238,3 +238,21 @@ button:disabled{opacity:.55;cursor:wait}
 .product-page-route .product-page-modal{width:100%;max-width:1440px;min-height:100vh;margin:0 auto;border:0;border-radius:0;box-shadow:none;background:var(--bg);padding-bottom:32px}
 .product-page-route .product-page-modal>.modalclose{position:fixed;top:18px;right:20px;z-index:40;width:40px;height:40px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--text)}
 @media(max-width:760px){.editor-page{padding:16px}.settings-card{padding:16px}.product-page-route .product-page-modal>.detail-picture{height:240px}}
+
+/* Community voting and comments */
+.mod-community{scroll-margin-top:24px}
+.mod-voting{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 0;border-bottom:1px solid var(--line);color:var(--muted);font-size:13px}
+.mod-voting>div{display:flex;gap:8px;flex-wrap:wrap}
+.vote-button{padding:8px 12px!important;font-size:12px!important}
+.vote-button.vote-selected{border-color:var(--accent)!important;color:var(--accent)!important;background:var(--panel)!important}
+.comment-form{display:grid;gap:10px;margin:18px 0}
+.comment-form>label{font-size:13px;font-weight:700}
+.comment-form textarea{width:100%;resize:vertical;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--text);padding:12px;font:inherit}
+.comment-form-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.comment-form-foot small,.community-comment time{font-size:11px;color:var(--muted)}
+.comment-list{display:grid;gap:10px}
+.community-comment{padding:13px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.community-comment>div{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.community-comment>div b{font-size:13px}
+.community-comment p{margin:8px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.6}
+@media(max-width:600px){.mod-voting{align-items:flex-start;flex-direction:column}.comment-form-foot{align-items:flex-start}}
