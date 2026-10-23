@@ -232,7 +232,64 @@ ipcMain.handle('mods:install-from-disk', async () => {
       const base = path.basename(source,ext).replace(/[^a-zA-Z0-9 _.-]/g,'').trim().slice(0,80) || 'Local Mod';
       const target = path.join(pluginRoot,base); await fs.mkdir(target,{recursive:true});
       if (ext === '.dll') { const destination = path.join(target,path.basename(source).replace(/[^a-zA-Z0-9._-]/g,'_')); await fs.copyFile(source,destination); paths.push(destination); }
-      else { await extractZip(source,{dir:target}); paths.push(target); }
+      else {
+        // Recursively inspect nested archives and place every discovered DLL directly
+        // in the mod's BepInEx folder so deeply nested release ZIPs still work.
+        const tempRoot = await fs.mkdtemp(path.join(app.getPath('temp'), 'mmm-zip-'));
+        try {
+          let archiveCount = 0;
+          const unpackArchive = async (archivePath, destination, depth) => {
+            if (depth > 8) throw new Error('This ZIP contains too many nested archive levels (maximum 8).');
+            archiveCount += 1;
+            if (archiveCount > 100) throw new Error('This ZIP contains too many nested archives (maximum 100).');
+            await fs.mkdir(destination, { recursive: true });
+            await extractZip(archivePath, { dir: destination });
+            const walk = async (directory, currentDepth) => {
+              const entries = await fs.readdir(directory, { withFileTypes: true });
+              for (const entry of entries) {
+                const full = path.join(directory, entry.name);
+                if (entry.isDirectory()) {
+                  await walk(full, currentDepth);
+                } else if (entry.isFile() && path.extname(entry.name).toLowerCase() === '.zip') {
+                  if (currentDepth >= 8) throw new Error('This ZIP contains too many nested archive levels (maximum 8).');
+                  const nestedDir = path.join(path.dirname(full), path.basename(full, path.extname(full)) + '-extracted');
+                  await unpackArchive(full, nestedDir, currentDepth + 1);
+                }
+              }
+            };
+            await walk(destination, depth);
+          };
+          await unpackArchive(source, path.join(tempRoot, 'root'), 0);
+          const dlls = [];
+          const findDlls = async (directory) => {
+            for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+              const full = path.join(directory, entry.name);
+              if (entry.isDirectory()) await findDlls(full);
+              else if (entry.isFile() && entry.name.toLowerCase().endsWith('.dll')) dlls.push(full);
+            }
+          };
+          await findDlls(path.join(tempRoot, 'root'));
+          if (!dlls.length) throw new Error('No .dll files were found inside this ZIP or its nested ZIP files. Check whether it contains a source code archive instead of a compiled mod.');
+          const usedNames = new Set();
+          for (const dll of dlls) {
+            let name = path.basename(dll).replace(/[^a-zA-Z0-9._-]/g, '_');
+            if (usedNames.has(name.toLowerCase())) {
+              const relative = path.relative(path.join(tempRoot, 'root'), dll).replace(/[^a-zA-Z0-9._-]/g, '_').replace(/_+/g, '_');
+              name = relative || name;
+            }
+            let candidate = name, suffix = 2;
+            while (usedNames.has(candidate.toLowerCase())) {
+              const parsed = path.parse(name);
+              candidate = parsed.name + '-' + suffix++ + parsed.ext;
+            }
+            usedNames.add(candidate.toLowerCase());
+            await fs.copyFile(dll, path.join(target, candidate));
+          }
+          paths.push(target);
+        } finally {
+          await fs.rm(tempRoot, { recursive: true, force: true });
+        }
+      }
       installed['local:'+base] = 'local';
     }
     await writeSettings({ ...settings, installedMods:installed });
