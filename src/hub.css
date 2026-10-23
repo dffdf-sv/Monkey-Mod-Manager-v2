@@ -91,3 +91,37 @@ button:disabled{opacity:.55;cursor:wait}
 .admin-mod-actions{display:flex;align-items:center;gap:13px;flex-shrink:0}
 .admin-mod-actions button{font-size:11px}
 @media(max-width:800px){.admin-advanced-grid{grid-template-columns:1fr}.admin-advanced-grid .full{grid-column:auto}.admin-mod-row{align-items:flex-start}.admin-mod-actions{gap:9px}}
+
+
+/* Local BepInEx configuration editor */
+.cfg-workspace{border:1px solid var(--line);background:var(--panel);border-radius:16px;padding:22px;margin:0 0 30px;min-width:0}
+.cfg-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-bottom:18px}
+.cfg-heading label{font-size:10px;letter-spacing:1.7px;font-weight:700;color:var(--accent)}
+.cfg-heading h2{font:700 23px 'Space Grotesk';margin:7px 0}
+.cfg-heading p,.cfg-muted{font-size:11px;line-height:1.6;color:var(--muted);margin:0}
+.cfg-layout{display:grid;grid-template-columns:minmax(190px,260px) minmax(0,1fr);gap:14px;min-height:440px}
+.cfg-files,.cfg-editor{border:1px solid var(--line);background:var(--panel2);border-radius:11px;min-width:0;overflow:hidden}
+.cfg-files-title{display:flex;justify-content:space-between;align-items:center;padding:13px;border-bottom:1px solid var(--line);font-size:11px;font-weight:700}
+.cfg-files-title span{color:var(--muted)}
+.cfg-file{display:flex;width:100%;flex-direction:column;gap:5px;text-align:left;padding:12px;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--text);cursor:pointer;overflow-wrap:anywhere}
+.cfg-file b{font-size:11px}
+.cfg-file small{font-size:10px;color:var(--muted)}
+.cfg-file:hover,.cfg-file.active{background:color-mix(in srgb,var(--accent) 10%,transparent);color:var(--accent)}
+.cfg-editor{display:flex;flex-direction:column}
+.cfg-editor-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px;border-bottom:1px solid var(--line)}
+.cfg-editor-bar b{font-size:11px;overflow-wrap:anywhere}
+.cfg-textarea{display:block;width:100%;flex:1;min-height:390px;resize:vertical;border:0!important;border-radius:0!important;background:#080b0a!important;color:#d9edc5!important;padding:16px!important;font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace!important;tab-size:2}
+.cfg-editor>.cfg-muted{padding:10px 13px}
+.cfg-empty{padding:12px;border:1px solid #d7a24a55;background:#d7a24a10;border-radius:9px;color:var(--muted);font-size:11px;margin-bottom:14px}
+.render-env-panel{border:1px solid var(--line);border-radius:12px;padding:15px;margin-top:18px;background:var(--panel2)}
+.render-env-panel .admin-manage-heading p{font-size:11px;color:var(--muted);margin:5px 0 0;line-height:1.5}
+.render-env-list{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.render-env-chip{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--text);max-width:100%;cursor:pointer}
+.render-env-chip b{font-size:10px;overflow-wrap:anywhere}
+.render-env-chip small{font-size:9px;color:var(--muted)}
+.render-env-chip.selected{border-color:var(--accent)}
+.render-env-form{display:grid;grid-template-columns:minmax(150px,.8fr) minmax(200px,1.4fr) auto;gap:10px;align-items:end}
+.render-env-form label{display:flex;flex-direction:column;gap:6px;font-size:10px;color:var(--muted)}
+.render-env-form input{width:100%;min-width:0;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--text);padding:10px;font-size:12px}
+.render-env-panel>.cfg-muted{margin-top:11px}
+@media(max-width:800px){.cfg-layout{grid-template-columns:1fr}.cfg-files{max-height:220px;overflow:auto}.cfg-textarea{min-height:320px}.render-env-form{grid-template-columns:1fr}.cfg-heading{flex-direction:column}}
