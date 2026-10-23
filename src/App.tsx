@@ -130,7 +130,7 @@ export default function App() {
         const response = await apiFetch(apiUrl('/api/github-import?url=' + encodeURIComponent(detail.sourceUrl!)));
         if (!response.ok) return;
         const data = await response.json() as Partial<Mod> & { readme?: string };
-        if (active && data.readme) setDetail(current => current && current.id === detail.id ? { ...current, readme: data.readme, changelog: current.changelog || data.changelog, websiteUrl: current.websiteUrl || data.websiteUrl, version: current.version || data.version } : current);
+        if (active && data.readme) setDetail(current => current && current.id === detail.id ? { ...current, readme: data.readme || current.readme || '', changelog: current.changelog || data.changelog || '', websiteUrl: current.websiteUrl || data.websiteUrl || '', version: current.version || data.version || '1.0.0' } : current);
       } catch { /* GitHub README is optional; keep the product page usable offline. */ }
     };
     void loadGitHubReadme();
