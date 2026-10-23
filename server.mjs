@@ -159,6 +159,48 @@ const server = http.createServer(async (req, res) => {
       const auth = adminAllowed(req);
       return auth.ok ? reply(res, 200, { ok: true }) : reply(res, auth.status, { error: auth.error });
     }
+    if (url.pathname === '/api/admin/render-env' && req.method === 'GET') {
+      if (!adminAllowed(req).ok) return reply(res, 401, { error: 'Unlock admin tools to manage Render variables.' });
+      const token = process.env.RENDER_API_KEY;
+      const serviceId = process.env.RENDER_SERVICE_ID;
+      if (!token || !serviceId) return reply(res, 503, { error: 'Render integration is not configured. Add RENDER_API_KEY and RENDER_SERVICE_ID to this service in Render, then deploy.' });
+      try {
+        const response = await fetch('https://api.render.com/v1/services/' + encodeURIComponent(serviceId) + '/env-vars?limit=100', {
+          headers: { authorization: 'Bearer ' + token, accept: 'application/json' },
+          signal: AbortSignal.timeout(12000)
+        });
+        if (!response.ok) return reply(res, 502, { error: 'Render API could not list variables (HTTP ' + response.status + '). Check the API key and service ID.' });
+        const data = await response.json();
+        const variables = Array.isArray(data) ? data.map((item) => item && item.envVar ? item.envVar : item).filter((item) => item && typeof item.key === 'string').map((item) => ({ key: item.key, hasValue: typeof item.value === 'string' && item.value.length > 0 })) : [];
+        return reply(res, 200, { variables, valuesHidden: true });
+      } catch (error) { return reply(res, 502, { error: error instanceof Error ? error.message : 'Could not connect to Render.' }); }
+    }
+    if (url.pathname.startsWith('/api/admin/render-env/') && req.method === 'PUT') {
+      if (!checkRate(req)) return reply(res, 429, { error: 'Too many Render variable changes. Wait one minute.' });
+      if (!adminAllowed(req).ok) return reply(res, 401, { error: 'Unlock admin tools to manage Render variables.' });
+      const token = process.env.RENDER_API_KEY;
+      const serviceId = process.env.RENDER_SERVICE_ID;
+      if (!token || !serviceId) return reply(res, 503, { error: 'Render integration is not configured. Add RENDER_API_KEY and RENDER_SERVICE_ID to this service in Render, then deploy.' });
+      let key;
+      try { key = decodeURIComponent(url.pathname.slice('/api/admin/render-env/'.length)); } catch { return reply(res, 400, { error: 'Invalid variable name.' }); }
+      if (!/^[A-Z][A-Z0-9_]{0,127}$/.test(key) || ['RENDER_API_KEY','RENDER_SERVICE_ID'].includes(key)) return reply(res, 400, { error: 'Use a valid uppercase variable name. Render connection variables cannot be changed here.' });
+      let body;
+      try { body = await readBody(req, 100000); } catch { return reply(res, 400, { error: 'Request body must be valid JSON.' }); }
+      if (typeof body.value !== 'string' || !body.value.length || body.value.length > 8000) return reply(res, 400, { error: 'Enter a value between 1 and 8,000 characters.' });
+      try {
+        const response = await fetch('https://api.render.com/v1/services/' + encodeURIComponent(serviceId) + '/env-vars/' + encodeURIComponent(key), {
+          method: 'PUT', headers: { authorization: 'Bearer ' + token, accept: 'application/json', 'content-type': 'application/json' },
+          body: JSON.stringify({ value: body.value }), signal: AbortSignal.timeout(12000)
+        });
+        if (!response.ok) return reply(res, 502, { error: 'Render rejected the variable update (HTTP ' + response.status + ').' });
+        const deploy = await fetch('https://api.render.com/v1/services/' + encodeURIComponent(serviceId) + '/deploys', {
+          method: 'POST', headers: { authorization: 'Bearer ' + token, accept: 'application/json', 'content-type': 'application/json' },
+          body: JSON.stringify({}), signal: AbortSignal.timeout(12000)
+        });
+        if (!deploy.ok) return reply(res, 202, { ok: true, deployed: false, key, message: key + ' was saved in Render, but automatic deployment could not be started (HTTP ' + deploy.status + '). Deploy the service from the Render dashboard.' });
+        return reply(res, 200, { ok: true, deployed: true, key, message: key + ' saved in Render. A deployment has been requested.' });
+      } catch (error) { return reply(res, 502, { error: error instanceof Error ? error.message : 'Could not update Render.' }); }
+    }
     if ((url.pathname === '/api/mods' && req.method === 'POST') || (url.pathname.startsWith('/api/mods/') && ['PUT','DELETE'].includes(req.method))) {
       if (!checkRate(req)) return reply(res, 429, { error: 'Too many admin requests. Wait one minute.' });
       const user = sessionFor(req);
