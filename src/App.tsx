@@ -401,9 +401,11 @@ export default function App() {
           if (response.ok) {
             const release = await response.json() as { tag_name?:string; html_url?:string; draft?:boolean; assets?:Array<{name:string;browser_download_url:string}> };
             const latest = String(release.tag_name || '').replace(/^v/i, '').split(/[+-]/)[0];
-            const current = appVersion;
+            const current = appVersion.replace(/-(\d+(?:\.\d+)*)$/, '.$1');
             const latestParts = latest.split('.').map(part => Number.parseInt(part, 10));
             const currentParts = current.split('.').map(part => Number.parseInt(part, 10));
+            while (latestParts.length < 3) latestParts.push(0);
+            while (currentParts.length < 3) currentParts.push(0);
             const isNewer = latestParts.length >= 3 && latestParts.every(Number.isFinite) &&
               latestParts.some((part, index) => part > (currentParts[index] || 0) &&
                 latestParts.slice(0, index).every((previous, previousIndex) => previous === (currentParts[previousIndex] || 0)));
