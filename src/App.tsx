@@ -104,7 +104,7 @@ export default function App() {
   const [renderError, setRenderError] = useState('');
   const [showRenderSettings, setShowRenderSettings] = useState(false);
   const desktop = Boolean(window.monkeyModManager && window.monkeyModManager.isDesktop);
-  const apiUrl = (path: string) => (desktop ? 'https://monkey-mod-hub.onrender.com' : '') + path;
+  const apiUrl = (path: string) => (desktop ? 'https://modhub.duckdns.org' : '') + path;
   const apiFetch = (url: string, init: RequestInit = {}) => {
     const token = localStorage.getItem('mmm-auth-token') || '';
     const headers = new Headers(init.headers || {});
@@ -138,7 +138,7 @@ export default function App() {
     if (window.monkeyModManager?.isDesktop) void window.monkeyModManager.getAppVersion().then(setAppVersion).catch(() => {});
     void loadCatalog(); void refreshAccount();
     const handleMessage = (event: MessageEvent) => {
-      if (event.origin === 'https://monkey-mod-hub.onrender.com' && event.data?.type === 'mmm-github-auth-complete') {
+      if (event.origin === 'https://modhub.duckdns.org' && event.data?.type === 'mmm-github-auth-complete') {
         void refreshAccount();
         window.setTimeout(() => void refreshAccount(), 700);
       }
