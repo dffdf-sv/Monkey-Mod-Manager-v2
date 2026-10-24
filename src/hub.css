@@ -291,3 +291,7 @@ button:disabled{opacity:.55;cursor:wait}
 
 /* Community feedback actions */
 .remove-rating{justify-self:start;padding:6px 10px!important;font-size:11px!important;color:var(--muted)!important;border-color:var(--line)!important}.remove-rating:hover{color:var(--text)!important;border-color:var(--accent)!important}.rating-action .remove-rating:disabled{opacity:.55;cursor:wait}
+
+/* Website sidebar download link */
+.install-app-nav{text-decoration:none}
+.install-app-nav:hover{border-color:var(--accent);color:var(--text)}
