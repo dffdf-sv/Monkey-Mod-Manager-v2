@@ -809,7 +809,7 @@ export default function App() {
 
         </>}
 
-        <footer><span><b>MONKEY MOD HUB</b> · Community-maintained releases</span><span>Not affiliated with Another Axiom. Use mods responsibly. ✳</span></footer>
+        <footer><span><b>MODHUB</b> · Community-maintained releases</span><span>Not affiliated with Another Axiom. Use mods responsibly. ✳</span></footer>
       </div>
     </main>
 
