@@ -459,7 +459,7 @@ ipcMain.handle('mod:install', async (_event, mod) => {
     } finally { await fs.rm(tempFile, { force: true }).catch(() => {}); }
   } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Could not install this mod.' }; }
 });
-ipcMain.handle('auth:github-sign-in', async () => { await shell.openExternal('https://monkey-mod-hub.onrender.com/auth/github?desktop=1'); return { ok: true }; });
+ipcMain.handle('auth:github-sign-in', async () => { await shell.openExternal('https://modhub.duckdns.org/auth/github?desktop=1'); return { ok: true }; });
 
 app.whenReady().then(() => {
   createWindow();
