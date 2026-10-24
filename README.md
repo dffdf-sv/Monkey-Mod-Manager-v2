@@ -1,6 +1,6 @@
 # ModHub
 
-## [website](modhub.duckdns.org)
+## [Visit ModHub](https://modhub.duckdns.org)
 
 **Manage Gorilla Tag PC mods from one desktop app.** Browse the mod catalogue, install supported mod files into your Gorilla Tag folder, manage installed mods, edit configuration files, and check for app updates.
 
