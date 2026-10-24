@@ -82,7 +82,7 @@ The built-in updater is supported by the AppImage build. For `.deb` installation
 
 GitHub sign-in uses GitHub's authorization flow; ModHub does not ask for or store your GitHub password. Never share your GitHub access token or put secrets in screenshots or issue reports.
 
-## Developers and build instructions
+# Developers and build instructions
 
 Requirements: Node.js 22 or newer and npm.
 
@@ -107,7 +107,7 @@ npm run dist:linux  # Linux AppImage and .deb (run on Linux)
 
 The prebuild step generates `build/icon.png` and `build/icon.ico` from the existing logo at `public/image.jpg`, so the desktop window, Windows installer, and Linux package use the same branding.
 
-### GitHub Actions release workflow
+## GitHub Actions release workflow
 
 1. Open [Build and publish desktop release](https://github.com/dffdf-sv/ModHub-v2/actions/workflows/desktop-build.yml).
 2. Select **Run workflow** and enter a new version such as `v2.0.2` using the `vMAJOR.MINOR.PATCH` format.
