@@ -1,6 +1,6 @@
 {
-  "name": "monkey-mod-manager",
-  "productName": "Monkey Mod Manager",
+  "name": "modhub",
+  "productName": "ModHub",
   "version": "2.0.0",
   "private": true,
   "type": "module",
@@ -36,7 +36,7 @@
   },
   "build": {
     "appId": "com.dffdfsv.monkeymodmanagerv2",
-    "productName": "Monkey Mod Manager",
+    "productName": "ModHub",
     "asar": true,
     "directories": {
       "output": "release"
@@ -86,7 +86,7 @@
     },
     "protocols": [
       {
-        "name": "Monkey Mod Manager GitHub sign-in",
+        "name": "ModHub GitHub sign-in",
         "schemes": [
           "monkeymodmanager"
         ]
@@ -105,5 +105,5 @@
     "name": "Monkey Mod Hub Contributors",
     "email": "295628523+dffdf-sv@users.noreply.github.com"
   },
-  "description": "Monkey Mod Manager for Gorilla Tag PC mods."
+  "description": "ModHub for Gorilla Tag PC mods."
 }
