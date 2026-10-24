@@ -661,7 +661,7 @@ export default function App() {
       <div className="sidebottom">
         <div className="status"><i /><span><b>Mod base</b><small>{loading ? 'Loading catalogue…' : mods.length + ' listed mods'}</small></span></div>
         <button className="themebtn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☼' : '☾'} <span>{theme === 'dark' ? 'Light appearance' : 'Dark appearance'}</span><b>↗</b></button>
-        <small className="version">MONKEY MOD HUB · V2.1</small>
+        <small className="version">MODHUB · V2.1</small>
       </div>
     </aside>
 
