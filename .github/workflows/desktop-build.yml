@@ -1,4 +1,4 @@
-name: Build and publish desktop release
+name: Build and publish ModHub release
 
 on:
   workflow_dispatch:
@@ -51,7 +51,7 @@ jobs:
             fi
             echo "Found an empty release from an earlier failed build; continuing."
           else
-            gh release create "$RELEASE_TAG" --title "Monkey Mod Manager $RELEASE_TAG" --generate-notes --target main
+            gh release create "$RELEASE_TAG" --title "ModHub $RELEASE_TAG" --generate-notes --target main
           fi
 
   build-windows:
@@ -78,7 +78,7 @@ jobs:
       - name: Upload Windows build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Monkey-Mod-Manager-Windows
+          name: ModHub-Windows
           path: |
             release/*.exe
             release/latest.yml
@@ -108,7 +108,7 @@ jobs:
       - name: Upload Linux build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Monkey-Mod-Manager-Linux
+          name: ModHub-Linux
           path: |
             release/*.AppImage
             release/*.deb
