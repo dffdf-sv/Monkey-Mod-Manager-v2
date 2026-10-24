@@ -6,14 +6,14 @@
 
 ## Download
 
-**[Download the latest release](https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/releases/latest)**
+**[Download the latest release](https://github.com/dffdf-sv/ModHub-v2/releases/latest)**
 
 Choose the installer for your operating system:
 
 - **Windows:** `ModHub-Setup-<version>-x64.exe`
 - **Linux:** `ModHub-<version>-x64.AppImage` or the `.deb` package for Debian/Ubuntu-based systems.
 
-Download installers from this repository's Releases page. Avoid unofficial mirrors. If no release is available yet, check the [GitHub Actions build page](https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/actions/workflows/desktop-build.yml) for build status.
+Download installers from this repository's Releases page. Avoid unofficial mirrors. If no release is available yet, check the [GitHub Actions build page](https://github.com/dffdf-sv/ModHub-v2/actions/workflows/desktop-build.yml) for build status.
 
 ## Windows: getting started
 
@@ -107,7 +107,7 @@ The prebuild step generates `build/icon.png` and `build/icon.ico` from the exist
 
 ### GitHub Actions release workflow
 
-1. Open [Build and publish desktop release](https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/actions/workflows/desktop-build.yml).
+1. Open [Build and publish desktop release](https://github.com/dffdf-sv/ModHub-v2/actions/workflows/desktop-build.yml).
 2. Select **Run workflow** and enter a new version such as `v2.0.2` using the `vMAJOR.MINOR.PATCH` format.
 3. The workflow prepares the GitHub Release, builds Windows and Linux packages, and publishes their installer files and updater metadata.
 4. Wait for both platform jobs to finish before distributing the release.
