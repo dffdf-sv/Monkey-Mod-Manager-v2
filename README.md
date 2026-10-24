@@ -121,3 +121,9 @@ A tag push beginning with `v` also triggers the workflow; the workflow validates
 The catalogue is backed by the `dffdf-sv/GORILA-TAG-MODBASE` repository. The web service can be deployed using `render.yaml`. Server-only environment variables such as `ADMIN_PASSWORD`, `GITHUB_TOKEN`, `RENDER_API_KEY`, and OAuth secrets must be configured in the hosting provider and must never be committed to source code or exposed in frontend code.
 
 For web curator setup and server environment details, see the deployment notes in the repository history or ask a maintainer. The desktop app can be used independently of the hosted curator tools.
+
+### Render GitHub token permissions
+
+For the Render service's `GITHUB_TOKEN`, use a **fine-grained personal access token** limited to `dffdf-sv/GORILA-TAG-MODBASE` with **Contents: Read and write** (the catalogue API reads and updates `modinfo.Json` and uploads assets). Also grant the token's account-level **Gists: Read and write** permission so private account saves can be listed and created/updated. Do not grant repository access to unrelated repositories. Add the token only as the Render environment variable `GITHUB_TOKEN`; never place it in frontend code or commit it.
+
+The desktop release workflow uses GitHub Actions' built-in `GITHUB_TOKEN` with `contents: write` for release creation and publishing. It does not need your Render token or a personal access token.
