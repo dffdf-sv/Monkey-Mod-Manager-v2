@@ -128,18 +128,19 @@ function signedSession(user) { const body=Buffer.from(JSON.stringify(user)).toSt
 function cookie(res,name,value,age) { const current=res.getHeader('Set-Cookie'); const items=Array.isArray(current)?current:current?[String(current)]:[]; items.push(name+'='+encodeURIComponent(value)+'; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age='+age); res.setHeader('Set-Cookie',items); }
 async function githubContent(pathname, bytes, message) {
   const token=process.env.GITHUB_TOKEN; if(!token)throw new Error('GITHUB_TOKEN is not configured.');
-  const response=await fetch('https://api.github.com/repos/'+MOD_REPO+'/contents/'+pathname,{method:'PUT',headers:{authorization:'Bearer '+token,accept:'application/vnd.github+json','content-type':'application/json','x-github-api-version':'2022-11-28','user-agent':'Monkey-Mod-Hub'},body:JSON.stringify({message,content:bytes.toString('base64'),branch:'main'}),signal:AbortSignal.timeout(20000)});
+  const response=await fetch('https://api.github.com/repos/'+MOD_REPO+'/contents/'+pathname,{method:'PUT',headers:{authorization:'Bearer '+token,accept:'application/vnd.github+json','content-type':'application/json','x-github-api-version':'2022-11-28','user-agent':'ModHub'},body:JSON.stringify({message,content:bytes.toString('base64'),branch:'main'}),signal:AbortSignal.timeout(20000)});
   const data=await response.json().catch(()=>({})); if(!response.ok)throw new Error(data.message||'GitHub asset upload failed.'); return data;
 }
 
 async function accountGists(userId) {
   const token = process.env.GITHUB_TOKEN;
   if (!token) throw new Error('Cloud account storage needs GITHUB_TOKEN with permission to create and edit private gists.');
-  const response = await fetch('https://api.github.com/gists?per_page=100', { headers: { authorization: 'Bearer ' + token, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'Monkey-Mod-Hub' }, signal: AbortSignal.timeout(12000) });
+  const response = await fetch('https://api.github.com/gists?per_page=100', { headers: { authorization: 'Bearer ' + token, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'ModHub' }, signal: AbortSignal.timeout(12000) });
   const data = await response.json().catch(() => []);
   if (!response.ok || !Array.isArray(data)) throw new Error('Could not access private account storage. Ensure GITHUB_TOKEN has gist permission.');
-  const marker = 'Monkey Mod Manager account data for user ' + userId;
-  return data.find((gist) => String(gist.description || '') === marker) || null;
+  const marker = 'ModHub account data for user ' + userId;
+  const legacyMarker = 'Monkey Mod Manager account data for user ' + userId;
+  return data.find((gist) => [marker, legacyMarker].includes(String(gist.description || ''))) || null;
 }
 async function readAccountData(userId) {
   const gist = await accountGists(userId);
@@ -163,10 +164,10 @@ async function writeAccountData(userId, value) {
   const content = JSON.stringify(data, null, 2);
   if (Buffer.byteLength(content) > 900000) throw new Error('Account data is too large (900 KB limit).');
   const existing = await accountGists(userId);
-  const marker = 'Monkey Mod Manager account data for user ' + userId;
+  const marker = 'ModHub account data for user ' + userId;
   const response = await fetch(existing ? 'https://api.github.com/gists/' + existing.id : 'https://api.github.com/gists', {
     method: existing ? 'PATCH' : 'POST',
-    headers: { authorization: 'Bearer ' + token, accept: 'application/vnd.github+json', 'content-type': 'application/json', 'x-github-api-version': '2022-11-28', 'user-agent': 'Monkey-Mod-Hub' },
+    headers: { authorization: 'Bearer ' + token, accept: 'application/vnd.github+json', 'content-type': 'application/json', 'x-github-api-version': '2022-11-28', 'user-agent': 'ModHub' },
     body: JSON.stringify({ description: marker, public: false, files: { 'monkey-mod-manager-account.json': { content } } }),
     signal: AbortSignal.timeout(15000)
   });
@@ -196,7 +197,7 @@ const server = http.createServer(async (req, res) => {
       if (!parseCookies(req).mmm_state || !safeEqual(parseCookies(req).mmm_state,url.searchParams.get('state'))) return reply(res,400,{error:'Account sign-in state did not match.'});
       const tr=await fetch('https://github.com/login/oauth/access_token',{method:'POST',headers:{accept:'application/json','content-type':'application/json'},body:JSON.stringify({client_id:process.env.GITHUB_OAUTH_CLIENT_ID,client_secret:process.env.GITHUB_OAUTH_CLIENT_SECRET,code:url.searchParams.get('code')}),signal:AbortSignal.timeout(10000)});
       const td=await tr.json(); if(!tr.ok||!td.access_token)return reply(res,401,{error:'GitHub sign-in failed.'});
-      const pr=await fetch('https://api.github.com/user',{headers:{authorization:'Bearer '+td.access_token,accept:'application/vnd.github+json','user-agent':'Monkey-Mod-Hub'},signal:AbortSignal.timeout(10000)}); const p=await pr.json();
+      const pr=await fetch('https://api.github.com/user',{headers:{authorization:'Bearer '+td.access_token,accept:'application/vnd.github+json','user-agent':'ModHub'},signal:AbortSignal.timeout(10000)}); const p=await pr.json();
       if(!pr.ok||!p.id||!p.login)return reply(res,401,{error:'Could not verify GitHub account.'});
       const sessionToken=signedSession({id:String(p.id),login:String(p.login),avatar:String(p.avatar_url||''),exp:Date.now()+604800000});
       cookie(res,'mmm_session',sessionToken,604800); cookie(res,'mmm_state','',0);
@@ -242,7 +243,7 @@ const server = http.createServer(async (req, res) => {
       const cpu = process.cpuUsage();
       return reply(res, 200, {
         status: 'healthy',
-        service: 'monkey-mod-hub',
+        service: 'modhub',
         timestamp: new Date().toISOString(),
         uptime: {
           seconds: Math.floor(process.uptime()),
@@ -288,7 +289,7 @@ const server = http.createServer(async (req, res) => {
         }
       });
     }
-    if (url.pathname === '/healthz' && req.method === 'GET') return reply(res, 200, { ok: true, service: 'monkey-mod-hub' });
+    if (url.pathname === '/healthz' && req.method === 'GET') return reply(res, 200, { ok: true, service: 'modhub' });
     if (url.pathname === '/api/github-import' && req.method === 'GET') {
       const source = url.searchParams.get('url') || '';
       let parsed;
