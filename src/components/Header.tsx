@@ -11,7 +11,7 @@ export default function Header({ search, onSearch, installedCount, totalCount }:
   return (
     <header className={styles.header}>
       <div className={styles.brand}>
-        <span className={styles.logo}>🐒</span>
+        <span className={styles.logo}>MH</span>
         <div>
           <h1 className={styles.title}>ModHub</h1>
           <p className={styles.subtitle}>Gorilla Tag mod hub</p>
