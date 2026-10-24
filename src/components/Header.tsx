@@ -13,8 +13,8 @@ export default function Header({ search, onSearch, installedCount, totalCount }:
       <div className={styles.brand}>
         <span className={styles.logo}>🐒</span>
         <div>
-          <h1 className={styles.title}>Monkey Mod Manager</h1>
-          <p className={styles.subtitle}>Gorilla Tag mod loader</p>
+          <h1 className={styles.title}>ModHub</h1>
+          <p className={styles.subtitle}>Gorilla Tag mod hub</p>
         </div>
       </div>
       <div className={styles.center}>
