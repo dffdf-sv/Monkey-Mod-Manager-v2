@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: monkey-mod-hub
+    name: modhub
     runtime: node
     plan: free
     region: frankfurt
