@@ -23,6 +23,8 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Resolve and validate version
         id: version
         shell: bash
