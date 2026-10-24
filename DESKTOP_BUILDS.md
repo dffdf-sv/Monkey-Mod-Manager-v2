@@ -1,6 +1,6 @@
 # Desktop builds
 
-Monkey Mod Manager is an Electron desktop app for Windows x64 and Linux x64.
+ModHub is an Electron desktop app for Windows x64 and Linux x64.
 
 ## Local builds
 
@@ -18,10 +18,10 @@ The `prebuild` hook generates `build/icon.png` and `build/icon.ico` from the cur
 
 ## Publish a release through GitHub Actions
 
-1. Open [Build and publish desktop release](https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/actions/workflows/desktop-build.yml).
+1. Open [Build and publish desktop release](https://github.com/dffdf-sv/ModHub-v2/actions/workflows/desktop-build.yml).
 2. Choose **Run workflow** and enter a new version in `vMAJOR.MINOR.PATCH` format, for example `v2.0.2`.
 3. The workflow creates the GitHub Release, builds Windows and Linux packages in parallel, and publishes the installer files plus Electron updater metadata.
-4. Check both build jobs before sharing the [Releases page](https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/releases).
+4. Check both build jobs before sharing the [Releases page](https://github.com/dffdf-sv/ModHub-v2/releases).
 
 Pushing a tag beginning with `v` also triggers the workflow, but the tag must use the same three-part numeric version format. Use a new version for each release. The GitHub Actions workflow requires `contents: write`, supplied through the repository's `GITHUB_TOKEN` permission; no personal access token should be committed to the repository.
 
