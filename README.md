@@ -1,25 +1,25 @@
-# Monkey Mod Manager
+# ModHub
 
 **Manage Gorilla Tag PC mods from one desktop app.** Browse the mod catalogue, install supported mod files into your Gorilla Tag folder, manage installed mods, edit configuration files, and check for app updates.
 
-> Monkey Mod Manager is an independent community project. It is not affiliated with or endorsed by Another Axiom or Gorilla Tag.
+> ModHub is an independent community project. It is not affiliated with or endorsed by Another Axiom or Gorilla Tag.
 
 ## Download
 
-**[Download the latest release](https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/releases/latest)**
+**[Download the latest release](https://github.com/dffdf-sv/ModHub-v2/releases/latest)**
 
 Choose the installer for your operating system:
 
-- **Windows:** `Monkey-Mod-Manager-Setup-<version>-x64.exe`
-- **Linux:** `Monkey-Mod-Manager-<version>-x64.AppImage` or the `.deb` package for Debian/Ubuntu-based systems.
+- **Windows:** `ModHub-Setup-<version>-x64.exe`
+- **Linux:** `ModHub-<version>-x64.AppImage` or the `.deb` package for Debian/Ubuntu-based systems.
 
-Download installers from this repository's Releases page. Avoid unofficial mirrors. If no release is available yet, check the [GitHub Actions build page](https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/actions/workflows/desktop-build.yml) for build status.
+Download installers from this repository's Releases page. Avoid unofficial mirrors. If no release is available yet, check the [GitHub Actions build page](https://github.com/dffdf-sv/ModHub-v2/actions/workflows/desktop-build.yml) for build status.
 
 ## Windows: getting started
 
 1. Download and run the Windows `.exe` installer from the Releases page.
 2. Follow the installer prompts. You can choose the install location.
-3. Open **Monkey Mod Manager** from the Start menu or desktop shortcut.
+3. Open **ModHub** from the Start menu or desktop shortcut.
 4. Open **Settings** and confirm the correct Gorilla Tag edition is selected:
    - **SteamVR** for the Steam PC version.
    - **Meta** for the Meta Quest Link / Oculus PC version.
@@ -39,7 +39,7 @@ The manager may ask to install BepInEx if it cannot find it in the selected game
 - Sign in with GitHub when using features that require an account.
 - Download desktop app updates through the built-in updater when a compatible update is published.
 
-### Updating Monkey Mod Manager
+### Updating ModHub
 
 Open **Settings → Check app + mod updates**. Turn on **Automatically download and install app updates** if you want the app to download an available update and restart to install it. Otherwise, you can approve the download and choose when to restart.
 
@@ -58,8 +58,8 @@ The built-in updater works with the packaged desktop application, not a developm
 - **AppImage:** download the `.AppImage`, make it executable, then run it. For example:
 
   ```bash
-  chmod +x Monkey-Mod-Manager-*.AppImage
-  ./Monkey-Mod-Manager-*.AppImage
+  chmod +x ModHub-*.AppImage
+  ./ModHub-*.AppImage
   ```
 
 - **Debian/Ubuntu:** install the `.deb` package with your distribution's package installer.
@@ -78,7 +78,7 @@ The built-in updater is supported by the AppImage build. For `.deb` installation
 
 ## Privacy and accounts
 
-GitHub sign-in uses GitHub's authorization flow; Monkey Mod Manager does not ask for or store your GitHub password. Never share your GitHub access token or put secrets in screenshots or issue reports.
+GitHub sign-in uses GitHub's authorization flow; ModHub does not ask for or store your GitHub password. Never share your GitHub access token or put secrets in screenshots or issue reports.
 
 ## Developers and build instructions
 
@@ -107,7 +107,7 @@ The prebuild step generates `build/icon.png` and `build/icon.ico` from the exist
 
 ### GitHub Actions release workflow
 
-1. Open [Build and publish desktop release](https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/actions/workflows/desktop-build.yml).
+1. Open [Build and publish desktop release](https://github.com/dffdf-sv/ModHub-v2/actions/workflows/desktop-build.yml).
 2. Select **Run workflow** and enter a new version such as `v2.0.2` using the `vMAJOR.MINOR.PATCH` format.
 3. The workflow prepares the GitHub Release, builds Windows and Linux packages, and publishes their installer files and updater metadata.
 4. Wait for both platform jobs to finish before distributing the release.
