@@ -22,7 +22,7 @@ function reply(res, status, payload) {
 function applyCors(req, res) {
   const origin = String(req.headers.origin || '');
   if (!origin) return;
-  const allowed = origin === 'null' || origin === 'https://monkey-mod-hub.onrender.com' || origin === process.env.DESKTOP_ALLOWED_ORIGIN;
+  const allowed = origin === 'null' || origin === 'https://modhub.duckdns.org' || origin === process.env.DESKTOP_ALLOWED_ORIGIN;
   if (!allowed) return;
   res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Vary', 'Origin');
@@ -60,7 +60,7 @@ async function readBody(req, limit = 1_000_000) {
   try { return JSON.parse(data || '{}'); } catch { throw new Error('Request body must be valid JSON.'); }
 }
 async function readGitHubFile() {
-  const response = await fetch(RAW_MODS, { headers: { 'user-agent': 'Monkey-Mod-Hub/2.1' }, signal: AbortSignal.timeout(10_000) });
+  const response = await fetch(RAW_MODS, { headers: { 'user-agent': 'ModHub/2.1' }, signal: AbortSignal.timeout(10_000) });
   if (!response.ok) throw new Error('Could not read the mod base on GitHub (' + response.status + ').');
   const data = await response.json();
   if (!Array.isArray(data)) throw new Error('The mod base JSON must be an array.');
@@ -77,7 +77,7 @@ const FEEDBACK_PATH = 'mod-feedback.json';
 async function readFeedbackFile() {
   const token = process.env.GITHUB_TOKEN;
   if (!token) throw new Error('Community feedback storage needs GITHUB_TOKEN.');
-  const response = await fetch('https://api.github.com/repos/' + MOD_REPO + '/contents/' + FEEDBACK_PATH, {headers:{authorization:'Bearer '+token,accept:'application/vnd.github+json','x-github-api-version':'2022-11-28','user-agent':'Monkey-Mod-Hub/2.1'},signal:AbortSignal.timeout(10000)});
+  const response = await fetch('https://api.github.com/repos/' + MOD_REPO + '/contents/' + FEEDBACK_PATH, {headers:{authorization:'Bearer '+token,accept:'application/vnd.github+json','x-github-api-version':'2022-11-28','user-agent':'ModHub/2.1'},signal:AbortSignal.timeout(10000)});
   if (response.status === 404) return {sha:null,data:{}};
   const result = await response.json().catch(()=>({}));
   if (!response.ok) throw new Error('Could not read community feedback ('+response.status+').');
@@ -86,14 +86,14 @@ async function readFeedbackFile() {
 }
 async function saveFeedbackFile(data, sha, message) {
   const token = process.env.GITHUB_TOKEN;
-  const response = await fetch('https://api.github.com/repos/' + MOD_REPO + '/contents/' + FEEDBACK_PATH, {method:'PUT',headers:{authorization:'Bearer '+token,accept:'application/vnd.github+json','content-type':'application/json','x-github-api-version':'2022-11-28','user-agent':'Monkey-Mod-Hub/2.1'},body:JSON.stringify({message,content:Buffer.from(JSON.stringify(data,null,2)+'\n').toString('base64'),...(sha?{sha}:{}),branch:'main'}),signal:AbortSignal.timeout(15000)});
+  const response = await fetch('https://api.github.com/repos/' + MOD_REPO + '/contents/' + FEEDBACK_PATH, {method:'PUT',headers:{authorization:'Bearer '+token,accept:'application/vnd.github+json','content-type':'application/json','x-github-api-version':'2022-11-28','user-agent':'ModHub/2.1'},body:JSON.stringify({message,content:Buffer.from(JSON.stringify(data,null,2)+'\n').toString('base64'),...(sha?{sha}:{}),branch:'main'}),signal:AbortSignal.timeout(15000)});
   const result=await response.json().catch(()=>({}));
   if(!response.ok)throw new Error('Could not save community feedback ('+response.status+'): '+(result.message||'check GITHUB_TOKEN write access.'));
 }
 async function readGithubContents() {
   const token = process.env.GITHUB_TOKEN;
   if (!token) throw new Error('Render is missing GITHUB_TOKEN. Add a fine-grained token with Contents: Read and write access to GORILA-TAG-MODBASE.');
-  const response = await fetch(MOD_API, { headers: { authorization: 'Bearer ' + token, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'Monkey-Mod-Hub/2.1' }, signal: AbortSignal.timeout(10_000) });
+  const response = await fetch(MOD_API, { headers: { authorization: 'Bearer ' + token, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'ModHub/2.1' }, signal: AbortSignal.timeout(10_000) });
   if (!response.ok) throw new Error('GitHub could not read modinfo.Json (' + response.status + '). Check GITHUB_TOKEN access.');
   const result = await response.json();
   return { sha: result.sha, list: JSON.parse(Buffer.from(result.content, 'base64').toString('utf8')) };
@@ -102,7 +102,7 @@ async function saveGithubList(list, sha, message) {
   const token = process.env.GITHUB_TOKEN;
   const response = await fetch(MOD_API, {
     method: 'PUT',
-    headers: { authorization: 'Bearer ' + token, accept: 'application/vnd.github+json', 'content-type': 'application/json', 'x-github-api-version': '2022-11-28', 'user-agent': 'Monkey-Mod-Hub/2.1' },
+    headers: { authorization: 'Bearer ' + token, accept: 'application/vnd.github+json', 'content-type': 'application/json', 'x-github-api-version': '2022-11-28', 'user-agent': 'ModHub/2.1' },
     body: JSON.stringify({ message, content: Buffer.from(JSON.stringify(list, null, 2) + '\n').toString('base64'), sha, branch: 'main' }),
     signal: AbortSignal.timeout(15_000)
   });
@@ -189,7 +189,7 @@ const server = http.createServer(async (req, res) => {
       if (!process.env.GITHUB_OAUTH_CLIENT_ID || !process.env.GITHUB_OAUTH_CLIENT_SECRET || !process.env.SESSION_SECRET) return reply(res,503,{error:'GitHub account login is not configured in Render yet.'});
       const desktopMode=url.searchParams.get('desktop')==='1';
       const state=crypto.randomBytes(24).toString('hex'); cookie(res,'mmm_state',state,600); cookie(res,'mmm_auth_mode',desktopMode?'desktop':'web',600);
-      const auth=new URL('https://github.com/login/oauth/authorize'); auth.searchParams.set('client_id',process.env.GITHUB_OAUTH_CLIENT_ID); auth.searchParams.set('redirect_uri','https://monkey-mod-hub.onrender.com/auth/github/callback'); auth.searchParams.set('scope','read:user'); auth.searchParams.set('state',state);
+      const auth=new URL('https://github.com/login/oauth/authorize'); auth.searchParams.set('client_id',process.env.GITHUB_OAUTH_CLIENT_ID); auth.searchParams.set('redirect_uri','https://modhub.duckdns.org/auth/github/callback'); auth.searchParams.set('scope','read:user'); auth.searchParams.set('state',state);
       res.writeHead(302,{location:auth.toString()}); return res.end();
     }
     if (url.pathname === '/auth/github/callback' && req.method === 'GET') {
@@ -204,10 +204,10 @@ const server = http.createServer(async (req, res) => {
       if(desktopMode){
         const deepLink='monkeymodmanager://auth?token='+encodeURIComponent(sessionToken);
         res.writeHead(200,{'content-type':'text/html; charset=utf-8','cache-control':'no-store','content-security-policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'","x-content-type-options":"nosniff"});
-        res.end('<!doctype html><meta charset="utf-8"><title>Signed in · Monkey Mod Manager</title><style>body{font:16px system-ui;background:#10150f;color:#f4f6f0;display:grid;place-items:center;min-height:90vh;text-align:center}main{max-width:440px;padding:32px;border:1px solid #3a4937;border-radius:18px}p{color:#b9c5b4}</style><main><h1>GitHub sign-in complete</h1><p>You can return to Monkey Mod Manager. This tab will close if your browser permits it.</p></main><script>location.href='+JSON.stringify(deepLink)+';setTimeout(()=>window.close(),10000);</script>'); return;
+        res.end('<!doctype html><meta charset="utf-8"><title>Signed in · ModHub</title><style>body{font:16px system-ui;background:#10150f;color:#f4f6f0;display:grid;place-items:center;min-height:90vh;text-align:center}main{max-width:440px;padding:32px;border:1px solid #3a4937;border-radius:18px}p{color:#b9c5b4}</style><main><h1>GitHub sign-in complete</h1><p>You can return to Monkey Mod Manager. This tab will close if your browser permits it.</p></main><script>location.href='+JSON.stringify(deepLink)+';setTimeout(()=>window.close(),10000);</script>'); return;
       }
       res.writeHead(200,{'content-type':'text/html; charset=utf-8','cache-control':'no-store','content-security-policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'","x-content-type-options":"nosniff"});
-      res.end('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Signed in · Monkey Mod Hub</title><style>*{box-sizing:border-box}body{font:16px system-ui;background:#10150f;color:#f4f6f0;display:grid;place-items:center;min-height:100vh;margin:0;padding:24px;text-align:center}main{width:min(460px,100%);padding:36px 28px;border:1px solid #3a4937;border-radius:20px;background:#151c13}h1{font-size:26px;margin:0 0 12px}p{color:#b9c5b4;line-height:1.65}button{margin-top:18px;padding:12px 18px;border:0;border-radius:10px;background:#c7f36b;color:#1b2410;font-weight:700;cursor:pointer}</style><main><h1>✓ GitHub sign-in complete</h1><p>You are signed in. Return to Monkey Mod Hub; this window will stay open for a moment so the app can finish connecting.</p><button onclick="window.close()">Close this window</button></main><script>function notifyParent(){try{if(window.opener&&!window.opener.closed)window.opener.postMessage({type:"mmm-github-auth-complete"},"https://monkey-mod-hub.onrender.com")}catch{}}notifyParent();let attempts=0;const timer=setInterval(()=>{notifyParent();attempts++;if(attempts>=10)clearInterval(timer)},500);setTimeout(()=>{if(window.opener&&!window.opener.closed)window.close()},10000);</script>'); return;
+      res.end('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Signed in · ModHub</title><style>*{box-sizing:border-box}body{font:16px system-ui;background:#10150f;color:#f4f6f0;display:grid;place-items:center;min-height:100vh;margin:0;padding:24px;text-align:center}main{width:min(460px,100%);padding:36px 28px;border:1px solid #3a4937;border-radius:20px;background:#151c13}h1{font-size:26px;margin:0 0 12px}p{color:#b9c5b4;line-height:1.65}button{margin-top:18px;padding:12px 18px;border:0;border-radius:10px;background:#c7f36b;color:#1b2410;font-weight:700;cursor:pointer}</style><main><h1>✓ GitHub sign-in complete</h1><p>You are signed in. Return to Monkey Mod Hub; this window will stay open for a moment so the app can finish connecting.</p><button onclick="window.close()">Close this window</button></main><script>function notifyParent(){try{if(window.opener&&!window.opener.closed)window.opener.postMessage({type:"mmm-github-auth-complete"},"https://modhub.duckdns.org")}catch{}}notifyParent();let attempts=0;const timer=setInterval(()=>{notifyParent();attempts++;if(attempts>=10)clearInterval(timer)},500);setTimeout(()=>{if(window.opener&&!window.opener.closed)window.close()},10000);</script>'); return;
     }
     if (url.pathname === '/api/account' && req.method === 'GET') { const u=sessionFor(req); return reply(res,200,{configured:Boolean(process.env.GITHUB_OAUTH_CLIENT_ID&&process.env.GITHUB_OAUTH_CLIENT_SECRET&&process.env.SESSION_SECRET),user:u?{id:u.id,login:u.login,avatar:u.avatar}:null}); }
 
@@ -297,7 +297,7 @@ const server = http.createServer(async (req, res) => {
       const parts = parsed.pathname.split('/').filter(Boolean);
       if (parts.length < 2 || !/^[A-Za-z0-9_.-]{1,100}$/.test(parts[0]) || !/^[A-Za-z0-9_.-]{1,100}$/.test(parts[1])) return reply(res, 400, { error: 'URL must point to a GitHub repository, e.g. https://github.com/owner/repository.' });
       const owner = parts[0], repo = parts[1].replace(/\.git$/i, '');
-      const apiHeaders = { ...(process.env.GITHUB_TOKEN ? { authorization: 'Bearer ' + process.env.GITHUB_TOKEN } : {}), accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'Monkey-Mod-Hub/2.1' };
+      const apiHeaders = { ...(process.env.GITHUB_TOKEN ? { authorization: 'Bearer ' + process.env.GITHUB_TOKEN } : {}), accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'ModHub/2.1' };
       try {
         const repoResponse = await fetch('https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo), { headers: apiHeaders, signal: AbortSignal.timeout(12000) });
         const repoData = await repoResponse.json().catch(() => ({}));
@@ -455,7 +455,7 @@ const server = http.createServer(async (req, res) => {
           if (repoUrl.protocol !== 'https:' || repoUrl.hostname.toLowerCase() !== 'github.com') return reply(res, 400, { error: 'Ownership transfer only works with a GitHub repository URL.' });
           const repoParts = repoUrl.pathname.split('/').filter(Boolean);
           if (repoParts.length < 2) return reply(res, 400, { error: 'Use a URL like https://github.com/owner/repository.' });
-          const ownerResponse = await fetch('https://api.github.com/repos/' + encodeURIComponent(repoParts[0]) + '/' + encodeURIComponent(repoParts[1].replace(/\.git$/i, '')), { headers: { ...(process.env.GITHUB_TOKEN ? { authorization: 'Bearer ' + process.env.GITHUB_TOKEN } : {}), accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'Monkey-Mod-Hub/2.1' }, signal: AbortSignal.timeout(12000) });
+          const ownerResponse = await fetch('https://api.github.com/repos/' + encodeURIComponent(repoParts[0]) + '/' + encodeURIComponent(repoParts[1].replace(/\.git$/i, '')), { headers: { ...(process.env.GITHUB_TOKEN ? { authorization: 'Bearer ' + process.env.GITHUB_TOKEN } : {}), accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'ModHub/2.1' }, signal: AbortSignal.timeout(12000) });
           const ownerData = await ownerResponse.json().catch(() => ({}));
           if (!ownerResponse.ok || !ownerData.owner || !ownerData.owner.id || ownerData.private) return reply(res, 400, { error: 'Could not verify the public GitHub repository owner.' });
           ownerId = String(ownerData.owner.id);
@@ -485,7 +485,7 @@ const server = http.createServer(async (req, res) => {
            if (repoUrl.protocol !== 'https:' || repoUrl.hostname.toLowerCase() !== 'github.com') return reply(res, 400, { error: 'Ownership transfer only works with a GitHub repository URL.' });
            const repoParts = repoUrl.pathname.split('/').filter(Boolean);
            if (repoParts.length < 2) return reply(res, 400, { error: 'Use a URL like https://github.com/owner/repository.' });
-           const ownerResponse = await fetch('https://api.github.com/repos/' + encodeURIComponent(repoParts[0]) + '/' + encodeURIComponent(repoParts[1].replace(/\.git$/i, '')), { headers: { ...(process.env.GITHUB_TOKEN ? { authorization: 'Bearer ' + process.env.GITHUB_TOKEN } : {}), accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'Monkey-Mod-Hub/2.1' }, signal: AbortSignal.timeout(12000) });
+           const ownerResponse = await fetch('https://api.github.com/repos/' + encodeURIComponent(repoParts[0]) + '/' + encodeURIComponent(repoParts[1].replace(/\.git$/i, '')), { headers: { ...(process.env.GITHUB_TOKEN ? { authorization: 'Bearer ' + process.env.GITHUB_TOKEN } : {}), accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'ModHub/2.1' }, signal: AbortSignal.timeout(12000) });
            const ownerData = await ownerResponse.json().catch(() => ({}));
            if (!ownerResponse.ok || !ownerData.owner || !ownerData.owner.id || ownerData.private) return reply(res, 400, { error: 'Could not verify the public GitHub repository owner.' });
            ownerId = String(ownerData.owner.id);
@@ -518,4 +518,4 @@ const server = http.createServer(async (req, res) => {
     else res.destroy();
   }
 });
-server.listen(PORT, '0.0.0.0', () => console.log('Monkey Mod Hub listening on port ' + PORT + (API_ONLY ? ' (API only)' : '')));
+server.listen(PORT, '0.0.0.0', () => console.log('ModHub listening on port ' + PORT + (API_ONLY ? ' (API only)' : '')));
