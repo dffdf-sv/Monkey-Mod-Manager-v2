@@ -654,6 +654,7 @@ export default function App() {
       {desktop && <button className={'nav ' + (page === 'Installed' ? 'chosen' : '')} onClick={() => { goToPage('Installed'); void window.monkeyModManager!.getDetectedMods().then(setDetectedMods); void window.monkeyModManager!.getInstalledMods().then(setInstalledMods); }}>▣ <span>Installed mods</span><b className="count">{detectedMods.length}</b></button>}
       {desktop && <button className={'nav ' + (page === 'Configs' ? 'chosen' : '')} onClick={() => { goToPage('Configs'); void loadConfigFiles(); }}>⚙ <span>CFG editor</span></button>}
       <button className={'nav ' + (page === 'Editor' ? 'chosen' : '')} onClick={() => { if (!account) { notify('Sign in with GitHub to add and manage your own mods.'); return; } setEditingId(null); setDraft(blankDraft); goToPage('Editor'); }}>{showAdmin ? '×' : '＋'} <span>Mod editor ↗</span></button>
+      {!desktop && <a className="nav install-app-nav" href="https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/releases/latest" target="_blank" rel="noreferrer">↓ <span>Install app</span><b aria-hidden="true">↗</b></a>}
       {desktop && <button className={'nav ' + (page === 'Settings' ? 'chosen' : '')} onClick={() => goToPage('Settings')}>⚙ <span>Settings</span></button>}
       <label className="side-label">CATEGORIES</label>
       {categories.map((item) => <button key={item} className={'nav catnav ' + (category === item ? 'chosen' : '')} onClick={() => setCategory(item)}><i className={'dot ' + item.toLowerCase().replace(' ', '-')} /><span>{item}</span></button>)}
