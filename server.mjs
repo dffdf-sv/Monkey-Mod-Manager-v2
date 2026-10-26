@@ -59,19 +59,12 @@ async function readBody(req, limit = 1_000_000) {
   for await (const chunk of req) { data += chunk; if (data.length > limit) throw new Error('Request body is too large.'); }
   try { return JSON.parse(data || '{}'); } catch { throw new Error('Request body must be valid JSON.'); }
 }
-async function readGitHubFile() {
-  const response = await fetch(RAW_MODS, { headers: { 'user-agent': 'ModHub/2.1' }, signal: AbortSignal.timeout(10_000) });
-  if (!response.ok) throw new Error('Could not read the mod base on GitHub (' + response.status + ').');
-  const data = await response.json();
-  if (!Array.isArray(data)) throw new Error('The mod base JSON must be an array.');
-  return data;
-}
 async function getMods() {
-  try { return (await readGitHubFile()).map(normalise).filter((mod) => mod.id && mod.name && httpsUrl(mod.downloadUrl, true)); }
-  catch {
-    try { return JSON.parse(await fs.readFile(path.join(ROOT, 'data', 'seed-mods.json'), 'utf8')).map(normalise); }
-    catch { return []; }
-  }
+  // Always read the live catalogue from the mod-base repository's GitHub Contents API.
+  // Do not silently substitute bundled seed data: the repository is the source of truth.
+  const { list } = await readGithubContents();
+  if (!Array.isArray(list)) throw new Error('GORILA-TAG-MODBASE/modinfo.Json must contain a JSON array.');
+  return list.map(normalise).filter((mod) => mod.id && mod.name && httpsUrl(mod.downloadUrl, true));
 }
 const FEEDBACK_PATH = 'mod-feedback.json';
 async function readFeedbackFile() {
@@ -381,7 +374,10 @@ const server = http.createServer(async (req, res) => {
         return reply(res,405,{error:'Method not allowed.'});
       }catch(error){return reply(res,502,{error:error instanceof Error?error.message:'Community feedback storage failed.'});}
     }
-    if (url.pathname === '/api/mods' && req.method === 'GET') return reply(res, 200, { mods: await getMods() });
+    if (url.pathname === '/api/mods' && req.method === 'GET') {
+      try { return reply(res, 200, { mods: await getMods(), source: MOD_REPO, sourceFile: MOD_FILE }); }
+      catch (error) { return reply(res, 502, { error: error instanceof Error ? error.message : 'Could not load the mod base API.' }); }
+    }
     if (url.pathname === '/api/admin/check' && req.method === 'POST') {
       if (!checkRate(req)) return reply(res, 429, { error: 'Too many admin attempts. Wait one minute.' });
       const auth = adminAllowed(req);
