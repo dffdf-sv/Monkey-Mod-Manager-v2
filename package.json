@@ -100,11 +100,13 @@
         "repo": "Monkey-Mod-Manager-v2",
         "releaseType": "release"
       }
-    ]
+    ],
+    "companyName": "dffdf-sv"
   },
   "author": {
-    "name": "ModHub Contributors",
-    "email": "295628523+dffdf-sv@users.noreply.github.com"
+    "name": "dffdf-sv",
+    "email": "295628523+dffdf-sv@users.noreply.github.com",
+    "url": "https://github.com/dffdf-sv"
   },
   "description": "ModHub for Gorilla Tag PC mods."
 }
