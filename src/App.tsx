@@ -41,17 +41,13 @@ declare global {
   }
 }
 const jungleArt = 'https://clan.akamai.steamstatic.com/images/39711486/dc62f773bc346540e86ab45a360ad777843a9bc3.png';
-const fallbackMods: Mod[] = [
-  { id: 'utilla', name: 'Utilla', author: 'developer9998 & contributors', category: 'Core', description: 'A PC library for Gorilla Tag that supports room-related features and custom gamemodes. Many community mods depend on it.', version: '1.6.27', downloadUrl: 'https://github.com/BRTeamYT/Utilla-GorillaTag/releases/download/1.6.27/Utilla.zip', imageUrl: jungleArt, sourceUrl: 'https://github.com/BRTeamYT/Utilla-GorillaTag/releases', dependencies: [], featured: true },
-  { id: 'monkephone', name: 'MonkePhone', author: 'developer9998', category: 'Utility', description: 'An in-game phone and photo tool for capturing moments while you play. Check the upstream page for features and requirements.', version: '1.0.9', downloadUrl: 'https://github.com/developer9998/MonkePhone/releases/download/1.0.9/MonkePhone.dll', imageUrl: 'https://gorilla-tag-mods.com/wp-content/uploads/2025/09/MonkePhone-mod.webp', sourceUrl: 'https://github.com/developer9998/MonkePhone/releases', dependencies: ['Utilla'], featured: true },
-  { id: 'ii-stupid', name: 'II stupid', author: 'iiDk-the-actual', category: 'Gameplay', description: 'A community mod menu with many gameplay options. Review its source and use gameplay-changing features only where they are permitted, such as compatible modded/private sessions.', version: '8.3.0', downloadUrl: 'https://sourceforge.net/projects/ii-s-stupid-menu.mirror/files/8.3.0/iis_Stupid_Menu.dll/download', imageUrl: 'https://images.gamebanana.com/img/ss/mods/sgi_sd_image_664cd6e384dd5.webp', sourceUrl: 'https://sourceforge.net/projects/ii-s-stupid-menu.mirror/files/8.3.0/', dependencies: ['Utilla'] }
-];
 const categories = ['All Mods', 'Core', 'Utility', 'Cosmetic', 'Maps', 'Gameplay', 'Your Mods'];
 const blankDraft: Draft = { name: '', author: '', category: 'Utility', description: '', version: '1.0.0', downloadUrl: '', imageUrl: '', sourceUrl: '', websiteUrl: '', embedUrl: '', requirements: '', supportedOS: ['Windows'], readme: '', changelog: '', additionalLinks: [], dependencies: [], galleryUrls: [], videoUrl: '', configSettings: [] };
 
 export default function App() {
-  const [mods, setMods] = useState<Mod[]>(fallbackMods);
+  const [mods, setMods] = useState<Mod[]>([]);
   const [loading, setLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All Mods');
@@ -124,14 +120,24 @@ export default function App() {
 
   const notify = (message: string) => { setNotice(message); window.setTimeout(() => setNotice(''), 3600); };
   const loadCatalog = async (): Promise<Mod[]> => {
+    setLoading(true);
     try {
       const response = await apiFetch(apiUrl('/api/mods'));
-      if (!response.ok) throw new Error('Catalog unavailable');
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.error || 'ModHub could not load the mod base API.');
+      }
       const data = await response.json() as { mods?: Mod[] };
-      if (Array.isArray(data.mods)) { setMods(data.mods); return data.mods; }
-    } catch { /* Baked-in fallback keeps local/offline preview usable. */ }
-    finally { setLoading(false); }
-    return mods;
+      if (!Array.isArray(data.mods)) throw new Error('The mod base API returned an invalid catalogue.');
+      setMods(data.mods);
+      setCatalogError('');
+      return data.mods;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not connect to the mod base API.';
+      setMods([]);
+      setCatalogError(message + ' Check the ModHub service and GORILA-TAG-MODBASE.');
+      return [];
+    } finally { setLoading(false); }
   };
 
   useEffect(() => {
