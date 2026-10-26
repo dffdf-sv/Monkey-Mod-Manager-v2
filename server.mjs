@@ -11,7 +11,6 @@ const PORT = Number(process.env.PORT || (API_ONLY ? 3001 : 3000));
 const MOD_REPO = process.env.MOD_REPO || 'dffdf-sv/GORILA-TAG-MODBASE';
 const MOD_FILE = 'modinfo.Json';
 const MOD_API = 'https://api.github.com/repos/' + MOD_REPO + '/contents/' + MOD_FILE;
-const RAW_MODS = 'https://raw.githubusercontent.com/' + MOD_REPO + '/main/' + MOD_FILE;
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.json': 'application/json; charset=utf-8' };
 const rateMap = new Map();
 
