@@ -194,6 +194,18 @@ ipcMain.handle('config:read-file', async (_event, name) => {
     return { ok: true, name, content: await fs.readFile(file, 'utf8') };
   } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Could not read config file.' }; }
 });
+const backupCleanupTimers = new Map();
+const scheduleBackupCleanup = (backupPath) => {
+  const existing = backupCleanupTimers.get(backupPath);
+  if (existing) clearTimeout(existing);
+  const timer = setTimeout(async () => {
+    backupCleanupTimers.delete(backupPath);
+    try { await fs.unlink(backupPath); } catch (error) { if (error.code !== 'ENOENT') console.warn('Could not remove expired config backup:', error.message); }
+  }, 2 * 60 * 1000);
+  timer.unref?.();
+  backupCleanupTimers.set(backupPath, timer);
+};
+
 ipcMain.handle('config:write-file', async (_event, payload) => {
   try {
     const name = payload && payload.name;
@@ -206,7 +218,7 @@ ipcMain.handle('config:write-file', async (_event, payload) => {
     const file = path.resolve(dir, name);
     if (!file.startsWith(dir + path.sep)) throw new Error('Invalid config path.');
     await fs.mkdir(dir, { recursive: true });
-    try { await fs.copyFile(file, file + '.bak'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    try { await fs.copyFile(file, file + '.bak'); scheduleBackupCleanup(file + '.bak'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
     await fs.writeFile(file, content, 'utf8');
     const savedContent = await fs.readFile(file, 'utf8');
     if (savedContent !== content) throw new Error('The config file could not be verified after saving.');
