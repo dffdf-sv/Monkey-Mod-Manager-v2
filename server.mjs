@@ -126,13 +126,25 @@ async function githubContent(pathname, bytes, message) {
 
 async function accountGists(userId) {
   const token = process.env.GITHUB_TOKEN;
-  if (!token) throw new Error('Cloud account storage needs GITHUB_TOKEN with permission to create and edit private gists.');
-  const response = await fetch('https://api.github.com/gists?per_page=100', { headers: { authorization: 'Bearer ' + token, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'ModHub' }, signal: AbortSignal.timeout(12000) });
-  const data = await response.json().catch(() => []);
-  if (!response.ok || !Array.isArray(data)) throw new Error('Could not access private account storage. Ensure GITHUB_TOKEN has gist permission.');
+  if (!token) throw new Error('Cloud account storage needs GITHUB_TOKEN with classic-token gist permission.');
   const marker = 'ModHub account data for user ' + userId;
   const legacyMarker = 'Monkey Mod Manager account data for user ' + userId;
-  return data.find((gist) => [marker, legacyMarker].includes(String(gist.description || ''))) || null;
+  // Page through private Gists so older users' records are still found after the service has many users.
+  for (let page = 1; page <= 20; page += 1) {
+    const response = await fetch('https://api.github.com/gists?per_page=100&page=' + page, {
+      headers: { authorization: 'Bearer ' + token, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'ModHub' },
+      signal: AbortSignal.timeout(12000)
+    });
+    const data = await response.json().catch(() => []);
+    if (!response.ok || !Array.isArray(data)) {
+      const detail = data && typeof data.message === 'string' ? data.message : 'GitHub rejected the Gist request.';
+      throw new Error('Could not access private account storage (' + response.status + '): ' + detail + ' Ensure GITHUB_TOKEN is a classic PAT with the gist scope.');
+    }
+    const found = data.find((gist) => [marker, legacyMarker].includes(String(gist.description || '')));
+    if (found) return found;
+    if (data.length < 100) return null;
+  }
+  throw new Error('Could not find the cloud save in the first 2,000 Gists. Check which GitHub account owns GITHUB_TOKEN.');
 }
 async function readAccountData(userId) {
   const gist = await accountGists(userId);
@@ -146,7 +158,7 @@ async function readAccountData(userId) {
 }
 async function writeAccountData(userId, value) {
   const token = process.env.GITHUB_TOKEN;
-  if (!token) throw new Error('Cloud account storage needs GITHUB_TOKEN with permission to create and edit private gists.');
+  if (!token) throw new Error('Cloud account storage needs GITHUB_TOKEN with classic-token gist permission.');
   const data = {
     profiles: Array.isArray(value.profiles) ? value.profiles.slice(0,50) : [],
     savedMods: Array.isArray(value.savedMods) ? value.savedMods.map(String).slice(0,500) : [],
@@ -164,7 +176,7 @@ async function writeAccountData(userId, value) {
     signal: AbortSignal.timeout(15000)
   });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error('Private cloud save failed. Check that GITHUB_TOKEN has gist permission (' + response.status + ').');
+  if (!response.ok) { const detail = typeof result.message === 'string' ? result.message : 'GitHub rejected the save.'; throw new Error('Private cloud save failed (' + response.status + '): ' + detail + ' Check that GITHUB_TOKEN is a classic PAT with gist scope.'); }
   return data;
 }
 
