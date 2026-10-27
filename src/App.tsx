@@ -342,6 +342,32 @@ export default function App() {
     const next = {...accountData, configs:{...accountData.configs,[selectedConfig]:configText}, savedMods:[...new Set([...accountData.savedMods,...saved])], installedMods:{...accountData.installedMods,...installedMods}};
     await saveAccountData(next, selectedConfig + ' saved to your account.');
   };
+  const importCfgToAccount = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file) return;
+    input.value = '';
+    if (!/\\.cfg$/i.test(file.name) || !/^[a-zA-Z0-9_. -]+\\.cfg$/i.test(file.name) || file.name.includes('..')) {
+      notify('Choose a valid .cfg file with a simple filename.');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) { notify('CFG files must be 2 MB or smaller.'); return; }
+    try {
+      const content = await file.text();
+      const next = {...accountData, configs:{...accountData.configs,[file.name]:content}};
+      await saveAccountData(next, file.name + ' imported to your private cloud configs.');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Could not import CFG file.');
+    }
+  };
+  const loadCloudConfig = (name: string, content: string) => {
+    setSelectedConfig(name);
+    setConfigText(content);
+    setConfigError('');
+    setPage('Configs');
+    if (!desktop) notify('CFG loaded into the editor. Install/open ModHub desktop to write it into a local game folder.');
+    else notify(name + ' loaded into the CFG editor. Use Save to write it into your game folder.');
+  };
   const createProfile = async (event: FormEvent) => {
     event.preventDefault();
     const name = profileName.trim();
@@ -763,9 +789,16 @@ export default function App() {
               <div className="admin-manage-heading"><h3>Save a profile</h3><span>Mods + configs + library</span></div>
               <form className="render-env-form" onSubmit={createProfile}>
                 <label>Profile name<input value={profileName} onChange={event=>setProfileName(event.target.value)} required maxLength={80} placeholder="e.g. Casual / Modded / VR" /></label>
-                <p className="cfg-muted">Captures installed-mod versions, saved library, and any config loaded in the CFG editor.</p>
+                <p className="cfg-muted">Captures installed-mod versions, saved library, and all CFG files already saved to your cloud configs.</p>
                 <button className="primary" disabled={accountDataBusy}>{accountDataBusy ? 'Saving…' : '＋ Save profile'}</button>
               </form>
+            </div>
+            <div className="admin-manage">
+              <div className="admin-manage-heading"><h3>Import CFG separately</h3><span>.cfg files · max 2 MB each</span></div>
+              <label className="cfg-import-control">Choose a CFG file to upload to your private account storage
+                <input type="file" accept=".cfg,text/plain" onChange={event=>void importCfgToAccount(event)} disabled={accountDataBusy} />
+              </label>
+              <p className="cfg-muted">This imports a .cfg file directly from your computer without needing to select it in the local game-folder editor first. Imported files appear below and can be included in profiles.</p>
             </div>
             <div className="admin-manage">
               <div className="admin-manage-heading"><h3>Your profiles</h3><span>{accountData.profiles.length} saved</span></div>
@@ -774,7 +807,7 @@ export default function App() {
             </div>
             <div className="admin-manage">
               <div className="admin-manage-heading"><h3>Cloud configuration files</h3><span>{Object.keys(accountData.configs).length} saved</span></div>
-              {Object.entries(accountData.configs).map(([name,content])=><div className="admin-mod-row" key={name}><div><b>{name}</b><small>{content.length.toLocaleString()} characters stored privately</small></div><div className="admin-mod-actions"><button type="button" className="details" onClick={()=>{setSelectedConfig(name);setConfigText(content);setPage('Configs');}}>Open</button><button type="button" className="delete-mod" disabled={accountDataBusy} onClick={()=>void saveAccountData({...accountData,configs:Object.fromEntries(Object.entries(accountData.configs).filter(([key])=>key!==name))},'Cloud config deleted.')}>Delete</button></div></div>)}
+              {Object.entries(accountData.configs).map(([name,content])=><div className="admin-mod-row" key={name}><div><b>{name}</b><small>{content.length.toLocaleString()} characters stored privately</small></div><div className="admin-mod-actions"><button type="button" className="details" onClick={()=>loadCloudConfig(name,content)}>Load CFG</button><button type="button" className="delete-mod" disabled={accountDataBusy} onClick={()=>void saveAccountData({...accountData,configs:Object.fromEntries(Object.entries(accountData.configs).filter(([key])=>key!==name))},'Cloud config deleted.')}>Delete</button></div></div>)}
               {!Object.keys(accountData.configs).length && <p className="form-help">Save a config from the CFG editor to keep a private cloud copy.</p>}
             </div>
           </>}
