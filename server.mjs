@@ -213,12 +213,27 @@ async function accountGists(userId) {
 async function readAccountData(userId) {
   const gist = await accountGists(userId);
   if (!gist) return { profiles: [], savedMods: [], configs: {}, installedMods: {} };
-  const raw = gist.files && gist.files['monkey-mod-manager-account.json'] && gist.files['monkey-mod-manager-account.json'].content;
-  if (!raw) return { profiles: [], savedMods: [], configs: {}, installedMods: {} };
+  const files = gist.files && typeof gist.files === 'object' ? gist.files : {};
+  const record = files['monkey-mod-manager-account.json'] || files['modhub-account.json'] ||
+    Object.entries(files).find(([name]) => /(?:modhub|monkey.*manager).*account.*\.json$/i.test(name))?.[1];
+  // An existing Gist with missing contents is a read error, never an empty save:
+  // returning {} here caused the UI to make saved profiles appear to vanish.
+  if (!record) throw new Error('A private cloud-save Gist exists but its account JSON file is missing. Your data has not been cleared; check the Gist in the GitHub account configured by GITHUB_TOKEN.');
+  let raw = typeof record.content === 'string' ? record.content : '';
+  if ((!raw || record.truncated) && record.raw_url) {
+    let rawUrl;
+    try { rawUrl = new URL(record.raw_url); } catch { rawUrl = null; }
+    if (rawUrl && rawUrl.protocol === 'https:' && rawUrl.hostname === 'gist.githubusercontent.com') {
+      const response = await fetch(rawUrl.toString(), { headers: { 'user-agent': 'ModHub' }, signal: AbortSignal.timeout(12000) });
+      if (response.ok) raw = await response.text();
+      else throw new Error('Could not retrieve the raw private cloud save (' + response.status + ').');
+    }
+  }
+  if (typeof raw !== 'string' || raw.length === 0) throw new Error('The private cloud save has no readable contents. Your data was not treated as empty; check GitHub Gists access for GITHUB_TOKEN.');
   try {
     const data = JSON.parse(raw);
     return { profiles: Array.isArray(data.profiles) ? data.profiles.slice(0,50) : [], savedMods: Array.isArray(data.savedMods) ? data.savedMods.slice(0,500) : [], configs: data.configs && typeof data.configs === 'object' ? data.configs : {}, installedMods: data.installedMods && typeof data.installedMods === 'object' ? data.installedMods : {} };
-  } catch { throw new Error('Saved account data is unreadable.'); }
+  } catch { throw new Error('Saved account data is unreadable. Your existing cloud save was not overwritten.'); }
 }
 async function writeAccountData(userId, value) {
   const token = process.env.GITHUB_TOKEN;
