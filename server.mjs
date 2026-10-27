@@ -126,7 +126,7 @@ async function githubContent(pathname, bytes, message) {
 
 async function accountGists(userId) {
   const token = process.env.GITHUB_TOKEN;
-  if (!token) throw new Error('Cloud account storage needs GITHUB_TOKEN with classic-token gist permission.');
+  if (!token) throw new Error('Cloud account storage needs GITHUB_TOKEN with Gists: write permission (or the gist scope for a classic PAT).');
   const marker = 'ModHub account data for user ' + userId;
   const legacyMarker = 'Monkey Mod Manager account data for user ' + userId;
   // Page through private Gists so older users' records are still found after the service has many users.
@@ -138,7 +138,7 @@ async function accountGists(userId) {
     const data = await response.json().catch(() => []);
     if (!response.ok || !Array.isArray(data)) {
       const detail = data && typeof data.message === 'string' ? data.message : 'GitHub rejected the Gist request.';
-      throw new Error('Could not access private account storage (' + response.status + '): ' + detail + ' Ensure GITHUB_TOKEN is a classic PAT with the gist scope.');
+      throw new Error('Could not access private account storage (' + response.status + '): ' + detail + ' Ensure GITHUB_TOKEN has Gists: write permission (or gist scope for a classic PAT).');
     }
     const found = data.find((gist) => [marker, legacyMarker].includes(String(gist.description || '')));
     if (found) return found;
@@ -158,7 +158,7 @@ async function readAccountData(userId) {
 }
 async function writeAccountData(userId, value) {
   const token = process.env.GITHUB_TOKEN;
-  if (!token) throw new Error('Cloud account storage needs GITHUB_TOKEN with classic-token gist permission.');
+  if (!token) throw new Error('Cloud account storage needs GITHUB_TOKEN with Gists: write permission (or the gist scope for a classic PAT).');
   const data = {
     profiles: Array.isArray(value.profiles) ? value.profiles.slice(0,50) : [],
     savedMods: Array.isArray(value.savedMods) ? value.savedMods.map(String).slice(0,500) : [],
@@ -176,7 +176,7 @@ async function writeAccountData(userId, value) {
     signal: AbortSignal.timeout(15000)
   });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) { const detail = typeof result.message === 'string' ? result.message : 'GitHub rejected the save.'; throw new Error('Private cloud save failed (' + response.status + '): ' + detail + ' Check that GITHUB_TOKEN is a classic PAT with gist scope.'); }
+  if (!response.ok) { const detail = typeof result.message === 'string' ? result.message : 'GitHub rejected the save.'; throw new Error('Private cloud save failed (' + response.status + '): ' + detail + ' Check that GITHUB_TOKEN has Gists: write permission (or gist scope for a classic PAT).'); }
   return data;
 }
 
