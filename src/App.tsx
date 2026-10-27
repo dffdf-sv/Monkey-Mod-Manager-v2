@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 import './fresh.css';
 import './hub.css';
 
@@ -342,7 +342,7 @@ export default function App() {
     const next = {...accountData, configs:{...accountData.configs,[selectedConfig]:configText}, savedMods:[...new Set([...accountData.savedMods,...saved])], installedMods:{...accountData.installedMods,...installedMods}};
     await saveAccountData(next, selectedConfig + ' saved to your account.');
   };
-  const importCfgToAccount = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const importCfgToAccount = async (event: ChangeEvent<HTMLInputElement>) => {
     const input = event.currentTarget;
     const file = input.files?.[0];
     if (!file) return;
