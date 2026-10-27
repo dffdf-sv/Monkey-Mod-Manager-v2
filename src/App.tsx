@@ -38,6 +38,7 @@ declare global {
       setGamePlatform: (platform:'Steam'|'Meta') => Promise<{ok:boolean;gameFolder:string|null;platform:'Steam'|'Meta'}>;
       toggleInstalledMod: (name:string) => Promise<{ok:boolean;message:string;enabled?:boolean}>;
       deleteInstalledMod: (name:string) => Promise<{ok:boolean;message:string}>;
+      removeProfileMods: (mods:Array<{id:string;name:string}>) => Promise<{ok:boolean;message:string;removed:number}>;
       launchGame: () => Promise<{ok:boolean;message:string}>;
     };
   }
@@ -574,6 +575,34 @@ export default function App() {
   const restoreProfile = async (profile: typeof accountData.profiles[number]) => {
     const legacyModIds = (profile.mods || []).map(mod => mod.id);
     const profileModIds = [...new Set([...legacyModIds, ...(profile.savedMods || []), ...Object.keys(profile.installedMods || {})])];
+    const installable = profileModIds.flatMap(id => {
+      const catalogueMod = mods.find(item => item.id === id);
+      if (catalogueMod) return [catalogueMod];
+      const snapshot = (profile.mods || []).find(item => item.id === id);
+      if (!snapshot || !/^https:\/\//i.test(snapshot.downloadUrl)) return [];
+      return [{
+        id: snapshot.id, name: snapshot.name, author: 'Unknown', category: snapshot.category || 'Utility',
+        description: 'Restored from saved profile', version: snapshot.version, downloadUrl: snapshot.downloadUrl,
+        imageUrl: snapshot.imageUrl, dependencies: []
+      } as Mod];
+    });
+    const installableIds = new Set(installable.map(mod => mod.id));
+    const missing = profileModIds.filter(id => !installableIds.has(id));
+
+    // Profile loading is a replacement operation for ModHub-managed mods.
+    // Confirm before removing anything; manually installed, untracked mods are left alone.
+    if (desktop && gameFolder) {
+      const managedToRemove = Object.keys(installedMods).flatMap(id => {
+        const mod = mods.find(item => item.id === id);
+        return mod ? [{ id, name: mod.name }] : [];
+      });
+      if (managedToRemove.length && !window.confirm('Load profile "' + profile.name + '"? This replaces all ' + managedToRemove.length + ' currently tracked ModHub mod(s) with the selected profile. Manually installed mods not tracked by ModHub will be left alone.')) return;
+      const removal = await window.monkeyModManager!.removeProfileMods(managedToRemove);
+      if (!removal.ok) { notify('Could not replace the current mods: ' + removal.message); return; }
+      setInstalledMods(await window.monkeyModManager!.getInstalledMods());
+      setDetectedMods(await window.monkeyModManager!.getDetectedMods());
+    }
+
     const next = {...accountData,savedMods:[...new Set([...(profile.savedMods || []), ...legacyModIds])],installedMods:{...(profile.installedMods || {})},configs:{...(profile.configs || {})}};
     if (await saveAccountData(next, 'Profile loaded into your account.')) {
       setSaved(profile.savedMods || []);
@@ -584,27 +613,12 @@ export default function App() {
           notify('Profile loaded to your account. Choose the Gorilla Tag folder in Settings to install its mods.');
           return;
         }
-        const installable = profileModIds.flatMap(id => {
-          const catalogueMod = mods.find(item => item.id === id);
-          if (catalogueMod) return [catalogueMod];
-          const snapshot = (profile.mods || []).find(item => item.id === id);
-          if (!snapshot || !/^https:\/\//i.test(snapshot.downloadUrl)) return [];
-          return [{
-            id: snapshot.id, name: snapshot.name, author: 'Unknown', category: snapshot.category || 'Utility',
-            description: 'Restored from saved profile', version: snapshot.version, downloadUrl: snapshot.downloadUrl,
-            imageUrl: snapshot.imageUrl, dependencies: []
-          } as Mod];
-        });
-        const installableIds = new Set(installable.map(mod => mod.id));
-        const missing = profileModIds.filter(id => !installableIds.has(id));
         if (!installable.length) {
           notify('Profile loaded, but its mods are not in the current catalogue. Refresh the catalogue and try again.');
           return;
         }
         let installedCount = 0;
         for (const mod of installable) {
-          const before = await window.monkeyModManager!.getInstalledMods();
-          if (before[mod.id] === mod.version) { installedCount++; continue; }
           await installMod(mod);
           const after = await window.monkeyModManager!.getInstalledMods();
           if (after[mod.id] === mod.version) installedCount++;
@@ -612,6 +626,8 @@ export default function App() {
         setInstalledMods(await window.monkeyModManager!.getInstalledMods());
         setDetectedMods(await window.monkeyModManager!.getDetectedMods());
         notify('Profile loaded: ' + installedCount + ' of ' + installable.length + ' mods installed.' + (missing.length ? ' ' + missing.length + ' mod(s) were not found in the current catalogue.' : ''));
+      } else if (desktop && gameFolder) {
+        notify('Profile loaded. ModHub-managed mods have been removed because this profile contains no mods.');
       }
     }
   };
