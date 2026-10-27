@@ -567,7 +567,8 @@ const server = http.createServer(async (req, res) => {
     if ((url.pathname === '/api/mods' && req.method === 'POST') || (url.pathname.startsWith('/api/mods/') && ['PUT','DELETE'].includes(req.method))) {
       if (!checkRate(req)) return reply(res, 429, { error: 'Too many admin requests. Wait one minute.' });
       const user = sessionFor(req);
-      if (!user) return reply(res, 401, { error: 'Sign in with GitHub to add and manage your own mods.' });
+      const admin = req.method === 'DELETE' && adminAllowed(req).ok;
+      if (!user && !admin) return reply(res, 401, { error: 'Sign in with GitHub to add and manage your own mods, or use the admin password to delete a listing.' });
       let current;
       try { current = await readGithubContents(); }
       catch (error) { return reply(res, 503, { error: error instanceof Error ? error.message : 'Could not access the mod base.' }); }
@@ -631,7 +632,7 @@ const server = http.createServer(async (req, res) => {
         return reply(res,200,{ok:true,mod:normalise(current.list[index])});
       }
       const oldEntry=current.list.find(entry=>slug(entry.name)===id);
-      if(oldEntry&&String(oldEntry.owner_id||'')!==user.id)return reply(res,403,{error:'You can only remove mods published by your account.'});
+      if (oldEntry && !admin && String(oldEntry.owner_id || '') !== user.id) return reply(res,403,{error:'You can only remove mods published by your account.'});
       const next = current.list.filter((entry) => slug(entry.name) !== id);
       if (next.length === current.list.length) return reply(res, 404, { error: 'Mod was not found.' });
       try { await saveGithubList(next, current.sha, 'Remove ' + id + ' from mod hub'); }
