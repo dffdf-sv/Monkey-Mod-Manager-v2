@@ -138,7 +138,7 @@ async function refreshGithubReleaseLinks() {
           || candidates.find((item) => /\.zip$/i.test(String(item.name || '')));
         if (!asset || !httpsUrl(asset.browser_download_url, true)) continue;
         const nextUrl = String(asset.browser_download_url);
-        const nextVersion = String(release.tag_name).slice(0, 40);
+        const nextVersion = String(release.tag_name).replace(/^v(?=\\d)/i, '').slice(0, 40);
         if (oldUrl === nextUrl && String(entry.version || '') === nextVersion) continue;
         entry.download_url = nextUrl;
         entry.version = nextVersion;
@@ -413,7 +413,7 @@ const server = http.createServer(async (req, res) => {
         if (repoData.html_url && repoData.has_wiki) additionalLinks.push({ label: 'Wiki', url: 'https://github.com/' + owner + '/' + repo + '/wiki' });
         return reply(res, 200, {
           name: String(repoData.name || repo).slice(0,90), author: String(repoData.owner && repoData.owner.login || owner).slice(0,90), githubOwnerId: String(repoData.owner && repoData.owner.id || ''), githubOwnerLogin: String(repoData.owner && repoData.owner.login || owner),
-          description: String(repoData.description || '').slice(0,1400), version: String(release.tag_name || repoData.default_branch || '1.0.0').slice(0,40),
+          description: String(repoData.description || '').slice(0,1400), version: String(release.tag_name || repoData.default_branch || '1.0.0').replace(/^v(?=\\d)/i, '').slice(0,40),
           downloadUrl: asset && asset.browser_download_url || '', sourceUrl: repoData.html_url || source,
           websiteUrl: httpsUrl(repoData.homepage || '', false) || '', readme: String(readme).slice(0,20000),
           changelog: String(release.body || '').slice(0,12000), dependencies: [], category,
