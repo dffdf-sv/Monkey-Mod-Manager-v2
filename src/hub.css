@@ -174,8 +174,9 @@ button:disabled{opacity:.55;cursor:wait}
 .product-sidebar-facts span{font-size:11px;line-height:1.5;overflow-wrap:anywhere}
 .product-page-content{min-width:0}
 .product-tabs{display:flex;gap:18px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-bottom:18px}
-.product-tabs a{font-size:11px;text-decoration:none;color:var(--muted);padding:0 0 12px}
-.product-tabs a:hover{color:var(--accent)}
+.product-tabs button{appearance:none;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--muted);font:inherit;font-size:11px;font-weight:700;padding:0 0 12px;cursor:pointer}
+.product-tabs button:hover,.product-tabs button.active{color:var(--accent)}
+.product-tabs button.active{border-bottom-color:var(--accent)}
 .product-info-section{scroll-margin-top:18px;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:18px;margin:0 0 14px;min-width:0}
 .product-info-section h3{font-size:15px;margin:0 0 13px}
 .product-info-section p{font-size:12px;line-height:1.75}
@@ -295,3 +296,23 @@ button:disabled{opacity:.55;cursor:wait}
 /* Website sidebar download link */
 .install-app-nav{text-decoration:none}
 .install-app-nav:hover{border-color:var(--accent);color:var(--text)}
+
+
+/* Per-profile CFG snapshots and individual review feedback */
+.profile-card{border:1px solid var(--line);border-radius:12px;margin:10px 0;overflow:hidden}
+.profile-card>.admin-mod-row{margin:0;border:0;border-radius:0}
+.profile-cfg-list{padding:8px 12px 12px;border-top:1px solid var(--line);display:grid;gap:8px}
+.profile-cfg-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px;border-radius:9px;background:var(--panel)}
+.profile-cfg-row>div:first-child{min-width:0;display:grid;gap:4px}
+.profile-cfg-row b{overflow-wrap:anywhere;font-size:12px}
+.profile-cfg-row small{color:var(--muted);font-size:10px}
+.product-readme{white-space:pre-wrap;overflow-wrap:anywhere}
+.review-reactions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.review-reactions>span{font-size:10px;color:var(--muted)}
+.review-vote-actions{display:flex;gap:6px;flex-wrap:wrap}
+.review-vote-actions .vote-button{font-size:10px;padding:6px 8px}
+.review-rating{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-left:auto}
+.review-rating>small{font-size:10px;color:var(--muted)}
+.review-rating .rating-stars{display:flex;gap:1px}
+.review-rating .rating-stars button{font-size:13px;padding:0 2px}
+@media(max-width:640px){.profile-cfg-row{align-items:flex-start;flex-direction:column}.review-rating{margin-left:0}}
