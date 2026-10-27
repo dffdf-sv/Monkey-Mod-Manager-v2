@@ -27,7 +27,7 @@ function inlineMarkdown(source: string): ReactNode[] {
       const parts = /^\[([^\]]+)\]\(([^\)]+)\)$/.exec(token);
       const url = parts ? safeUrl(parts[2]) : null;
       output.push(parts && url ? <a key={match.index} href={url} target={url.startsWith('#') ? undefined : '_blank'} rel={url.startsWith('#') ? undefined : 'noopener noreferrer'}>{inlineMarkdown(parts[1])}</a> : token);
-    } else if (token.startsWith('``')) {
+    } else if (token.charAt(0) === String.fromCharCode(96)) {
       output.push(<code key={match.index}>{token.slice(1, -1)}</code>);
     } else if (token.startsWith('**') || token.startsWith('__')) {
       output.push(<strong key={match.index}>{inlineMarkdown(token.slice(2, -2))}</strong>);
