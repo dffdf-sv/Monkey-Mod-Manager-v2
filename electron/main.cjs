@@ -51,17 +51,46 @@ async function installModArchive(archivePath, gameFolder, pluginDir, modName) {
       if (archiveCount > 100) throw new Error('This ZIP contains too many nested archives (maximum 100).');
       await fs.mkdir(destination, { recursive: true });
       await extractZip(source, { dir: destination });
-      const inspect = async (directory) => {
+      // Do not blindly unpack every ZIP bundled inside a mod ZIP. Source
+      // archives often contain test plugins, examples, or unrelated bundled
+      // mods; installing all of them is how the wrong mods get copied.
+      // Only descend into nested ZIPs when this archive is just a wrapper and
+      // contains no compiled DLLs and no BepInEx/plugins package layout.
+      const hasPluginLayout = async (directory) => {
         for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
           const full = path.join(directory, entry.name);
-          if (entry.isDirectory()) await inspect(full);
-          else if (entry.isFile() && path.extname(entry.name).toLowerCase() === '.zip') {
-            const nested = path.join(path.dirname(full), path.basename(full, path.extname(full)) + '-extracted');
-            await unpackArchive(full, nested, depth + 1);
+          if (!entry.isDirectory()) continue;
+          if (entry.name.toLowerCase() === 'plugins' &&
+              path.basename(path.dirname(full)).toLowerCase() === 'bepinex') return true;
+          if (await hasPluginLayout(full)) return true;
+        }
+        return false;
+      };
+      const hasCompiledDll = async (directory) => {
+        for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+          const full = path.join(directory, entry.name);
+          if (entry.isDirectory()) {
+            if (await hasCompiledDll(full)) return true;
+          } else if (entry.isFile() && path.extname(entry.name).toLowerCase() === '.dll') {
+            return true;
           }
         }
+        return false;
       };
-      await inspect(destination);
+      const archiveAlreadyHasMods = await hasPluginLayout(destination) || await hasCompiledDll(destination);
+      if (!archiveAlreadyHasMods) {
+        const inspect = async (directory) => {
+          for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+            const full = path.join(directory, entry.name);
+            if (entry.isDirectory()) await inspect(full);
+            else if (entry.isFile() && path.extname(entry.name).toLowerCase() === '.zip') {
+              const nested = path.join(path.dirname(full), path.basename(full, path.extname(full)) + '-extracted');
+              await unpackArchive(full, nested, depth + 1);
+            }
+          }
+        };
+        await inspect(destination);
+      }
     };
     await unpackArchive(archivePath, root, 0);
     const directories = [root], files = [];
