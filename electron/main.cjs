@@ -509,9 +509,20 @@ ipcMain.handle('mod:install', async (_event, mod) => {
     const buffer = Buffer.from(await response.arrayBuffer());
     if (!buffer.length || buffer.length > 180 * 1024 * 1024) throw new Error('Download is empty or too large (180 MB limit).');
     const finalUrl = new URL(response.url);
-    const ext = path.extname(finalUrl.pathname).toLowerCase();
-    if (['.dll', '.zip'].indexOf(ext) < 0) throw new Error('Only .dll and .zip mod files can be installed by the desktop app.');
-    const safeName = path.basename(decodeURIComponent(finalUrl.pathname)).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const finalExt = path.extname(finalUrl.pathname).toLowerCase();
+    const requestedExt = path.extname(downloadUrl.pathname).toLowerCase();
+    const responseType = String(response.headers.get('content-type') || '').toLowerCase();
+    // GitHub archive URLs often redirect to codeload URLs with no .zip suffix.
+    // Preserve the requested archive extension so those source ZIPs still install.
+    const ext = ['.dll', '.zip'].includes(finalExt) ? finalExt
+      : ['.dll', '.zip'].includes(requestedExt) ? requestedExt
+      : responseType.includes('zip') ? '.zip' : '';
+    if (!ext) throw new Error('Only .dll and .zip mod files can be installed by the desktop app.');
+    let safeName = path.basename(decodeURIComponent(finalUrl.pathname)).replace(/[^a-zA-Z0-9._-]/g, '_');
+    if (!/\.(dll|zip)$/i.test(safeName)) {
+      const label = String(mod.name).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0,80) || 'modhub-mod';
+      safeName = label + ext;
+    }
     const tempFile = path.join(app.getPath('temp'), 'modhub-mod-' + Date.now() + '-' + safeName);
     await fs.writeFile(tempFile, buffer);
     try {
