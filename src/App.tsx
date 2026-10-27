@@ -146,7 +146,12 @@ export default function App() {
         // Never show the previous user's private data while the new account is loading.
         setAccountData({profiles:[],savedMods:[],configs:{},installedMods:{}});
         setAccountDataLoadedFor(null);
-        setSaved([]);
+        let accountCachedSaved: string[] = [];
+        try {
+          const parsed = JSON.parse(localStorage.getItem('mmm-saved:' + userId) || '[]');
+          if (Array.isArray(parsed)) accountCachedSaved = parsed.filter((value): value is string => typeof value === 'string');
+        } catch { /* Ignore an invalid cache for this GitHub account. */ }
+        setSaved(accountCachedSaved);
       }
 
       const dataResponse = await apiFetch(apiUrl('/api/account/data'));
@@ -433,12 +438,7 @@ export default function App() {
     setAccountDataLoadedFor(null);
     setAccountLoadError('');
     setAccountLoading(false);
-    let anonymousSaved: string[] = [];
-    try {
-      const parsed = JSON.parse(localStorage.getItem('mmm-saved') || '[]');
-      if (Array.isArray(parsed)) anonymousSaved = parsed.filter((value): value is string => typeof value === 'string');
-    } catch { /* Ignore an invalid local-only library cache. */ }
-    setSaved(anonymousSaved);
+    setSaved([]);
     await logoutRequest;
     notify('Signed out of ModHub. The next person can sign in with their own GitHub account.');
   };
