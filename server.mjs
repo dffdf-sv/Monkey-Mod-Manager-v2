@@ -129,16 +129,20 @@ async function refreshGithubReleaseLinks() {
         const release = await response.json().catch(() => ({}));
         const assets = Array.isArray(release.assets) ? release.assets : [];
         const candidates = assets.filter((asset) => /\.(dll|zip)$/i.test(String(asset.name || '')) && !/(^|[-_. ])(symbols?|debug|source|tests?)([-_. ]|$)/i.test(String(asset.name || '')));
-        if (!candidates.length || !release.tag_name) continue;
+        if (!release.tag_name) continue;
         const oldUrl = String(entry.download_url || entry.downloadUrl || '');
         let oldAssetName = '';
         try { oldAssetName = path.basename(new URL(oldUrl).pathname); } catch {}
         const asset = candidates.find((item) => String(item.name).toLowerCase() === oldAssetName.toLowerCase())
-          || candidates.find((item) => /\.dll$/i.test(String(item.name || '')))
-          || candidates.find((item) => /\.zip$/i.test(String(item.name || '')));
-        if (!asset || !httpsUrl(asset.browser_download_url, true)) continue;
-        const nextUrl = String(asset.browser_download_url);
-        const nextVersion = String(release.tag_name).replace(/^v(?=\d)/i, '').slice(0, 40);
+          || candidates.find((item) => /\.zip$/i.test(String(item.name || '')))
+          || candidates.find((item) => /\.dll$/i.test(String(item.name || '')));
+        const tag = String(release.tag_name);
+        const encodedTag = tag.split('/').map(encodeURIComponent).join('/');
+        // When the author has not uploaded a compiled asset, use the ZIP archive for
+        // that exact release tag. The desktop installer will look for DLLs in it.
+        const sourceArchive = 'https://github.com/' + encodeURIComponent(owner) + '/' + encodeURIComponent(name) + '/archive/refs/tags/' + encodedTag + '.zip';
+        const nextUrl = asset && httpsUrl(asset.browser_download_url, true) ? String(asset.browser_download_url) : sourceArchive;
+        const nextVersion = tag.replace(/^v(?=\d)/i, '').slice(0, 40);
         if (oldUrl === nextUrl && String(entry.version || '') === nextVersion) continue;
         entry.download_url = nextUrl;
         entry.version = nextVersion;
@@ -403,7 +407,12 @@ const server = http.createServer(async (req, res) => {
         const asset = compatibleAssets.find((item) => String(item.name || '').toLowerCase().replace(/[^a-z0-9]/g, '').includes(repoStem))
           || compatibleAssets.find((item) => /\.zip$/i.test(String(item.name || '')))
           || compatibleAssets.find((item) => /\.dll$/i.test(String(item.name || '')));
-        if (!asset) return reply(res,422,{error:'This GitHub repository has no uploaded .dll or .zip release asset. Publish a compiled mod file in Releases, or enter a direct HTTPS download URL manually.'});
+        const releaseTag = String(release.tag_name || '').trim();
+        const fallbackRef = releaseTag
+          ? 'refs/tags/' + releaseTag.split('/').map(encodeURIComponent).join('/')
+          : 'refs/heads/' + String(repoData.default_branch || 'main').split('/').map(encodeURIComponent).join('/');
+        const sourceArchive = 'https://github.com/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo) + '/archive/' + fallbackRef + '.zip';
+        const downloadUrl = asset && httpsUrl(asset.browser_download_url, true) ? String(asset.browser_download_url) : sourceArchive;
         const topics = Array.isArray(repoData.topics) ? repoData.topics : [];
         const topicText = topics.join(' ').toLowerCase();
         const category = /core|library|framework|dependency/.test(topicText) ? 'Core' : /map|level/.test(topicText) ? 'Maps' : /cosmetic|skin|appearance/.test(topicText) ? 'Cosmetic' : /gameplay|menu|cheat/.test(topicText) ? 'Gameplay' : /utility|tool|helper/.test(topicText) ? 'Utility' : '';
@@ -414,9 +423,9 @@ const server = http.createServer(async (req, res) => {
         return reply(res, 200, {
           name: String(repoData.name || repo).slice(0,90), author: String(repoData.owner && repoData.owner.login || owner).slice(0,90), githubOwnerId: String(repoData.owner && repoData.owner.id || ''), githubOwnerLogin: String(repoData.owner && repoData.owner.login || owner),
           description: String(repoData.description || '').slice(0,1400), version: String(release.tag_name || repoData.default_branch || '1.0.0').replace(/^v(?=\d)/i, '').slice(0,40),
-          downloadUrl: asset && asset.browser_download_url || '', sourceUrl: repoData.html_url || source,
+          downloadUrl, sourceUrl: repoData.html_url || source,
           websiteUrl: httpsUrl(repoData.homepage || '', false) || '', readme: String(readme).slice(0,20000),
-          changelog: String(release.body || '').slice(0,12000), dependencies: [], category,
+          changelog: (String(release.body || '') + (!asset ? '\n\nModHub could not find a compiled .dll/.zip release asset, so this link downloads the GitHub source archive. The desktop app will search inside the ZIP for compiled DLLs; if it contains only source code, publish a compiled DLL or ZIP in GitHub Releases.' : '')).slice(0,12000), dependencies: [], category,
           additionalLinks, topics, stars: Number(repoData.stargazers_count || 0)
         });
       } catch (error) { return reply(res, 502, { error: error instanceof Error ? error.message : 'GitHub import failed.' }); }
