@@ -104,6 +104,15 @@ async function installModArchive(archivePath, gameFolder, pluginDir, modName) {
         if (/\.dll$/i.test(source)) copiedDlls += 1;
         if (/\.cfg$/i.test(source)) copiedConfigs += 1;
       }
+      // Classic BepInEx distributions also ship loader files alongside the
+      // BepInEx directory. Preserve those when the archive wrapper is nested.
+      const distributionRoot = path.dirname(packageDir);
+      const bootstrapPattern = /^(winhttp(?:_x64)?\.dll|version\.dll|doorstop_config\.ini)$/i;
+      for (const source of files.filter(file => path.dirname(file) === distributionRoot && bootstrapPattern.test(path.basename(file)))) {
+        await copyFileSafe(source, path.join(gameFolder, path.basename(source)), gameFolder);
+        copiedFiles += 1;
+        if (/\.dll$/i.test(source)) copiedDlls += 1;
+      }
     } else {
       if (pluginRoots.length) {
         for (const pluginsRoot of pluginRoots) {
