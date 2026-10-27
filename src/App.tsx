@@ -952,6 +952,7 @@ export default function App() {
       {desktop && <button className={'nav ' + (page === 'Configs' ? 'chosen' : '')} onClick={() => { goToPage('Configs'); void loadConfigFiles(); }}>⚙ <span>CFG editor</span></button>}
       <button className={'nav ' + (page === 'Editor' ? 'chosen' : '')} onClick={() => { if (!account) { notify('Sign in with GitHub to add and manage your own mods.'); return; } setEditingId(null); setDraft(blankDraft); goToPage('Editor'); }}>{showAdmin ? '×' : '＋'} <span>Mod editor ↗</span></button>
       {!desktop && <a className="nav install-app-nav" href="https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/releases/latest" target="_blank" rel="noreferrer">↓ <span>Install app</span><b aria-hidden="true">↗</b></a>}
+      <a className="nav github-project-nav" href="https://github.com/dffdf-sv/Monkey-Mod-Manager-v2" target="_blank" rel="noopener noreferrer" title="Open the ModHub source code on GitHub">⌘ <span>ModHub on GitHub</span><b aria-hidden="true">↗</b></a>
       {desktop && <button className={'nav ' + (page === 'Settings' ? 'chosen' : '')} onClick={() => goToPage('Settings')}>⚙ <span>Settings</span></button>}
       <div className="sidebottom">
         <div className="status"><i /><span><b>Mod base</b><small>{loading ? 'Loading catalogue…' : mods.length + ' listed mods'}</small></span></div>
@@ -1115,7 +1116,7 @@ export default function App() {
 
         </>}
 
-        <footer><span><b>MODHUB</b> · Community-maintained releases</span><span>Not affiliated with Another Axiom. Use mods responsibly. ✳</span></footer>
+        <footer><span><b>MODHUB</b> · Community-maintained releases</span><span className="footer-links"><a href="https://github.com/dffdf-sv/Monkey-Mod-Manager-v2" target="_blank" rel="noopener noreferrer">GitHub repository ↗</a><span>Not affiliated with Another Axiom. Use mods responsibly. ✳</span></span></footer>
       </div>
     </main>
 
