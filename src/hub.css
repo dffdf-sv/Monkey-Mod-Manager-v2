@@ -344,3 +344,12 @@ button:disabled{opacity:.55;cursor:wait}
 .product-readme-preview .markdown-body{font-size:12px}
 
 .markdown-table-wrap{max-width:100%;overflow:auto;margin:.8em 0}.markdown-table{border-collapse:collapse;width:100%;font-size:.92em}.markdown-table th,.markdown-table td{padding:8px 10px;border:1px solid var(--line);text-align:left;vertical-align:top}.markdown-table th{background:var(--panel);font-weight:700}
+
+
+/* Official ModHub source repository links */
+.github-project-nav{text-decoration:none}
+.github-project-nav:hover{border-color:var(--accent);color:var(--text);background:color-mix(in srgb,var(--accent) 6%,transparent)}
+footer .footer-links{display:flex;align-items:center;justify-content:flex-end;gap:16px;flex-wrap:wrap}
+footer .footer-links a{color:var(--muted);text-decoration:none}
+footer .footer-links a:hover{color:var(--accent)}
+@media(max-width:800px){footer .footer-links{justify-content:flex-start;gap:8px}}
