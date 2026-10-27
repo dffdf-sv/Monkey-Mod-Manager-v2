@@ -584,8 +584,19 @@ export default function App() {
           notify('Profile loaded to your account. Choose the Gorilla Tag folder in Settings to install its mods.');
           return;
         }
-        const installable = profileModIds.map(id => mods.find(item => item.id === id)).filter((mod): mod is Mod => Boolean(mod));
-        const missing = profileModIds.filter(id => !mods.some(item => item.id === id));
+        const installable = profileModIds.flatMap(id => {
+          const catalogueMod = mods.find(item => item.id === id);
+          if (catalogueMod) return [catalogueMod];
+          const snapshot = (profile.mods || []).find(item => item.id === id);
+          if (!snapshot || !/^https:\/\//i.test(snapshot.downloadUrl)) return [];
+          return [{
+            id: snapshot.id, name: snapshot.name, author: 'Unknown', category: snapshot.category || 'Utility',
+            description: 'Restored from saved profile', version: snapshot.version, downloadUrl: snapshot.downloadUrl,
+            imageUrl: snapshot.imageUrl, dependencies: []
+          } as Mod];
+        });
+        const installableIds = new Set(installable.map(mod => mod.id));
+        const missing = profileModIds.filter(id => !installableIds.has(id));
         if (!installable.length) {
           notify('Profile loaded, but its mods are not in the current catalogue. Refresh the catalogue and try again.');
           return;
