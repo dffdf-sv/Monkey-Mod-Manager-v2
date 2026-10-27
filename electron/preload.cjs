@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('monkeyModManager', {
   getGamePlatform: () => ipcRenderer.invoke('game:get-platform'),
   setGamePlatform: (platform) => ipcRenderer.invoke('game:set-platform', platform),
   toggleInstalledMod: (name) => ipcRenderer.invoke('mods:toggle-installed', name),
+  deleteInstalledMod: (name) => ipcRenderer.invoke('mods:delete-installed', name),
   launchGame: () => ipcRenderer.invoke('game:launch'),
   hasBepInEx: () => ipcRenderer.invoke('bepinex:has-installed'),
   installModFromDisk: () => ipcRenderer.invoke('mods:install-from-disk'),
