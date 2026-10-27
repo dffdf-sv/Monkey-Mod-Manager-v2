@@ -503,7 +503,7 @@ ipcMain.handle('mod:install', async (_event, mod) => {
     const ext = path.extname(finalUrl.pathname).toLowerCase();
     if (['.dll', '.zip'].indexOf(ext) < 0) throw new Error('Only .dll and .zip mod files can be installed by the desktop app.');
     const safeName = path.basename(decodeURIComponent(finalUrl.pathname)).replace(/[^a-zA-Z0-9._-]/g, '_');
-    const tempFile = path.join(app.getPath('temp'), 'monkey-mod-' + Date.now() + '-' + safeName);
+    const tempFile = path.join(app.getPath('temp'), 'modhub-mod-' + Date.now() + '-' + safeName);
     await fs.writeFile(tempFile, buffer);
     try {
       const safeModName = String(mod.name).replace(/[^a-zA-Z0-9 _.-]/g, '').trim().slice(0, 80) || 'Mod';
@@ -517,10 +517,11 @@ ipcMain.handle('mod:install', async (_event, mod) => {
         await writeSettings({ ...latestSettings, installedMods: { ...(latestSettings.installedMods || {}), [String(mod.id)]: String(mod.version) } });
         return { ok: true, path: installedPath, message: mod.name + ' installed to its own folder: ' + pluginDir };
       }
-      await extractZip(tempFile, { dir: pluginDir });
+      const archiveResult = await installModArchive(tempFile, gameFolder, pluginDir, safeModName);
       const latestSettings = await readSettings();
       await writeSettings({ ...latestSettings, installedMods: { ...(latestSettings.installedMods || {}), [String(mod.id)]: String(mod.version) } });
-      return { ok: true, path: pluginDir, message: mod.name + ' ZIP extracted into its own plugin folder: ' + pluginDir };
+      const configNote = archiveResult.copiedConfigs ? ' and merged ' + archiveResult.copiedConfigs + ' CFG file(s) into BepInEx/config' : '';
+      return { ok: true, path: pluginDir, message: mod.name + ' ZIP inspected through nested folders, installed ' + archiveResult.copiedDlls + ' DLL file(s)' + configNote + '.' };
     } finally { await fs.rm(tempFile, { force: true }).catch(() => {}); }
   } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Could not install this mod.' }; }
 });
