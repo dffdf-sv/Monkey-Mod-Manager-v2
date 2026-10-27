@@ -34,14 +34,31 @@ function httpsUrl(value, required = false) {
   if (!value && !required) return '';
   try { const parsed = new URL(value); return parsed.protocol === 'https:' ? parsed.toString() : null; } catch { return null; }
 }
+function normaliseImageUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'https:') return '';
+    // GitHub's normal HTML blob pages are not image files. Convert them to raw image URLs.
+    if (['github.com', 'www.github.com'].includes(url.hostname.toLowerCase())) {
+      const parts = url.pathname.split('/').filter(Boolean);
+      if (parts.length >= 5 && parts[2] === 'blob') {
+        const owner = parts[0], repo = parts[1], ref = parts[3], file = parts.slice(4).join('/');
+        return 'https://raw.githubusercontent.com/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo) + '/' + ref.split('/').map(encodeURIComponent).join('/') + '/' + file.split('/').map(encodeURIComponent).join('/');
+      }
+    }
+    return url.toString();
+  } catch { return ''; }
+}
 function normalise(entry) {
   const name = String(entry.name || '').trim();
   return {
     id: slug(entry.id || name), name, author: String(entry.author || 'Community').trim(),
     category: String(entry.category || 'Utility').trim(), description: String(entry.description || '').trim(),
     version: String(entry.version || '1.0.0').trim(), downloadUrl: String(entry.download_url || entry.downloadUrl || '').trim(),
-    imageUrl: String(entry.image_url || entry.imageUrl || '').trim(), sourceUrl: String(entry.source_url || entry.sourceUrl || '').trim(), websiteUrl: String(entry.website_url || entry.websiteUrl || '').trim(), embedUrl: String(entry.embed_url || entry.embedUrl || '').trim(), requirements: String(entry.requirements || '').trim(), supportedOS: Array.isArray(entry.supported_os || entry.supportedOS) ? (entry.supported_os || entry.supportedOS).map(String) : [], readme: String(entry.readme || '').trim(), changelog: String(entry.changelog || '').trim(), additionalLinks: Array.isArray(entry.additional_links || entry.additionalLinks) ? (entry.additional_links || entry.additionalLinks).map((item) => ({label:String(item.label||''),url:String(item.url||'')})).filter((item) => item.label && httpsUrl(item.url, true)).slice(0,20) : [],
-    dependencies: Array.isArray(entry.dependencies) ? entry.dependencies.map((value) => String(value)) : [], featured: Boolean(entry.featured), galleryUrls: Array.isArray(entry.gallery_urls || entry.galleryUrls) ? (entry.gallery_urls || entry.galleryUrls).map(String) : [], videoUrl: String(entry.video_url || entry.videoUrl || ''), configSettings: Array.isArray(entry.config_settings || entry.configSettings) ? (entry.config_settings || entry.configSettings) : [], ownerId: String(entry.owner_id || entry.ownerId || '')
+    imageUrl: normaliseImageUrl(entry.image_url || entry.imageUrl || ''), sourceUrl: String(entry.source_url || entry.sourceUrl || '').trim(), websiteUrl: String(entry.website_url || entry.websiteUrl || '').trim(), embedUrl: String(entry.embed_url || entry.embedUrl || '').trim(), requirements: String(entry.requirements || '').trim(), supportedOS: Array.isArray(entry.supported_os || entry.supportedOS) ? (entry.supported_os || entry.supportedOS).map(String) : [], readme: String(entry.readme || '').trim(), changelog: String(entry.changelog || '').trim(), additionalLinks: Array.isArray(entry.additional_links || entry.additionalLinks) ? (entry.additional_links || entry.additionalLinks).map((item) => ({label:String(item.label||''),url:String(item.url||'')})).filter((item) => item.label && httpsUrl(item.url, true)).slice(0,20) : [],
+    dependencies: Array.isArray(entry.dependencies) ? entry.dependencies.map((value) => String(value)) : [], featured: Boolean(entry.featured), galleryUrls: Array.isArray(entry.gallery_urls || entry.galleryUrls) ? (entry.gallery_urls || entry.galleryUrls).map(normaliseImageUrl).filter(Boolean) : [], videoUrl: String(entry.video_url || entry.videoUrl || ''), configSettings: Array.isArray(entry.config_settings || entry.configSettings) ? (entry.config_settings || entry.configSettings) : [], ownerId: String(entry.owner_id || entry.ownerId || '')
   };
 }
 function safeEqual(a, b) {
@@ -578,7 +595,7 @@ const server = http.createServer(async (req, res) => {
         const name = String(body.name || '').trim(); const author = String(body.author || '').trim();
         const version = String(body.version || '').trim(); const description = String(body.description || '').trim();
         const category = String(body.category || 'Utility').trim();
-        const downloadUrl = httpsUrl(body.downloadUrl, true); const imageUrl = httpsUrl(body.imageUrl || '', false); const sourceUrl = httpsUrl(body.sourceUrl || '', false); const videoUrl = httpsUrl(body.videoUrl || '', false);
+        const downloadUrl = httpsUrl(body.downloadUrl, true); const imageUrl = body.imageUrl ? httpsUrl(normaliseImageUrl(body.imageUrl), false) : ''; const sourceUrl = httpsUrl(body.sourceUrl || '', false); const videoUrl = httpsUrl(body.videoUrl || '', false);
         if (!name || !author || !version || !description || !downloadUrl || imageUrl === null || sourceUrl === null || videoUrl === null) return reply(res, 400, { error: 'Name, author, version, description and HTTPS download URL are required. Image/source URLs must also be HTTPS.' });
         if (name.length > 90 || description.length > 1400 || author.length > 90 || version.length > 40) return reply(res, 400, { error: 'One or more fields are too long.' });
         const id = slug(name);
@@ -597,7 +614,7 @@ const server = http.createServer(async (req, res) => {
           if (!ownerResponse.ok || !ownerData.owner || !ownerData.owner.id || ownerData.private) return reply(res, 400, { error: 'Could not verify the public GitHub repository owner.' });
           ownerId = String(ownerData.owner.id);
         }
-        const entry = { name, version, author, description, category, download_url: downloadUrl, image_url: imageUrl || '', gallery_urls: Array.isArray(body.galleryUrls) ? body.galleryUrls.map((value) => httpsUrl(value, true)).filter(Boolean).slice(0, 8) : [], video_url: videoUrl || '', source_url: sourceUrl || '', website_url:websiteUrl||'',embed_url:embedUrl||'',requirements:String(body.requirements||'').slice(0,500),supported_os:Array.isArray(body.supportedOS)?body.supportedOS.map(String).slice(0,12):[],readme:String(body.readme||'').slice(0,12000),changelog:String(body.changelog||'').slice(0,6000),additional_links:additionalLinks, dependencies: deps.map((item) => String(item).trim()).filter(Boolean).slice(0, 20), featured: false, owner_id: ownerId };
+        const entry = { name, version, author, description, category, download_url: downloadUrl, image_url: imageUrl || '', gallery_urls: Array.isArray(body.galleryUrls) ? body.galleryUrls.map((value) => httpsUrl(normaliseImageUrl(value), true)).filter(Boolean).slice(0, 8) : [], video_url: videoUrl || '', source_url: sourceUrl || '', website_url:websiteUrl||'',embed_url:embedUrl||'',requirements:String(body.requirements||'').slice(0,500),supported_os:Array.isArray(body.supportedOS)?body.supportedOS.map(String).slice(0,12):[],readme:String(body.readme||'').slice(0,12000),changelog:String(body.changelog||'').slice(0,6000),additional_links:additionalLinks, dependencies: deps.map((item) => String(item).trim()).filter(Boolean).slice(0, 20), featured: false, owner_id: ownerId };
         current.list.push(entry);
         try { await saveGithubList(current.list, current.sha, 'Add ' + name + ' to mod hub'); }
         catch (error) { return reply(res, 502, { error: error instanceof Error ? error.message : 'Could not save mod to GitHub.' }); }
