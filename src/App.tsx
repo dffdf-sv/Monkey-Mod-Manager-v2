@@ -426,6 +426,7 @@ export default function App() {
 
   const saveAccountData = async (next: typeof accountData, successMessage = 'Saved to your account.') => {
     if (!account) { notify('Sign in with GitHub to save data to your account.'); return false; }
+    if (accountWriteInProgress.current) { notify('A cloud save is already in progress. Wait for it to finish, then try again.'); return false; }
     const userId = account.id;
     if (activeAccountId.current !== userId || accountDataLoadedFor !== userId) {
       notify('Your private cloud save is still loading. Use Refresh account and try again.');
@@ -571,6 +572,7 @@ export default function App() {
     }
   };
   const toggleSaved = (mod: Mod) => {
+    if (account && accountWriteInProgress.current) { notify('A cloud save is in progress. Please wait before changing your saved list again.'); return; }
     const adding = !saved.includes(mod.id);
     const nextSaved = adding ? [...saved, mod.id] : saved.filter((id) => id !== mod.id);
     setSaved(nextSaved);
@@ -1002,7 +1004,7 @@ export default function App() {
             </div>
             <div className="admin-manage">
               <div className="admin-manage-heading"><h3>Your profiles</h3><span>{accountData.profiles.length} saved</span></div>
-              {accountData.profiles.map(profile=><div className="profile-card" key={profile.id}><div className="admin-mod-row"><div><b>{profile.name}</b><small>{new Date(profile.createdAt).toLocaleString()} · {Object.keys(profile.installedMods).length} installed mods · {Object.keys(profile.configs).length} configs</small></div><div className="admin-mod-actions"><button type="button" className="details" onClick={()=>setExpandedProfileId(current=>current===profile.id?null:profile.id)}>{expandedProfileId===profile.id?'Hide CFGs':'View CFGs'}</button><button type="button" className="details" onClick={()=>void restoreProfile(profile)}>Load</button><button type="button" className="delete-mod" disabled={accountDataBusy} onClick={()=>void saveAccountData({...accountData,profiles:accountData.profiles.filter(item=>item.id!==profile.id)},'Profile removed.')}>Delete</button></div></div>{expandedProfileId===profile.id && <div className="profile-cfg-list">{Object.entries(profile.configs||{}).map(([name,content])=><div className="profile-cfg-row" key={name}><div><b>{name}</b><small>{content.length.toLocaleString()} characters · saved in this profile</small></div><div className="admin-mod-actions"><button type="button" className="details" onClick={()=>loadCloudConfig(name,content)}>Open CFG</button>{desktop && <button type="button" className="primary" disabled={configBusy||!gameFolder} onClick={()=>void installCloudConfigToGame(name,content)}>Load to game</button>}</div></div>)}{!Object.keys(profile.configs||{}).length&&<p className="form-help">This profile has no CFG files. Import a .cfg separately or save one from the CFG editor before saving the profile.</p>}</div>}</div>)}
+              {accountData.profiles.map(profile=><div className="profile-card" key={profile.id}><div className="admin-mod-row"><div><b>{profile.name}</b><small>{new Date(profile.createdAt).toLocaleString()} · {Object.keys(profile.installedMods).length} installed mods · {Object.keys(profile.configs).length} configs</small></div><div className="admin-mod-actions"><button type="button" className="details" onClick={()=>setExpandedProfileId(current=>current===profile.id?null:profile.id)}>{expandedProfileId===profile.id?'Hide CFGs':'View CFGs'}</button><button type="button" className="details" onClick={()=>void restoreProfile(profile)} disabled={accountDataBusy}>Load</button><button type="button" className="delete-mod" disabled={accountDataBusy} onClick={()=>void saveAccountData({...accountData,profiles:accountData.profiles.filter(item=>item.id!==profile.id)},'Profile removed.')}>Delete</button></div></div>{expandedProfileId===profile.id && <div className="profile-cfg-list">{Object.entries(profile.configs||{}).map(([name,content])=><div className="profile-cfg-row" key={name}><div><b>{name}</b><small>{content.length.toLocaleString()} characters · saved in this profile</small></div><div className="admin-mod-actions"><button type="button" className="details" onClick={()=>loadCloudConfig(name,content)}>Open CFG</button>{desktop && <button type="button" className="primary" disabled={configBusy||!gameFolder} onClick={()=>void installCloudConfigToGame(name,content)}>Load to game</button>}</div></div>)}{!Object.keys(profile.configs||{}).length&&<p className="form-help">This profile has no CFG files. Import a .cfg separately or save one from the CFG editor before saving the profile.</p>}</div>}</div>)}
               {!accountData.profiles.length && <p className="form-help">No profiles yet. Create one above to save a snapshot to your account.</p>}
             </div>
             <div className="admin-manage">
