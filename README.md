@@ -4,7 +4,7 @@
 
 **Manage Gorilla Tag PC mods from one desktop app.** Browse the mod catalogue, install supported mod files into your Gorilla Tag folder, manage installed mods, edit configuration files, and check for app updates.
 
-> ModHub is an independent community project. It is not affiliated with or endorsed by Another Axiom or Gorilla Tag.
+> ModHub is an independent community project. It is not affiliated with or endorsed by Another Axiom or Gorilla Tag. Mods from [gorillatag modbase](https://github.com/dffdf-sv/GORILA-TAG-MODBASE)
 
 ## Download
 
