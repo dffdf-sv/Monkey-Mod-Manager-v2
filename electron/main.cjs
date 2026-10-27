@@ -444,14 +444,30 @@ ipcMain.handle('config:save', async (_event, payload) => {
 });
 ipcMain.handle('mods:get-detected', async () => {
   const settings = await readSettings(); if (!settings.gameFolder) return [];
-  const plugins = path.join(path.resolve(settings.gameFolder), 'BepInEx', 'plugins');
+  const plugins = path.resolve(path.join(path.resolve(settings.gameFolder), 'BepInEx', 'plugins'));
   const entries = await fs.readdir(plugins, { withFileTypes: true }).catch(() => []);
   const detected = [];
+  const collectDlls = async (directory, depth = 0) => {
+    if (depth > 8) return [];
+    const found = [];
+    const nested = await fs.readdir(directory, { withFileTypes: true }).catch(() => []);
+    for (const item of nested) {
+      const full = path.resolve(directory, item.name);
+      if (!full.startsWith(plugins + path.sep)) continue;
+      if (item.isDirectory()) found.push(...await collectDlls(full, depth + 1));
+      else if (item.isFile() && /\.dll(?:\.disabled)?$/i.test(item.name)) found.push(full);
+    }
+    return found;
+  };
   for (const entry of entries) {
-    const full = path.join(plugins, entry.name);
+    const full = path.resolve(plugins, entry.name);
+    if (!full.startsWith(plugins + path.sep)) continue;
     if (entry.isDirectory()) {
-      const nested = await fs.readdir(full, { withFileTypes: true }).catch(() => []);
-      if (nested.some(item => item.isFile() && /\.dll(?:\.disabled)?$/i.test(item.name))) detected.push(entry.name);
+      const dlls = await collectDlls(full);
+      if (dlls.length) {
+        const allDisabled = dlls.every(file => file.toLowerCase().endsWith('.dll.disabled'));
+        detected.push(entry.name + (allDisabled ? '.disabled' : ''));
+      }
     } else if (entry.isFile() && /\.dll(?:\.disabled)?$/i.test(entry.name)) detected.push(entry.name);
   }
   return [...new Set(detected)];
