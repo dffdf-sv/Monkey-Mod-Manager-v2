@@ -103,6 +103,60 @@ async function saveGithubList(list, sha, message) {
     throw new Error('GitHub save failed (' + response.status + '): ' + (detail.message || 'Check repository write permission.'));
   }
 }
+let releaseRefreshBusy = false;
+async function refreshGithubReleaseLinks() {
+  if (releaseRefreshBusy || !process.env.GITHUB_TOKEN) return { checked: 0, updated: 0 };
+  releaseRefreshBusy = true;
+  let checked = 0, updated = 0;
+  try {
+    const current = await readGithubContents();
+    if (!Array.isArray(current.list)) return { checked, updated };
+    const next = current.list.map((entry) => ({ ...entry }));
+    const apiHeaders = { authorization: 'Bearer ' + process.env.GITHUB_TOKEN, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'ModHub/2.1' };
+    for (const entry of next.slice(0, 150)) {
+      const source = String(entry.source_url || entry.sourceUrl || '');
+      let parsed;
+      try { parsed = new URL(source); } catch { continue; }
+      if (parsed.protocol !== 'https:' || !['github.com','www.github.com'].includes(parsed.hostname.toLowerCase())) continue;
+      const parts = parsed.pathname.split('/').filter(Boolean);
+      if (parts.length < 2) continue;
+      const owner = parts[0], name = parts[1].replace(/\.git$/i, '');
+      if (!/^[A-Za-z0-9_.-]{1,100}$/.test(owner) || !/^[A-Za-z0-9_.-]{1,100}$/.test(name)) continue;
+      checked += 1;
+      try {
+        const response = await fetch('https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(name) + '/releases/latest', { headers: apiHeaders, signal: AbortSignal.timeout(10000) });
+        if (!response.ok) continue;
+        const release = await response.json().catch(() => ({}));
+        const assets = Array.isArray(release.assets) ? release.assets : [];
+        const candidates = assets.filter((asset) => /\.(dll|zip)$/i.test(String(asset.name || '')) && !/(symbols?|debug|source|test)/i.test(String(asset.name || '')));
+        if (!candidates.length || !release.tag_name) continue;
+        const oldUrl = String(entry.download_url || entry.downloadUrl || '');
+        let oldAssetName = '';
+        try { oldAssetName = path.basename(new URL(oldUrl).pathname); } catch {}
+        const asset = candidates.find((item) => String(item.name).toLowerCase() === oldAssetName.toLowerCase())
+          || candidates.find((item) => /\.dll$/i.test(String(item.name || '')))
+          || candidates.find((item) => /\.zip$/i.test(String(item.name || '')));
+        if (!asset || !httpsUrl(asset.browser_download_url, true)) continue;
+        const nextUrl = String(asset.browser_download_url);
+        const nextVersion = String(release.tag_name).slice(0, 40);
+        if (oldUrl === nextUrl && String(entry.version || '') === nextVersion) continue;
+        entry.download_url = nextUrl;
+        entry.version = nextVersion;
+        if (typeof release.body === 'string' && release.body.trim()) entry.changelog = release.body.slice(0, 6000);
+        updated += 1;
+      } catch { /* A deleted or rate-limited repository must not block other mods. */ }
+    }
+    if (updated > 0) await saveGithubList(next, current.sha, 'Refresh GitHub release links for ' + updated + ' ModHub mod(s)');
+    console.log('ModHub weekly GitHub release check: ' + checked + ' repositories checked, ' + updated + ' link(s) updated.');
+    return { checked, updated };
+  } catch (error) {
+    console.error('ModHub GitHub release check failed:', error instanceof Error ? error.message : error);
+    return { checked, updated };
+  } finally {
+    releaseRefreshBusy = false;
+  }
+}
+
 function adminAllowed(req) {
   if (!process.env.ADMIN_PASSWORD) return { ok: false, status: 503, error: 'Set ADMIN_PASSWORD in the Render environment first.' };
   if (!safeEqual(req.headers['x-admin-password'], process.env.ADMIN_PASSWORD)) return { ok: false, status: 401, error: 'Admin password was not accepted.' };
@@ -141,7 +195,17 @@ async function accountGists(userId) {
       throw new Error('Could not access private account storage (' + response.status + '): ' + detail + ' Ensure GITHUB_TOKEN has Gists: write permission (or gist scope for a classic PAT).');
     }
     const found = data.find((gist) => [marker, legacyMarker].includes(String(gist.description || '')));
-    if (found) return found;
+    if (found) {
+      // Gist index results may omit file content. Fetch the full Gist document
+      // before parsing so a refresh cannot mistake a valid save for an empty one.
+      const detailResponse = await fetch('https://api.github.com/gists/' + encodeURIComponent(found.id), {
+        headers: { authorization: 'Bearer ' + token, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'ModHub' },
+        signal: AbortSignal.timeout(12000)
+      });
+      const detail = await detailResponse.json().catch(() => ({}));
+      if (!detailResponse.ok || !detail.files) throw new Error('Could not read the private cloud save (' + detailResponse.status + ').');
+      return detail;
+    }
     if (data.length < 100) return null;
   }
   throw new Error('Could not find the cloud save in the first 2,000 Gists. Check which GitHub account owns GITHUB_TOKEN.');
@@ -319,7 +383,8 @@ const server = http.createServer(async (req, res) => {
         const releaseResponse = await fetch('https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo) + '/releases/latest', { headers: apiHeaders, signal: AbortSignal.timeout(12000) });
         const release = releaseResponse.ok ? await releaseResponse.json().catch(() => ({})) : {};
         const assets = Array.isArray(release.assets) ? release.assets : [];
-        const asset = assets.find((item) => /\.(dll|zip)$/i.test(String(item.name || '')));
+        const compatibleAssets = assets.filter((item) => /\.(dll|zip)$/i.test(String(item.name || '')) && !/(symbols?|debug|source|test)/i.test(String(item.name || '')));
+        const asset = compatibleAssets.find((item) => /\.dll$/i.test(String(item.name || ''))) || compatibleAssets.find((item) => /\.zip$/i.test(String(item.name || '')));
         const topics = Array.isArray(repoData.topics) ? repoData.topics : [];
         const topicText = topics.join(' ').toLowerCase();
         const category = /core|library|framework|dependency/.test(topicText) ? 'Core' : /map|level/.test(topicText) ? 'Maps' : /cosmetic|skin|appearance/.test(topicText) ? 'Cosmetic' : /gameplay|menu|cheat/.test(topicText) ? 'Gameplay' : /utility|tool|helper/.test(topicText) ? 'Utility' : '';
@@ -338,52 +403,87 @@ const server = http.createServer(async (req, res) => {
       } catch (error) { return reply(res, 502, { error: error instanceof Error ? error.message : 'GitHub import failed.' }); }
     }
     if (url.pathname.startsWith('/api/mod-feedback/')) {
-      const match=url.pathname.match(/^\/api\/mod-feedback\/([^/]+)(?:\/(vote|comments|rating))?$/);
-      if(!match)return reply(res,404,{error:'Feedback route not found.'});
-      let modId; try{modId=decodeURIComponent(match[1]);}catch{return reply(res,400,{error:'Invalid mod ID.'});}
-      if(!modId||modId.length>120)return reply(res,400,{error:'Invalid mod ID.'});
-      const user=sessionFor(req);
-      try{
-        const file=await readFeedbackFile();
-        const item=file.data[modId]&&typeof file.data[modId]==='object'?file.data[modId]:{votes:{},comments:[]};
-        item.votes=item.votes&&typeof item.votes==='object'?item.votes:{};
-        item.ratings=item.ratings&&typeof item.ratings==='object'?item.ratings:{};
-        item.comments=Array.isArray(item.comments)?item.comments:[];
-        if(req.method==='GET'&&!match[2]){
-          const votes=Object.values(item.votes).map(Number);
-          const ratings=Object.values(item.ratings).map(Number).filter(v=>Number.isInteger(v)&&v>=1&&v<=5); return reply(res,200,{upvotes:votes.filter(v=>v===1).length,downvotes:votes.filter(v=>v===-1).length,myVote:user?Number(item.votes[user.id]||0):0,ratingAverage:ratings.length?Math.round((ratings.reduce((sum,v)=>sum+v,0)/ratings.length)*10)/10:0,ratingCount:ratings.length,myRating:user?Number(item.ratings[user.id]||0):0,comments:item.comments.slice(-100).reverse()});
+      const match = url.pathname.match(/^\/api\/mod-feedback\/([^/]+)(?:\/(vote|comments|rating)(?:\/([^/]+)(?:\/(vote|rating))?)?)?$/);
+      if (!match) return reply(res,404,{error:'Feedback route not found.'});
+      let modId; try { modId = decodeURIComponent(match[1]); } catch { return reply(res,400,{error:'Invalid mod ID.'}); }
+      if (!modId || modId.length > 120) return reply(res,400,{error:'Invalid mod ID.'});
+      const action = match[2] || '';
+      let commentId = '';
+      try { commentId = match[3] ? decodeURIComponent(match[3]) : ''; } catch { return reply(res,400,{error:'Invalid review ID.'}); }
+      const reviewAction = match[4] || '';
+      const user = sessionFor(req);
+      const publicComment = (comment, viewer) => {
+        const votes = comment.votes && typeof comment.votes === 'object' ? comment.votes : {};
+        const ratings = comment.ratings && typeof comment.ratings === 'object' ? comment.ratings : {};
+        const numbers = Object.values(ratings).map(Number).filter(value => Number.isInteger(value) && value >= 1 && value <= 5);
+        const { votes: _votes, ratings: _ratings, userId: _userId, ...safe } = comment;
+        return { ...safe, upvotes:Object.values(votes).filter(value => Number(value) === 1).length, downvotes:Object.values(votes).filter(value => Number(value) === -1).length,
+          myVote:viewer ? Number(votes[viewer.id] || 0) : 0, ratingAverage:numbers.length ? Math.round(numbers.reduce((sum,value)=>sum+value,0)/numbers.length*10)/10 : 0,
+          ratingCount:numbers.length, myRating:viewer ? Number(ratings[viewer.id] || 0) : 0 };
+      };
+      try {
+        const file = await readFeedbackFile();
+        const item = file.data[modId] && typeof file.data[modId] === 'object' ? file.data[modId] : {votes:{},ratings:{},comments:[]};
+        item.votes = item.votes && typeof item.votes === 'object' ? item.votes : {};
+        item.ratings = item.ratings && typeof item.ratings === 'object' ? item.ratings : {};
+        item.comments = Array.isArray(item.comments) ? item.comments : [];
+        if (req.method === 'GET' && !action) {
+          const votes = Object.values(item.votes).map(Number);
+          const ratings = Object.values(item.ratings).map(Number).filter(value=>Number.isInteger(value)&&value>=1&&value<=5);
+          return reply(res,200,{upvotes:votes.filter(value=>value===1).length,downvotes:votes.filter(value=>value===-1).length,myVote:user?Number(item.votes[user.id]||0):0,
+            ratingAverage:ratings.length?Math.round(ratings.reduce((sum,value)=>sum+value,0)/ratings.length*10)/10:0,ratingCount:ratings.length,myRating:user?Number(item.ratings[user.id]||0):0,
+            comments:item.comments.slice(-100).reverse().map(comment=>publicComment(comment,user))});
         }
-        if(!user)return reply(res,401,{error:'Sign in with GitHub to vote or comment.'});
-        if(req.method==='POST'&&match[2]==='vote'){
-          if(!checkRate(req))return reply(res,429,{error:'Too many votes. Wait a minute.'});
+        if (!user) return reply(res,401,{error:'Sign in with GitHub to vote, rate, or comment.'});
+        if (action === 'comments' && commentId && reviewAction && req.method === 'POST') {
+          if (!checkRate(req)) return reply(res,429,{error:'Too many review reactions. Wait a minute.'});
+          const comment = item.comments.find(value=>String(value.id)===commentId);
+          if (!comment) return reply(res,404,{error:'Review not found.'});
+          if (!comment.votes || typeof comment.votes !== 'object') comment.votes = {};
+          if (!comment.ratings || typeof comment.ratings !== 'object') comment.ratings = {};
+          const body = await readBody(req,5000);
+          if (reviewAction === 'vote') {
+            const vote = Number(body.vote);
+            if (![-1,0,1].includes(vote)) return reply(res,400,{error:'Review vote must be helpful, not helpful, or cleared.'});
+            if (vote === 0) delete comment.votes[user.id]; else comment.votes[user.id] = vote;
+          } else {
+            const rating = Number(body.rating);
+            if (!Number.isInteger(rating) || rating < 0 || rating > 5) return reply(res,400,{error:'Review rating must be 0 (remove) or a whole number from 1 to 5.'});
+            if (rating === 0) delete comment.ratings[user.id]; else comment.ratings[user.id] = rating;
+          }
+          file.data[modId] = item;
+          await saveFeedbackFile(file.data,file.sha,'React to review for '+modId);
+          return reply(res,200,{comment:publicComment(comment,user)});
+        }
+        if (req.method === 'POST' && action === 'vote' && !commentId) {
+          if (!checkRate(req)) return reply(res,429,{error:'Too many votes. Wait a minute.'});
           const body=await readBody(req,5000); const vote=Number(body.vote);
-          if(![-1,0,1].includes(vote))return reply(res,400,{error:'Vote must be helpful, not helpful, or cleared.'});
-          if(vote===0)delete item.votes[user.id];else item.votes[user.id]=vote;
-          file.data[modId]=item;await saveFeedbackFile(file.data,file.sha,'Update community vote for '+modId);
+          if(![-1,0,1].includes(vote)) return reply(res,400,{error:'Vote must be helpful, not helpful, or cleared.'});
+          if(vote===0) delete item.votes[user.id]; else item.votes[user.id]=vote;
+          file.data[modId]=item; await saveFeedbackFile(file.data,file.sha,'Update community vote for '+modId);
           const votes=Object.values(item.votes).map(Number);
-          return reply(res,200,{upvotes:votes.filter(v=>v===1).length,downvotes:votes.filter(v=>v===-1).length,myVote:vote});
+          return reply(res,200,{upvotes:votes.filter(value=>value===1).length,downvotes:votes.filter(value=>value===-1).length,myVote:vote});
         }
-        if(req.method==='POST'&&match[2]==='rating'){
-          if(!checkRate(req))return reply(res,429,{error:'Too many ratings. Wait a minute.'});
+        if (req.method === 'POST' && action === 'rating' && !commentId) {
+          if (!checkRate(req)) return reply(res,429,{error:'Too many ratings. Wait a minute.'});
           const body=await readBody(req,5000);const rating=Number(body.rating);
           if(!Number.isInteger(rating)||rating<0||rating>5)return reply(res,400,{error:'Rating must be 0 (remove) or a whole number from 1 to 5.'});
           if(rating===0)delete item.ratings[user.id];else item.ratings[user.id]=rating;
-          file.data[modId]=item;
-          await saveFeedbackFile(file.data,file.sha,(rating===0?'Remove rating for ':'Rate mod ')+modId);
-          const ratings=Object.values(item.ratings).map(Number).filter(v=>Number.isInteger(v)&&v>=1&&v<=5);
-          return reply(res,200,{ratingAverage:ratings.length?Math.round((ratings.reduce((sum,v)=>sum+v,0)/ratings.length)*10)/10:0,ratingCount:ratings.length,myRating:rating===0?0:rating});
+          file.data[modId]=item;await saveFeedbackFile(file.data,file.sha,(rating===0?'Remove rating for ':'Rate mod ')+modId);
+          const ratings=Object.values(item.ratings).map(Number).filter(value=>Number.isInteger(value)&&value>=1&&value<=5);
+          return reply(res,200,{ratingAverage:ratings.length?Math.round(ratings.reduce((sum,value)=>sum+value,0)/ratings.length*10)/10:0,ratingCount:ratings.length,myRating:rating===0?0:rating});
         }
-        if(req.method==='POST'&&match[2]==='comments'){
-          if(!checkRate(req))return reply(res,429,{error:'Too many comments. Wait a minute.'});
+        if (req.method === 'POST' && action === 'comments' && !commentId) {
+          if (!checkRate(req)) return reply(res,429,{error:'Too many comments. Wait a minute.'});
           const body=await readBody(req,10000);const comment=String(body.body||'').trim();
           if(!comment||comment.length>1000)return reply(res,400,{error:'Comment must be between 1 and 1,000 characters.'});
-          item.comments.push({id:crypto.randomUUID(),userId:user.id,login:String(user.login||'Community member').slice(0,80),body:comment,createdAt:new Date().toISOString()});
+          item.comments.push({id:crypto.randomUUID(),userId:user.id,login:String(user.login||'Community member').slice(0,80),body:comment,createdAt:new Date().toISOString(),votes:{},ratings:{}});
           item.comments=item.comments.slice(-100);
-          file.data[modId]=item;await saveFeedbackFile(file.data,file.sha,'Add community comment for '+modId);
-          return reply(res,201,{comments:item.comments.slice().reverse()});
+          file.data[modId]=item;await saveFeedbackFile(file.data,file.sha,'Add community review for '+modId);
+          return reply(res,201,{comments:item.comments.slice().reverse().map(comment=>publicComment(comment,user))});
         }
         return reply(res,405,{error:'Method not allowed.'});
-      }catch(error){return reply(res,502,{error:error instanceof Error?error.message:'Community feedback storage failed.'});}
+      } catch(error) { return reply(res,502,{error:error instanceof Error?error.message:'Community feedback storage failed.'}); }
     }
     if (url.pathname === '/api/mods' && req.method === 'GET') {
       try { return reply(res, 200, { mods: await getMods(), source: MOD_REPO, sourceFile: MOD_FILE }); }
@@ -526,4 +626,10 @@ const server = http.createServer(async (req, res) => {
     else res.destroy();
   }
 });
-server.listen(PORT, '0.0.0.0', () => console.log('ModHub listening on port ' + PORT + (API_ONLY ? ' (API only)' : '')));
+server.listen(PORT, '0.0.0.0', () => {
+  console.log('ModHub listening on port ' + PORT + (API_ONLY ? ' (API only)' : ''));
+  const startupRefresh = setTimeout(() => { void refreshGithubReleaseLinks(); }, 45000);
+  if (typeof startupRefresh.unref === 'function') startupRefresh.unref();
+  const weeklyRefresh = setInterval(() => { void refreshGithubReleaseLinks(); }, 7 * 24 * 60 * 60 * 1000);
+  if (typeof weeklyRefresh.unref === 'function') weeklyRefresh.unref();
+});
