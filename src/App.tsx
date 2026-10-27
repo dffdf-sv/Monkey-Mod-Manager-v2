@@ -566,9 +566,15 @@ export default function App() {
         }
       } catch { /* Keep cloud/selected CFGs if the local game folder is unavailable. */ }
     }
-    const profileModIds = [...new Set([...saved, ...Object.keys(installedMods)])];
+    let profileInstalledMods = { ...installedMods };
+    if (desktop && window.monkeyModManager && gameFolder) {
+      try { profileInstalledMods = await window.monkeyModManager.getInstalledMods(); }
+      catch { /* Keep the current state snapshot if local detection is unavailable. */ }
+    }
+    const profileSavedMods = [...new Set(saved)];
+    const profileModIds = [...new Set([...profileSavedMods, ...Object.keys(profileInstalledMods)])];
     const profileMods = profileModIds.flatMap(id => { const mod = mods.find(item => item.id === id); return mod ? [{id:mod.id,name:mod.name,version:mod.version,downloadUrl:mod.downloadUrl,imageUrl:mod.imageUrl,category:mod.category}] : []; });
-    const profile = {id:crypto.randomUUID(),name,createdAt:new Date().toISOString(),installedMods:{...installedMods},configs:profileConfigs,savedMods:[...saved],mods:profileMods};
+    const profile = {id:crypto.randomUUID(),name,createdAt:new Date().toISOString(),installedMods:profileInstalledMods,configs:profileConfigs,savedMods:profileSavedMods,mods:profileMods};
     const next = {...accountData,profiles:[profile,...accountData.profiles].slice(0,50),savedMods:[...new Set([...accountData.savedMods,...saved])],installedMods:{...accountData.installedMods,...installedMods}};
     if (await saveAccountData(next, 'Profile "' + name + '" saved to your account.')) setProfileName('');
   };
@@ -603,9 +609,17 @@ export default function App() {
       setDetectedMods(await window.monkeyModManager!.getDetectedMods());
     }
 
-    const next = {...accountData,savedMods:[...new Set([...(profile.savedMods || []), ...legacyModIds])],installedMods:{...(profile.installedMods || {})},configs:{...(profile.configs || {})}};
+    // Loading a profile should merge its CFG files into cloud storage, not erase
+    // unrelated CFGs that the user has separately uploaded.
+    const profileSavedMods = [...new Set([...(profile.savedMods || []), ...legacyModIds])];
+    const next = {
+      ...accountData,
+      savedMods: profileSavedMods,
+      installedMods: { ...(profile.installedMods || {}) },
+      configs: { ...accountData.configs, ...(profile.configs || {}) }
+    };
     if (await saveAccountData(next, 'Profile loaded into your account.')) {
-      setSaved(profile.savedMods || []);
+      setSaved(profileSavedMods);
       const firstConfig = Object.entries(profile.configs || {})[0];
       if (firstConfig && desktop) { setPage('Configs'); await loadConfigFiles(); setSelectedConfig(firstConfig[0]); setConfigText(firstConfig[1]); }
       if (desktop && profileModIds.length) {
