@@ -422,7 +422,7 @@ const server = http.createServer(async (req, res) => {
         if (repoData.html_url && repoData.has_wiki) additionalLinks.push({ label: 'Wiki', url: 'https://github.com/' + owner + '/' + repo + '/wiki' });
         return reply(res, 200, {
           name: String(repoData.name || repo).slice(0,90), author: String(repoData.owner && repoData.owner.login || owner).slice(0,90), githubOwnerId: String(repoData.owner && repoData.owner.id || ''), githubOwnerLogin: String(repoData.owner && repoData.owner.login || owner),
-          description: String(repoData.description || '').slice(0,1400), version: String(release.tag_name || repoData.default_branch || '1.0.0').replace(/^v(?=\d)/i, '').slice(0,40),
+          description: String(repoData.description || '').slice(0,1400), version: String(release.tag_name || '1.0.0').replace(/^v(?=\d)/i, '').slice(0,40),
           downloadUrl, sourceUrl: repoData.html_url || source,
           websiteUrl: httpsUrl(repoData.homepage || '', false) || '', readme: String(readme).slice(0,20000),
           changelog: (String(release.body || '') + (!asset ? '\n\nModHub could not find a compiled .dll/.zip release asset, so this link downloads the GitHub source archive. The desktop app will search inside the ZIP for compiled DLLs; if it contains only source code, publish a compiled DLL or ZIP in GitHub Releases.' : '')).slice(0,12000), dependencies: [], category,
