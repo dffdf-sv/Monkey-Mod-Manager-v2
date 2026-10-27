@@ -235,7 +235,7 @@ async function readAccountData(userId) {
   const gist = await accountGists(userId);
   if (!gist) return { profiles: [], savedMods: [], configs: {}, installedMods: {} };
   const files = gist.files && typeof gist.files === 'object' ? gist.files : {};
-  const record = files['monkey-mod-manager-account.json'] || files['modhub-account.json'] ||
+  const record = files['modhub-account.json'] || files['monkey-mod-manager-account.json'] ||
     Object.entries(files).find(([name]) => /(?:modhub|monkey.*manager).*account.*\.json$/i.test(name))?.[1];
   // An existing Gist with missing contents is a read error, never an empty save:
   // returning {} here caused the UI to make saved profiles appear to vanish.
@@ -269,10 +269,16 @@ async function writeAccountData(userId, value) {
   if (Buffer.byteLength(content) > 900000) throw new Error('Account data is too large (900 KB limit).');
   const existing = await accountGists(userId);
   const marker = 'ModHub account data for user ' + userId;
+  // Keep updating whichever file already stores this account, while making new saves use the ModHub filename.
+  const accountFilename = existing && existing.files && existing.files['modhub-account.json']
+    ? 'modhub-account.json'
+    : existing && existing.files && existing.files['monkey-mod-manager-account.json']
+      ? 'monkey-mod-manager-account.json'
+      : 'modhub-account.json';
   const response = await fetch(existing ? 'https://api.github.com/gists/' + existing.id : 'https://api.github.com/gists', {
     method: existing ? 'PATCH' : 'POST',
     headers: { authorization: 'Bearer ' + token, accept: 'application/vnd.github+json', 'content-type': 'application/json', 'x-github-api-version': '2022-11-28', 'user-agent': 'ModHub' },
-    body: JSON.stringify({ description: marker, public: false, files: { 'monkey-mod-manager-account.json': { content } } }),
+    body: JSON.stringify({ description: marker, public: false, files: { [accountFilename]: { content } } }),
     signal: AbortSignal.timeout(15000)
   });
   const result = await response.json().catch(() => ({}));
