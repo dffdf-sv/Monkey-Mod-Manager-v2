@@ -254,6 +254,39 @@ ipcMain.handle('game:launch', async () => {
     return { ok:true, message:'Launching Gorilla Tag…' };
   } catch (error) { return { ok:false, message:error instanceof Error ? error.message : 'Could not launch Gorilla Tag.' }; }
 });
+ipcMain.handle('mods:remove-profile-mods', async (_event, requestedMods) => {
+  try {
+    if (!Array.isArray(requestedMods) || requestedMods.length > 500) throw new Error('Invalid profile mod list.');
+    const settings = await readSettings();
+    if (!settings.gameFolder) throw new Error('Choose your Gorilla Tag game folder first.');
+    const root = path.resolve(settings.gameFolder);
+    const plugins = path.resolve(root, 'BepInEx', 'plugins');
+    if (!plugins.startsWith(root + path.sep)) throw new Error('Invalid plugins folder.');
+    const entries = await fs.readdir(plugins, { withFileTypes: true }).catch(() => []);
+    const installedMods = { ...(settings.installedMods || {}) };
+    let removed = 0;
+    for (const item of requestedMods) {
+      if (!item || typeof item.id !== 'string' || item.id.length > 180 ||
+          typeof item.name !== 'string' || !item.name.trim() || item.name.length > 180 ||
+          item.name.includes('..') || item.name.includes('/') || item.name.includes('\\\\')) {
+        throw new Error('Invalid managed mod entry.');
+      }
+      const safeName = item.name.replace(/[^a-zA-Z0-9 _.-]/g, '').trim().slice(0, 80) || 'Mod';
+      const matched = entries.find(entry => entry.name.toLowerCase() === safeName.toLowerCase());
+      if (matched && (matched.isDirectory() || matched.isFile())) {
+        const target = path.resolve(plugins, matched.name);
+        if (!target.startsWith(plugins + path.sep)) throw new Error('Invalid mod path.');
+        await fs.rm(target, { recursive: matched.isDirectory(), force: true });
+        removed += 1;
+      }
+      delete installedMods[item.id];
+    }
+    await writeSettings({ ...settings, installedMods });
+    return { ok: true, removed, message: removed + ' ModHub-managed mod folder(s) removed.' };
+  } catch (error) {
+    return { ok: false, removed: 0, message: error instanceof Error ? error.message : 'Could not replace profile mods.' };
+  }
+});
 ipcMain.handle('mods:delete-installed', async (_event, requestedName) => {
   try {
     if (typeof requestedName !== 'string' || !requestedName || requestedName.length > 180 || requestedName.includes('..') || requestedName.includes('/') || requestedName.includes('\\')) throw new Error('Invalid mod name.');
