@@ -40,6 +40,111 @@ async function writeSettings(settings) {
   await fs.mkdir(path.dirname(settingsFile()), { recursive: true });
   await fs.writeFile(settingsFile(), JSON.stringify(settings, null, 2), 'utf8');
 }
+async function installModArchive(archivePath, gameFolder, pluginDir, modName) {
+  const tempRoot = await fs.mkdtemp(path.join(app.getPath('temp'), 'modhub-archive-'));
+  const root = path.join(tempRoot, 'root');
+  try {
+    let archiveCount = 0;
+    const unpackArchive = async (source, destination, depth) => {
+      if (depth > 8) throw new Error('This ZIP contains too many nested levels (maximum 8).');
+      archiveCount += 1;
+      if (archiveCount > 100) throw new Error('This ZIP contains too many nested archives (maximum 100).');
+      await fs.mkdir(destination, { recursive: true });
+      await extractZip(source, { dir: destination });
+      const inspect = async (directory) => {
+        for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+          const full = path.join(directory, entry.name);
+          if (entry.isDirectory()) await inspect(full);
+          else if (entry.isFile() && path.extname(entry.name).toLowerCase() === '.zip') {
+            const nested = path.join(path.dirname(full), path.basename(full, path.extname(full)) + '-extracted');
+            await unpackArchive(full, nested, depth + 1);
+          }
+        }
+      };
+      await inspect(destination);
+    };
+    await unpackArchive(archivePath, root, 0);
+    const directories = [root], files = [];
+    const scan = async (directory) => {
+      for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+        const full = path.join(directory, entry.name);
+        if (entry.isDirectory()) { directories.push(full); await scan(full); }
+        else if (entry.isFile() && path.extname(entry.name).toLowerCase() !== '.zip') files.push(full);
+      }
+    };
+    await scan(root);
+    const bepinexDirs = directories.filter(directory => path.basename(directory).toLowerCase() === 'bepinex');
+    const pluginRoots = [];
+    const configRoots = [];
+    for (const directory of bepinexDirs) {
+      const plugins = path.join(directory, 'plugins');
+      const config = path.join(directory, 'config');
+      if (await fs.stat(plugins).then(info => info.isDirectory()).catch(() => false)) pluginRoots.push(plugins);
+      if (await fs.stat(config).then(info => info.isDirectory()).catch(() => false)) configRoots.push(config);
+    }
+    const copyFileSafe = async (source, destination, allowedRoot, backup = false) => {
+      const resolvedRoot = path.resolve(allowedRoot), resolved = path.resolve(destination);
+      if (resolved !== resolvedRoot && !resolved.startsWith(resolvedRoot + path.sep)) throw new Error('Archive contains an unsafe destination path.');
+      await fs.mkdir(path.dirname(resolved), { recursive: true });
+      if (backup && await fs.stat(resolved).then(info => info.isFile()).catch(() => false)) {
+        await fs.copyFile(resolved, resolved + '.bak');
+      }
+      await fs.copyFile(source, resolved);
+    };
+    let copiedDlls = 0, copiedConfigs = 0, copiedFiles = 0;
+    const packageDir = bepinexDirs.find(directory => /bepinex/i.test(modName) &&
+      (directories.includes(path.join(directory, 'core')) || directories.includes(path.join(directory, 'patchers'))));
+    if (packageDir) {
+      const targetRoot = path.join(gameFolder, 'BepInEx');
+      for (const source of files.filter(file => file.startsWith(packageDir + path.sep))) {
+        const relative = path.relative(packageDir, source);
+        const destination = path.join(targetRoot, relative);
+        await copyFileSafe(source, destination, targetRoot, /\\.cfg$/i.test(source));
+        copiedFiles += 1;
+        if (/\\.dll$/i.test(source)) copiedDlls += 1;
+        if (/\\.cfg$/i.test(source)) copiedConfigs += 1;
+      }
+    } else {
+      if (pluginRoots.length) {
+        for (const pluginsRoot of pluginRoots) {
+          for (const source of files.filter(file => file.startsWith(pluginsRoot + path.sep))) {
+            const relative = path.relative(pluginsRoot, source);
+            await copyFileSafe(source, path.join(pluginDir, relative), pluginDir);
+            copiedFiles += 1;
+            if (/\\.dll$/i.test(source)) copiedDlls += 1;
+          }
+        }
+      } else {
+        const dlls = files.filter(file => /\\.dll$/i.test(file) && !/[/\\]BepInEx[/\\](core|patchers)[/\\]/i.test(file));
+        const used = new Set();
+        for (const source of dlls) {
+          const base = path.basename(source).replace(/[^a-zA-Z0-9._-]/g, '_');
+          let candidate = base, suffix = 2;
+          while (used.has(candidate.toLowerCase())) {
+            const parsed = path.parse(base);
+            candidate = parsed.name + '-' + suffix++ + parsed.ext;
+          }
+          used.add(candidate.toLowerCase());
+          await copyFileSafe(source, path.join(pluginDir, candidate), pluginDir);
+          copiedFiles += 1; copiedDlls += 1;
+        }
+      }
+      const configRoot = path.join(gameFolder, 'BepInEx', 'config');
+      for (const configs of configRoots) {
+        for (const source of files.filter(file => file.startsWith(configs + path.sep))) {
+          const relative = path.relative(configs, source);
+          await copyFileSafe(source, path.join(configRoot, relative), configRoot, /\\.cfg$/i.test(source));
+          copiedFiles += 1;
+          if (/\\.cfg$/i.test(source)) copiedConfigs += 1;
+        }
+      }
+    }
+    if (!copiedFiles) throw new Error('No installable DLLs or BepInEx files were found in this ZIP. Check that it contains a compiled mod rather than source code.');
+    return { copiedFiles, copiedDlls, copiedConfigs };
+  } finally {
+    await fs.rm(tempRoot, { recursive: true, force: true }).catch(() => {});
+  }
+}
 function createWindow() {
   const win = new BrowserWindow({
     width: 1440, height: 960, minWidth: 780, minHeight: 600,
