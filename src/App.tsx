@@ -573,11 +573,35 @@ export default function App() {
   };
   const restoreProfile = async (profile: typeof accountData.profiles[number]) => {
     const legacyModIds = (profile.mods || []).map(mod => mod.id);
+    const profileModIds = [...new Set([...legacyModIds, ...(profile.savedMods || []), ...Object.keys(profile.installedMods || {})])];
     const next = {...accountData,savedMods:[...new Set([...(profile.savedMods || []), ...legacyModIds])],installedMods:{...(profile.installedMods || {})},configs:{...(profile.configs || {})}};
-    if (await saveAccountData(next, 'Profile loaded into your account. Reinstall listed mods on this device as needed.')) {
-      setSaved(profile.savedMods);
-      const firstConfig = Object.entries(profile.configs)[0];
+    if (await saveAccountData(next, 'Profile loaded into your account.')) {
+      setSaved(profile.savedMods || []);
+      const firstConfig = Object.entries(profile.configs || {})[0];
       if (firstConfig && desktop) { setPage('Configs'); await loadConfigFiles(); setSelectedConfig(firstConfig[0]); setConfigText(firstConfig[1]); }
+      if (desktop && profileModIds.length) {
+        if (!gameFolder) {
+          notify('Profile loaded to your account. Choose the Gorilla Tag folder in Settings to install its mods.');
+          return;
+        }
+        const installable = profileModIds.map(id => mods.find(item => item.id === id)).filter((mod): mod is Mod => Boolean(mod));
+        const missing = profileModIds.filter(id => !mods.some(item => item.id === id));
+        if (!installable.length) {
+          notify('Profile loaded, but its mods are not in the current catalogue. Refresh the catalogue and try again.');
+          return;
+        }
+        let installedCount = 0;
+        for (const mod of installable) {
+          const before = await window.monkeyModManager!.getInstalledMods();
+          if (before[mod.id] === mod.version) { installedCount++; continue; }
+          await installMod(mod);
+          const after = await window.monkeyModManager!.getInstalledMods();
+          if (after[mod.id] === mod.version) installedCount++;
+        }
+        setInstalledMods(await window.monkeyModManager!.getInstalledMods());
+        setDetectedMods(await window.monkeyModManager!.getDetectedMods());
+        notify('Profile loaded: ' + installedCount + ' of ' + installable.length + ' mods installed.' + (missing.length ? ' ' + missing.length + ' mod(s) were not found in the current catalogue.' : ''));
+      }
     }
   };
   const toggleSaved = (mod: Mod) => {
@@ -594,7 +618,12 @@ export default function App() {
   };
 
   const openModInApp = (mod: Mod) => {
-    if (desktop) { void installMod(mod); return; }
+    if (desktop) {
+      setPage('Discover');
+      setDetail(mod);
+      setDetailTab('Overview');
+      return;
+    }
     setShowAppFallback(false);
     window.location.href = 'monkeymodmanager://mod/' + encodeURIComponent(mod.id);
     window.setTimeout(() => setShowAppFallback(true), 5000);
@@ -1011,7 +1040,7 @@ export default function App() {
             </div>
             <div className="admin-manage">
               <div className="admin-manage-heading"><h3>Your profiles</h3><span>{accountData.profiles.length} saved</span></div>
-              {accountData.profiles.map(profile=>{const profileMods=profile.mods?.length?profile.mods: [...new Set([...(profile.savedMods||[]),...Object.keys(profile.installedMods||{})])].flatMap(id=>{const mod=mods.find(item=>item.id===id);return mod?[{id:mod.id,name:mod.name,version:mod.version,downloadUrl:mod.downloadUrl,imageUrl:mod.imageUrl,category:mod.category}]:[];});return <div className="profile-card" key={profile.id}><div className="admin-mod-row"><div><b>{profile.name}</b><small>{new Date(profile.createdAt).toLocaleString()} · {profileMods.length} mods · {Object.keys(profile.installedMods||{}).length} installed · {Object.keys(profile.configs||{}).length} CFGs</small></div><div className="admin-mod-actions"><button type="button" className="details" onClick={()=>setExpandedProfileId(current=>current===profile.id?null:profile.id)}>{expandedProfileId===profile.id?'Hide contents':'View mods + CFGs'}</button><button type="button" className="details" onClick={()=>void restoreProfile(profile)} disabled={accountDataBusy}>Load</button><button type="button" className="delete-mod" disabled={accountDataBusy} onClick={()=>void saveAccountData({...accountData,profiles:accountData.profiles.filter(item=>item.id!==profile.id)},'Profile removed.')}>Delete</button></div></div>{expandedProfileId===profile.id && <div className="profile-cfg-list"><h4>Mods in this profile</h4>{profileMods.map(mod=>{const isInstalled=Object.prototype.hasOwnProperty.call(profile.installedMods||{},mod.id);return <div className="profile-cfg-row" key={mod.id}>{mod.imageUrl&&<img src={mod.imageUrl} alt="" style={{width:42,height:42,objectFit:'cover',borderRadius:8}}/>}<div><b>{mod.name}</b><small>v{profile.installedMods?.[mod.id]||mod.version}{mod.category?' · '+mod.category:''} · {isInstalled?'Installed in snapshot':(profile.savedMods||[]).includes(mod.id)?'Saved in library':'Included in profile'}</small></div><div className="admin-mod-actions"><button type="button" className="details" onClick={()=>{const current=mods.find(item=>item.id===mod.id);if(current){setDetail(current);setPage('Discover');}}}>View mod</button><button type="button" className="details" onClick={()=>window.open(mod.downloadUrl,'_blank','noopener,noreferrer')}>Download</button></div></div>})}{!profileMods.length&&<p className="form-help">This profile has no mod records. Save a new profile to capture your saved and installed catalogue mods.</p>}<h4>CFG files</h4>{Object.entries(profile.configs||{}).map(([name,content])=><div className="profile-cfg-row" key={name}><div><b>{name}</b><small>{content.length.toLocaleString()} characters · saved in this profile</small></div><div className="admin-mod-actions"><button type="button" className="details" onClick={()=>loadCloudConfig(name,content)}>Open CFG</button>{desktop && <button type="button" className="primary" disabled={configBusy||!gameFolder} onClick={()=>void installCloudConfigToGame(name,content)}>Load to game</button>}</div></div>)}{!Object.keys(profile.configs||{}).length&&<p className="form-help">This profile has no CFG files. Import a .cfg separately or save one from the CFG editor before saving the profile.</p>}</div>}</div>})}
+              {accountData.profiles.map(profile=>{const profileMods=profile.mods?.length?profile.mods: [...new Set([...(profile.savedMods||[]),...Object.keys(profile.installedMods||{})])].flatMap(id=>{const mod=mods.find(item=>item.id===id);return mod?[{id:mod.id,name:mod.name,version:mod.version,downloadUrl:mod.downloadUrl,imageUrl:mod.imageUrl,category:mod.category}]:[];});return <div className="profile-card" key={profile.id}><div className="admin-mod-row"><div><b>{profile.name}</b><small>{new Date(profile.createdAt).toLocaleString()} · {profileMods.length} mods · {Object.keys(profile.installedMods||{}).length} installed · {Object.keys(profile.configs||{}).length} CFGs</small></div><div className="admin-mod-actions"><button type="button" className="details" onClick={()=>setExpandedProfileId(current=>current===profile.id?null:profile.id)}>{expandedProfileId===profile.id?'Hide contents':'View mods + CFGs'}</button><button type="button" className="details" onClick={()=>void restoreProfile(profile)} disabled={accountDataBusy}>Load</button><button type="button" className="delete-mod" disabled={accountDataBusy} onClick={()=>void saveAccountData({...accountData,profiles:accountData.profiles.filter(item=>item.id!==profile.id)},'Profile removed.')}>Delete</button></div></div>{expandedProfileId===profile.id && <div className="profile-cfg-list"><h4>Mods in this profile</h4>{profileMods.map(mod=>{const isInstalled=Object.prototype.hasOwnProperty.call(profile.installedMods||{},mod.id);return <div className="profile-cfg-row" key={mod.id}>{mod.imageUrl&&<img src={mod.imageUrl} alt="" style={{width:42,height:42,objectFit:'cover',borderRadius:8}}/>}<div><b>{mod.name}</b><small>v{profile.installedMods?.[mod.id]||mod.version}{mod.category?' · '+mod.category:''} · {isInstalled?'Installed in snapshot':(profile.savedMods||[]).includes(mod.id)?'Saved in library':'Included in profile'}</small></div><div className="admin-mod-actions"><button type="button" className="details" onClick={()=>{const current=mods.find(item=>item.id===mod.id);if(current)openModInApp(current);else notify('This mod is not in the current catalogue. Refresh the catalogue and try again.');}}>View mod</button><button type="button" className="details" onClick={()=>{const current=mods.find(item=>item.id===mod.id);if(current){if(desktop)void installMod(current);else openModInApp(current);}else notify('This mod is not in the current catalogue. Refresh the catalogue and try again.');}}>Download</button></div></div>})}{!profileMods.length&&<p className="form-help">This profile has no mod records. Save a new profile to capture your saved and installed catalogue mods.</p>}<h4>CFG files</h4>{Object.entries(profile.configs||{}).map(([name,content])=><div className="profile-cfg-row" key={name}><div><b>{name}</b><small>{content.length.toLocaleString()} characters · saved in this profile</small></div><div className="admin-mod-actions"><button type="button" className="details" onClick={()=>loadCloudConfig(name,content)}>Open CFG</button>{desktop && <button type="button" className="primary" disabled={configBusy||!gameFolder} onClick={()=>void installCloudConfigToGame(name,content)}>Load to game</button>}</div></div>)}{!Object.keys(profile.configs||{}).length&&<p className="form-help">This profile has no CFG files. Import a .cfg separately or save one from the CFG editor before saving the profile.</p>}</div>}</div>})}
               {!accountData.profiles.length && <p className="form-help">No profiles yet. Create one above to save a snapshot to your account.</p>}
             </div>
             <div className="admin-manage">
