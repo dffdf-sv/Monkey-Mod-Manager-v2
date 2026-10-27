@@ -342,3 +342,5 @@ button:disabled{opacity:.55;cursor:wait}
 .markdown-body img{max-width:100%;height:auto;border-radius:8px}
 .product-readme-preview{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
 .product-readme-preview .markdown-body{font-size:12px}
+
+.markdown-table-wrap{max-width:100%;overflow:auto;margin:.8em 0}.markdown-table{border-collapse:collapse;width:100%;font-size:.92em}.markdown-table th,.markdown-table td{padding:8px 10px;border:1px solid var(--line);text-align:left;vertical-align:top}.markdown-table th{background:var(--panel);font-weight:700}
