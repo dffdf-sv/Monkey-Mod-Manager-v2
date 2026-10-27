@@ -122,6 +122,12 @@ The catalogue is backed by the `dffdf-sv/GORILA-TAG-MODBASE` repository. The web
 
 For web curator setup and server environment details, see the deployment notes in the repository history or ask a maintainer. The desktop app can be used independently of the hosted curator tools.
 
+### Account cloud save behavior
+
+Account profiles, saved mods, installed-mod snapshots, and uploaded CFG copies are stored as **private Gists owned by the GitHub account configured by the Render `GITHUB_TOKEN`**. Each save is keyed to the signed-in person's GitHub numeric user ID, so different people who sign in get separate records; one user's profile or CFG list is not returned to another user. These Gists are not created in every end user's personal GitHub profile. The service account that owns `GITHUB_TOKEN` can access the underlying private Gists.
+
+If the Profiles page cannot load data, it now shows the cloud-storage error rather than silently displaying an empty list. For a fine-grained PAT, grant **Gists: write** and the repository **Contents: read and write** needed for the mod base; for a classic PAT, use the `gist` scope (and `repo` only if required by the repository access). Keep this token only in Render's `GITHUB_TOKEN` environment variable.
+
 ### Render GitHub token permissions
 
 For the Render service's `GITHUB_TOKEN`, use a **fine-grained personal access token** limited to `dffdf-sv/GORILA-TAG-MODBASE` with **Contents: Read and write** (the catalogue API reads and updates `modinfo.Json` and uploads assets). Also grant the token's account-level **Gists: Read and write** permission so private account saves can be listed and created/updated. Do not grant repository access to unrelated repositories. Add the token only as the Render environment variable `GITHUB_TOKEN`; never place it in frontend code or commit it.
