@@ -254,6 +254,32 @@ ipcMain.handle('game:launch', async () => {
     return { ok:true, message:'Launching Gorilla Tag…' };
   } catch (error) { return { ok:false, message:error instanceof Error ? error.message : 'Could not launch Gorilla Tag.' }; }
 });
+ipcMain.handle('mods:delete-installed', async (_event, requestedName) => {
+  try {
+    if (typeof requestedName !== 'string' || !requestedName || requestedName.length > 180 || requestedName.includes('..') || requestedName.includes('/') || requestedName.includes('\\')) throw new Error('Invalid mod name.');
+    const settings = await readSettings();
+    if (!settings.gameFolder) throw new Error('Choose your Gorilla Tag game folder first.');
+    const root = path.resolve(settings.gameFolder);
+    const plugins = path.resolve(root, 'BepInEx', 'plugins');
+    if (!plugins.startsWith(root + path.sep)) throw new Error('Invalid plugins folder.');
+    const entries = await fs.readdir(plugins, { withFileTypes: true }).catch(() => []);
+    const cleanName = value => String(value).replace(/\.disabled$/i, '').replace(/\.dll$/i, '').toLowerCase();
+    const matched = entries.find(entry => entry.name === requestedName || cleanName(entry.name) === cleanName(requestedName));
+    if (!matched) throw new Error('That mod is no longer in the plugins folder. Refresh the installed-mod list.');
+    if (!matched.isDirectory() && !matched.isFile()) throw new Error('Only regular mod files and folders can be deleted.');
+    const target = path.resolve(plugins, matched.name);
+    if (!target.startsWith(plugins + path.sep)) throw new Error('Invalid mod path.');
+    await fs.rm(target, { recursive: matched.isDirectory(), force: false });
+    const installedMods = { ...(settings.installedMods || {}) };
+    for (const key of Object.keys(installedMods)) {
+      if (cleanName(key) === cleanName(matched.name) || cleanName(matched.name).includes(cleanName(key))) delete installedMods[key];
+    }
+    await writeSettings({ ...settings, installedMods });
+    return { ok: true, message: matched.name.replace(/\.disabled$/i, '') + ' deleted from BepInEx/plugins.' };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Could not delete mod.' };
+  }
+});
 ipcMain.handle('mods:toggle-installed', async (_event, requestedName) => {
   try {
     if (typeof requestedName !== 'string' || !requestedName || requestedName.length > 180 || requestedName.includes('..')) throw new Error('Invalid mod name.');
