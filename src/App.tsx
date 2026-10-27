@@ -347,7 +347,7 @@ export default function App() {
     const file = input.files?.[0];
     if (!file) return;
     input.value = '';
-    if (!/\\.cfg$/i.test(file.name) || !/^[a-zA-Z0-9_. -]+\\.cfg$/i.test(file.name) || file.name.includes('..')) {
+    if (!/\.cfg$/i.test(file.name) || !/^[a-zA-Z0-9_. -]+\.cfg$/i.test(file.name) || file.name.includes('..')) {
       notify('Choose a valid .cfg file with a simple filename.');
       return;
     }
@@ -365,8 +365,34 @@ export default function App() {
     setConfigText(content);
     setConfigError('');
     setPage('Configs');
-    if (!desktop) notify('CFG loaded into the editor. Install/open ModHub desktop to write it into a local game folder.');
-    else notify(name + ' loaded into the CFG editor. Use Save to write it into your game folder.');
+    if (!desktop) notify('CFG opened in the editor state. Use ModHub desktop to write it into a local game folder.');
+    else notify(name + ' loaded into the CFG editor. Press Save config to write it into your game folder.');
+  };
+  const installCloudConfigToGame = async (name: string, content: string) => {
+    if (!desktop || !window.monkeyModManager) {
+      notify('Open ModHub desktop to install a CFG into your local Gorilla Tag folder.');
+      return;
+    }
+    if (!/^[a-zA-Z0-9_. -]+\.cfg$/i.test(name) || name.includes('..')) {
+      notify('This CFG filename is not safe to install.');
+      return;
+    }
+    setConfigBusy(true);
+    setConfigError('');
+    try {
+      const result = await window.monkeyModManager.writeConfigFile({name, content});
+      if (!result.ok) throw new Error(result.message || 'Could not install this CFG.');
+      setPage('Configs');
+      await loadConfigFiles();
+      setSelectedConfig(name);
+      setConfigText(content);
+      notify('Installed ' + name + ' to Gorilla Tag. ' + result.message);
+    } catch (error) {
+      setConfigError(error instanceof Error ? error.message : 'Could not install this CFG.');
+      notify(error instanceof Error ? error.message : 'Could not install this CFG.');
+    } finally {
+      setConfigBusy(false);
+    }
   };
   const createProfile = async (event: FormEvent) => {
     event.preventDefault();
@@ -807,7 +833,7 @@ export default function App() {
             </div>
             <div className="admin-manage">
               <div className="admin-manage-heading"><h3>Cloud configuration files</h3><span>{Object.keys(accountData.configs).length} saved</span></div>
-              {Object.entries(accountData.configs).map(([name,content])=><div className="admin-mod-row" key={name}><div><b>{name}</b><small>{content.length.toLocaleString()} characters stored privately</small></div><div className="admin-mod-actions"><button type="button" className="details" onClick={()=>loadCloudConfig(name,content)}>Load CFG</button><button type="button" className="delete-mod" disabled={accountDataBusy} onClick={()=>void saveAccountData({...accountData,configs:Object.fromEntries(Object.entries(accountData.configs).filter(([key])=>key!==name))},'Cloud config deleted.')}>Delete</button></div></div>)}
+              {Object.entries(accountData.configs).map(([name,content])=><div className="admin-mod-row" key={name}><div><b>{name}</b><small>{content.length.toLocaleString()} characters · private cloud copy</small></div><div className="admin-mod-actions"><button type="button" className="details" onClick={()=>loadCloudConfig(name,content)}>Open editor</button>{desktop && <button type="button" className="primary" disabled={configBusy || !gameFolder} title={!gameFolder ? 'Choose the game folder in Settings first' : 'Write this CFG into BepInEx/config'} onClick={()=>void installCloudConfigToGame(name,content)}>{configBusy ? 'Loading…' : 'Load to game'}</button>}<button type="button" className="delete-mod" disabled={accountDataBusy} onClick={()=>void saveAccountData({...accountData,configs:Object.fromEntries(Object.entries(accountData.configs).filter(([key])=>key!==name))},'Cloud config deleted.')}>Delete</button></div></div>)}
               {!Object.keys(accountData.configs).length && <p className="form-help">Save a config from the CFG editor to keep a private cloud copy.</p>}
             </div>
           </>}
