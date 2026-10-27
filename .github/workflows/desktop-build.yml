@@ -70,11 +70,15 @@ jobs:
         run: npm pkg set "version=${{ needs.prepare-release.outputs.version }}"
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Build and publish Windows installer + updater metadata
+      - name: Build Windows installer
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run build && npx electron-builder --win nsis --x64 --publish always
+          RELEASE_TAG: ${{ needs.prepare-release.outputs.tag }}
+        run: |
+          npm run build
+          npx electron-builder --win nsis --x64 --publish never
+          gh release upload "$RELEASE_TAG" release/*.exe release/*.exe.blockmap release/latest.yml --clobber
       - name: Upload Windows build artifact
         uses: actions/upload-artifact@v4
         with:
@@ -101,10 +105,14 @@ jobs:
         run: npm pkg set "version=${{ needs.prepare-release.outputs.version }}"
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Build and publish Linux packages + updater metadata
+      - name: Build Linux packages
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run build && npx electron-builder --linux AppImage deb --x64 --publish always
+          RELEASE_TAG: ${{ needs.prepare-release.outputs.tag }}
+        run: |
+          npm run build
+          npx electron-builder --linux AppImage deb --x64 --publish never
+          gh release upload "$RELEASE_TAG" release/*.AppImage release/*.deb release/latest-linux.yml --clobber
       - name: Upload Linux build artifacts
         uses: actions/upload-artifact@v4
         with:
