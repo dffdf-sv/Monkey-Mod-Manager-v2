@@ -113,7 +113,7 @@ async function refreshGithubReleaseLinks() {
     if (!Array.isArray(current.list)) return { checked, updated };
     const next = current.list.map((entry) => ({ ...entry }));
     const apiHeaders = { authorization: 'Bearer ' + process.env.GITHUB_TOKEN, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'ModHub/2.1' };
-    for (const entry of next.slice(0, 150)) {
+    for (const entry of next) {
       const source = String(entry.source_url || entry.sourceUrl || '');
       let parsed;
       try { parsed = new URL(source); } catch { continue; }
@@ -128,7 +128,7 @@ async function refreshGithubReleaseLinks() {
         if (!response.ok) continue;
         const release = await response.json().catch(() => ({}));
         const assets = Array.isArray(release.assets) ? release.assets : [];
-        const candidates = assets.filter((asset) => /\.(dll|zip)$/i.test(String(asset.name || '')) && !/(symbols?|debug|source|test)/i.test(String(asset.name || '')));
+        const candidates = assets.filter((asset) => /\.(dll|zip)$/i.test(String(asset.name || '')) && !/(^|[-_. ])(symbols?|debug|source|tests?)([-_. ]|$)/i.test(String(asset.name || '')));
         if (!candidates.length || !release.tag_name) continue;
         const oldUrl = String(entry.download_url || entry.downloadUrl || '');
         let oldAssetName = '';
@@ -383,8 +383,12 @@ const server = http.createServer(async (req, res) => {
         const releaseResponse = await fetch('https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo) + '/releases/latest', { headers: apiHeaders, signal: AbortSignal.timeout(12000) });
         const release = releaseResponse.ok ? await releaseResponse.json().catch(() => ({})) : {};
         const assets = Array.isArray(release.assets) ? release.assets : [];
-        const compatibleAssets = assets.filter((item) => /\.(dll|zip)$/i.test(String(item.name || '')) && !/(symbols?|debug|source|test)/i.test(String(item.name || '')));
-        const asset = compatibleAssets.find((item) => /\.dll$/i.test(String(item.name || ''))) || compatibleAssets.find((item) => /\.zip$/i.test(String(item.name || '')));
+        const compatibleAssets = assets.filter((item) => /\.(dll|zip)$/i.test(String(item.name || '')) && !/(^|[-_. ])(symbols?|debug|source|tests?)([-_. ]|$)/i.test(String(item.name || '')));
+        const repoStem = repo.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const asset = compatibleAssets.find((item) => String(item.name || '').toLowerCase().replace(/[^a-z0-9]/g, '').includes(repoStem))
+          || compatibleAssets.find((item) => /\.zip$/i.test(String(item.name || '')))
+          || compatibleAssets.find((item) => /\.dll$/i.test(String(item.name || '')));
+        if (!asset) return reply(res,422,{error:'This GitHub repository has no uploaded .dll or .zip release asset. Publish a compiled mod file in Releases, or enter a direct HTTPS download URL manually.'});
         const topics = Array.isArray(repoData.topics) ? repoData.topics : [];
         const topicText = topics.join(' ').toLowerCase();
         const category = /core|library|framework|dependency/.test(topicText) ? 'Core' : /map|level/.test(topicText) ? 'Maps' : /cosmetic|skin|appearance/.test(topicText) ? 'Cosmetic' : /gameplay|menu|cheat/.test(topicText) ? 'Gameplay' : /utility|tool|helper/.test(topicText) ? 'Utility' : '';
