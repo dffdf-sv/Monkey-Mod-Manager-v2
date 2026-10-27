@@ -81,6 +81,11 @@ export default function App() {
   const [autoInstallUpdates, setAutoInstallUpdates] = useState(() => localStorage.getItem('mmm-auto-install-updates') === 'true');
   const [account, setAccount] = useState<{id:string;login:string;avatar:string}|null>(null);
   const [accountConfigured, setAccountConfigured] = useState(false);
+  const [accountLoading, setAccountLoading] = useState(false);
+  const [accountLoadError, setAccountLoadError] = useState('');
+  const [accountDataLoadedFor, setAccountDataLoadedFor] = useState<string | null>(null);
+  const accountRefreshSequence = useRef(0);
+  const activeAccountId = useRef<string | null>(null);
   const [accountData, setAccountData] = useState<{profiles:Array<{id:string;name:string;createdAt:string;installedMods:Record<string,string>;configs:Record<string,string>;savedMods:string[]}>;savedMods:string[];configs:Record<string,string>;installedMods:Record<string,string>}>({profiles:[],savedMods:[],configs:{},installedMods:{}});
   const [profileName, setProfileName] = useState('My Gorilla Tag setup');
   const [accountDataBusy, setAccountDataBusy] = useState(false);
@@ -107,16 +112,67 @@ export default function App() {
     if (token) headers.set('Authorization', 'Bearer ' + token);
     return fetch(url, { ...init, headers, credentials: desktop ? 'omit' : 'same-origin' });
   };
-  const refreshAccount = () => apiFetch(apiUrl('/api/account')).then((r) => r.json()).then(async (data) => {
-    setAccount(data.user || null); setAccountConfigured(Boolean(data.configured));
-    if (data.user) {
-      try {
-        const response = await apiFetch(apiUrl('/api/account/data'));
-        const result = await response.json();
-        if (response.ok && result.data) setAccountData({profiles:result.data.profiles||[],savedMods:result.data.savedMods||[],configs:result.data.configs||{},installedMods:result.data.installedMods||{}});
-      } catch { /* Cloud data can be refreshed from Profiles later. */ }
-    } else setAccountData({profiles:[],savedMods:[],configs:{},installedMods:{}});
-  }).catch(() => {});
+  const refreshAccount = async () => {
+    const requestId = ++accountRefreshSequence.current;
+    setAccountLoading(true);
+    setAccountLoadError('');
+    try {
+      const accountResponse = await apiFetch(apiUrl('/api/account'));
+      const accountResult = await accountResponse.json().catch(() => ({}));
+      if (!accountResponse.ok) throw new Error(accountResult.error || 'Could not check your GitHub sign-in.');
+      if (requestId !== accountRefreshSequence.current) return;
+      setAccountConfigured(Boolean(accountResult.configured));
+
+      const user = accountResult.user || null;
+      if (!user) {
+        activeAccountId.current = null;
+        setAccount(null);
+        setAccountData({profiles:[],savedMods:[],configs:{},installedMods:{}});
+        setAccountDataLoadedFor(null);
+        let anonymousSaved: string[] = [];
+        try {
+          const parsed = JSON.parse(localStorage.getItem('mmm-saved') || '[]');
+          if (Array.isArray(parsed)) anonymousSaved = parsed.filter((value): value is string => typeof value === 'string');
+        } catch { /* Ignore an invalid local-only library cache. */ }
+        setSaved(anonymousSaved);
+        return;
+      }
+
+      const userId = String(user.id);
+      const changedAccount = activeAccountId.current !== userId;
+      activeAccountId.current = userId;
+      setAccount(user);
+      if (changedAccount) {
+        // Never show the previous user's private data while the new account is loading.
+        setAccountData({profiles:[],savedMods:[],configs:{},installedMods:{}});
+        setAccountDataLoadedFor(null);
+        setSaved([]);
+      }
+
+      const dataResponse = await apiFetch(apiUrl('/api/account/data'));
+      const dataResult = await dataResponse.json().catch(() => ({}));
+      if (!dataResponse.ok || !dataResult.data) {
+        throw new Error(dataResult.error || 'ModHub could not load your private cloud save.');
+      }
+      if (requestId !== accountRefreshSequence.current || activeAccountId.current !== userId) return;
+
+      const cloudData = {
+        profiles: Array.isArray(dataResult.data.profiles) ? dataResult.data.profiles : [],
+        savedMods: Array.isArray(dataResult.data.savedMods) ? dataResult.data.savedMods.filter((value: unknown): value is string => typeof value === 'string') : [],
+        configs: dataResult.data.configs && typeof dataResult.data.configs === 'object' && !Array.isArray(dataResult.data.configs) ? dataResult.data.configs : {},
+        installedMods: dataResult.data.installedMods && typeof dataResult.data.installedMods === 'object' && !Array.isArray(dataResult.data.installedMods) ? dataResult.data.installedMods : {}
+      };
+      setAccountData(cloudData);
+      setSaved(cloudData.savedMods);
+      setAccountDataLoadedFor(userId);
+    } catch (error) {
+      if (requestId === accountRefreshSequence.current) {
+        setAccountLoadError(error instanceof Error ? error.message : 'Could not load your private cloud save.');
+      }
+    } finally {
+      if (requestId === accountRefreshSequence.current) setAccountLoading(false);
+    }
+  };
 
   const notify = (message: string) => { setNotice(message); window.setTimeout(() => setNotice(''), 3600); };
   const loadCatalog = async (): Promise<Mod[]> => {
@@ -195,7 +251,13 @@ export default function App() {
     });
     return stop;
   }, [desktop, autoInstallUpdates]);
-  useEffect(() => { localStorage.setItem('mmm-saved', JSON.stringify(saved)); }, [saved]);
+  useEffect(() => {
+    if (account && accountDataLoadedFor === account.id) {
+      localStorage.setItem('mmm-saved:' + account.id, JSON.stringify(saved));
+    } else if (!account) {
+      localStorage.setItem('mmm-saved', JSON.stringify(saved));
+    }
+  }, [saved, account, accountDataLoadedFor]);
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem('mmm-theme', theme); }, [theme]);
   useEffect(() => { setShowAppFallback(false); }, [detail?.id]);
   useEffect(() => {
@@ -326,16 +388,59 @@ export default function App() {
 
   const saveAccountData = async (next: typeof accountData, successMessage = 'Saved to your account.') => {
     if (!account) { notify('Sign in with GitHub to save data to your account.'); return false; }
+    const userId = account.id;
+    if (activeAccountId.current !== userId || accountDataLoadedFor !== userId) {
+      notify('Your private cloud save is still loading. Use Refresh account and try again.');
+      return false;
+    }
     setAccountDataBusy(true);
     try {
       const response = await apiFetch(apiUrl('/api/account/data'), {method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({data:next})});
       const result = await response.json().catch(()=>({}));
       if (!response.ok) throw new Error(result.error || 'Cloud save failed.');
-      setAccountData(next); notify(successMessage); return true;
+      if (activeAccountId.current !== userId) return false;
+      const savedData = {
+        profiles: Array.isArray(result.data?.profiles) ? result.data.profiles : next.profiles,
+        savedMods: Array.isArray(result.data?.savedMods) ? result.data.savedMods : next.savedMods,
+        configs: result.data?.configs && typeof result.data.configs === 'object' ? result.data.configs : next.configs,
+        installedMods: result.data?.installedMods && typeof result.data.installedMods === 'object' ? result.data.installedMods : next.installedMods
+      };
+      setAccountData(savedData);
+      setSaved(savedData.savedMods);
+      setAccountDataLoadedFor(userId);
+      setAccountLoadError('');
+      notify(successMessage);
+      return true;
     } catch (error) {
-      notify(error instanceof Error ? error.message : 'Cloud save failed. Check account storage setup.');
+      if (activeAccountId.current === userId) {
+        const message = error instanceof Error ? error.message : 'Cloud save failed. Check account storage setup.';
+        setAccountLoadError(message);
+        notify(message);
+      }
       return false;
-    } finally { setAccountDataBusy(false); }
+    } finally {
+      setAccountDataBusy(false);
+    }
+  };
+
+  const signOut = async () => {
+    const logoutRequest = apiFetch(apiUrl('/api/account/logout'), {method:'POST'}).catch(() => null);
+    accountRefreshSequence.current += 1;
+    activeAccountId.current = null;
+    localStorage.removeItem('mmm-auth-token');
+    setAccount(null);
+    setAccountData({profiles:[],savedMods:[],configs:{},installedMods:{}});
+    setAccountDataLoadedFor(null);
+    setAccountLoadError('');
+    setAccountLoading(false);
+    let anonymousSaved: string[] = [];
+    try {
+      const parsed = JSON.parse(localStorage.getItem('mmm-saved') || '[]');
+      if (Array.isArray(parsed)) anonymousSaved = parsed.filter((value): value is string => typeof value === 'string');
+    } catch { /* Ignore an invalid local-only library cache. */ }
+    setSaved(anonymousSaved);
+    await logoutRequest;
+    notify('Signed out of ModHub. The next person can sign in with their own GitHub account.');
   };
   const saveCurrentConfigToAccount = async () => {
     if (!selectedConfig) { notify('Choose a config file first.'); return; }
@@ -412,8 +517,14 @@ export default function App() {
   };
   const toggleSaved = (mod: Mod) => {
     const adding = !saved.includes(mod.id);
-    setSaved((current) => adding ? [...current, mod.id] : current.filter((id) => id !== mod.id));
-    notify(adding ? mod.name + ' saved to your library' : mod.name + ' removed from your library');
+    const nextSaved = adding ? [...saved, mod.id] : saved.filter((id) => id !== mod.id);
+    setSaved(nextSaved);
+    if (account && accountDataLoadedFor === account.id) {
+      const next = {...accountData, savedMods: nextSaved};
+      void saveAccountData(next, adding ? mod.name + ' saved to your library and account.' : mod.name + ' removed from your library and account.');
+    } else {
+      notify(adding ? mod.name + ' saved to your library' : mod.name + ' removed from your library');
+    }
   };
 
   const openModInApp = (mod: Mod) => {
@@ -724,7 +835,7 @@ export default function App() {
     </aside>
 
     <main className="main">
-      <header className="topbar"><span>Workspace <b>/</b> <strong>{page === 'Editor' ? 'Mod editor' : page}</strong></span><div><span className="gamepill"><i /> Gorilla Tag</span>{desktop && <button className="primary launch-game" onClick={async()=>{const result=await window.monkeyModManager!.launchGame();notify(result.message);}} title="Launch Gorilla Tag">▶ Launch game</button>}<button className="roundbtn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☼' : '☾'}</button><button className="secondary account-button" onClick={()=>{if(account){localStorage.removeItem('mmm-auth-token');void apiFetch(apiUrl('/api/account/logout'),{method:'POST'}).finally(()=>{setAccount(null);notify('Signed out.');});}else if(accountConfigured){if(desktop){void window.monkeyModManager?.signInWithGitHub().catch(()=>notify('Could not open your default browser.'));}else{const popup=window.open(apiUrl('/auth/github'),'mmm-github-signin','popup,width=560,height=760');if(!popup)notify('Allow pop-ups to sign in with GitHub.');}}else{notify('GitHub account login needs OAuth settings in Render.');}}}>{account ? 'Sign out · '+account.login : 'Sign in with GitHub'}</button><span className="avatar">{account?.login?.slice(0,1).toUpperCase()||'M'}</span></div></header>
+      <header className="topbar"><span>Workspace <b>/</b> <strong>{page === 'Editor' ? 'Mod editor' : page}</strong></span><div><span className="gamepill"><i /> Gorilla Tag</span>{desktop && <button className="primary launch-game" onClick={async()=>{const result=await window.monkeyModManager!.launchGame();notify(result.message);}} title="Launch Gorilla Tag">▶ Launch game</button>}<button className="roundbtn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☼' : '☾'}</button><button className="secondary account-button" onClick={()=>{if(account){void signOut();}else if(accountConfigured){if(desktop){void window.monkeyModManager?.signInWithGitHub().catch(()=>notify('Could not open your default browser.'));}else{const popup=window.open(apiUrl('/auth/github'),'mmm-github-signin','popup,width=560,height=760');if(!popup)notify('Allow pop-ups to sign in with GitHub.');}}else{notify('GitHub account login needs OAuth settings in Render.');}}}>{account ? 'Sign out · '+account.login : 'Sign in with GitHub'}</button><span className="avatar">{account?.login?.slice(0,1).toUpperCase()||'M'}</span></div></header>
       <div className="content">
         {page === 'Overview' && <>
         <section className="hero">
@@ -803,8 +914,10 @@ export default function App() {
         </section>}
 
         {page === 'Settings' ? <section className="cfg-workspace settings-workspace"><div className="cfg-heading"><div><label>LOCAL INSTALLATION</label><h2>Game settings</h2><p>Choose which Gorilla Tag edition to manage and verify the install folder used by the desktop installer.</p></div></div><div className="settings-card"><label>Game installation / PCVR platform<select value={gamePlatform} onChange={event => void changeGamePlatform(event.target.value as 'Steam'|'Meta')}><option value="Steam">SteamVR (Steam)</option><option value="Meta">Meta Quest Link / Oculus PCVR</option></select></label><div className="settings-path"><small>ACTIVE GORILLA TAG FOLDER</small><code>{gameFolder || 'No folder selected'}</code></div>{desktop && <button className="primary" onClick={async()=>{const folder=await window.monkeyModManager!.chooseGameFolder();setGameFolder(folder);if(folder){setDetectedMods(await window.monkeyModManager!.getDetectedMods());notify('Game folder saved.');}}}>Choose folder…</button>}<label className="settings-check"><input type="checkbox" checked={hideInstallNotice} onChange={event=>{setHideInstallNotice(event.target.checked);localStorage.setItem('mmm-hide-install-notice',String(event.target.checked));}} /> Hide install-complete prompts</label><p className="form-help">Choose the edition where Gorilla Tag is installed. You can switch between SteamVR and Meta PCVR here any time; changing the platform searches for that install, and you can use Choose folder if it is not detected automatically.</p><div className="settings-path"><small>MODHUB DESKTOP APP</small><code>Installed version: v{appVersion}</code>{appUpdate ? <p className="form-help">Update available: v{appUpdate.version}</p> : <p className="form-help">Use Check updates to check for the latest app release and tracked mod updates.</p>}{appUpdateStatus && <p className="form-help">{appUpdateStatus}</p>}{appUpdateStatus.startsWith('Update downloaded.') && <button className="primary" onClick={()=>void window.monkeyModManager?.installAppUpdate().then(result=>notify(result.message))}>Restart and install update</button>}<button className="secondary" disabled={checkingUpdates} onClick={()=>void checkForUpdates()}>{checkingUpdates ? 'Checking…' : 'Check app + mod updates'}</button><label className="settings-check"><input type="checkbox" checked={autoInstallUpdates} onChange={event=>{setAutoInstallUpdates(event.target.checked);localStorage.setItem('mmm-auto-install-updates',String(event.target.checked));}} /> Automatically download and install app updates</label><p className="form-help">Uses the built-in updater to download release updates in-app, show progress, and restart to install. Available in the installed desktop build.</p></div></div></section> : page === 'Profiles' ? <section className="cfg-workspace">
-          <div className="cfg-heading"><div><label>YOUR ACCOUNT</label><h2>Account & profiles</h2><p>Keep saved mods, installed-mod snapshots, and config files synced to your GitHub account in private cloud storage.</p></div><button className="secondary" disabled={!account || accountDataBusy} onClick={() => void refreshAccount()}>↻ Refresh account</button></div>
-          {!account ? <div className="cfg-empty">Sign in with GitHub to save profiles, configs, and installed-mod lists to your account.</div> : <>
+          <div className="cfg-heading"><div><label>YOUR ACCOUNT</label><h2>Account & profiles</h2><p>Keep saved mods, installed-mod snapshots, and CFG files synced to ModHub's private cloud storage, linked to your GitHub identity.</p></div><button className="secondary" disabled={!account || accountLoading || accountDataBusy} onClick={() => void refreshAccount()}>{accountLoading ? '↻ Loading…' : '↻ Refresh account'}</button></div>
+          {accountLoading && <p className="cfg-muted">Loading your private cloud save…</p>}
+           {accountLoadError && <div className="admin-error" role="alert">Cloud save problem: {accountLoadError} Check the Render GITHUB_TOKEN has private Gist access, then refresh.</div>}
+           {!account ? <div className="cfg-empty">Sign in with GitHub to save profiles, configs, and installed-mod lists to your account.</div> : <>
             <div className="product-meta-grid">
               <div><small>SAVED MODS</small><b>{accountData.savedMods.length || saved.length}</b></div>
               <div><small>INSTALLED MODS SNAPSHOT</small><b>{Object.keys(accountData.installedMods).length}</b></div>
