@@ -1038,7 +1038,8 @@ export default function App() {
         <div className="toolbar"><label className="search">⌕ <input id="modsearch" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search mods, creators, categories…" />{query && <button onClick={() => setQuery('')}>×</button>}<kbd>Ctrl K</kbd></label><div className="pills">{categories.map((item) => <button key={item} className={category === item ? 'pillactive' : ''} onClick={() => setCategory(item)}>{item === 'All Mods' ? 'All' : item}</button>)}</div></div>
 
         {visibleMods.length ? <div className="grid">{visibleMods.map((mod) => <article className="modcard" key={mod.id}>
-          <div className="mod-picture clickable-product-picture" role="button" tabIndex={0} onClick={() => { setDetail(mod); setDetailTab('Overview'); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setDetail(mod); setDetailTab('Overview'); } }} aria-label={'Open product page for ' + mod.name} style={mod.imageUrl ? { backgroundImage: 'linear-gradient(180deg, #0a110522 0%, #0a1105b5 100%), url("' + mod.imageUrl + '")' } : undefined}>
+          <div className="mod-picture clickable-product-picture" role="button" tabIndex={0} onClick={() => { setDetail(mod); setDetailTab('Overview'); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setDetail(mod); setDetailTab('Overview'); } }} aria-label={'Open product page for ' + mod.name}>
+            {mod.imageUrl && <img className="mod-picture-img" src={mod.imageUrl} alt={mod.name + ' cover'} loading="lazy" referrerPolicy="no-referrer" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
             <span className="picture-tag">{mod.category}</span>{mod.featured && <span className="featured-tag">✦ Featured</span>}{desktop && detectedMods.some(name=>name.toLowerCase()===mod.name.toLowerCase()||name.toLowerCase()===mod.id.toLowerCase()) && <span className="detected-tag">✓ Detected</span>}<button className="picture-details" onClick={(event) => { event.stopPropagation(); setDetail(mod); setDetailTab('Overview'); }} aria-label={'Open product page for ' + mod.name}>↗</button>{!mod.imageUrl && <b>{mod.name.slice(0, 1).toUpperCase()}</b>}
           </div>
           <div className="card-body">
@@ -1057,7 +1058,7 @@ export default function App() {
     </main>
 
     {detail && <div className="product-page-route"><section className="product-page-modal" role="region" aria-label={detail.name + ' product page'}><button className="modalclose" onClick={() => setDetail(null)}>×</button>
-      <div className="detail-picture" style={detail.imageUrl ? { backgroundImage: 'linear-gradient(180deg, #07100611, #071006bb), url("' + detail.imageUrl + '")' } : undefined}>{!detail.imageUrl && <span>🐒</span>}</div>
+      <div className="detail-picture">{detail.imageUrl && <img src={detail.imageUrl} alt={detail.name + ' cover'} loading="lazy" referrerPolicy="no-referrer" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}{!detail.imageUrl && <span>🐒</span>}</div>
       <div className="product-page-heading"><div><span className="category">{detail.category}</span><h2>{detail.name}</h2></div><span className="version">v{detail.version}</span></div><p className="author">by {detail.author} · v{detail.version}</p><p className="product-description">{detail.description}</p>
       {(detail.galleryUrls||[]).length>0 && <div className="detail-gallery">{(detail.galleryUrls||[]).map((url,i)=><img key={url+i} src={url} alt={detail.name+' screenshot '+(i+1)} />)}</div>}
       {detail.videoUrl && <video className="mod-video" controls preload="metadata" src={detail.videoUrl} />}
