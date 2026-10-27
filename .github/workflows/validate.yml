@@ -1,0 +1,31 @@
+name: Validate ModHub
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Type-check and build web app
+        run: npm run build
+      - name: Check server and Electron syntax
+        run: |
+          node --check server.mjs
+          node --check electron/main.cjs
+          node --check electron/preload.cjs
