@@ -99,10 +99,10 @@ async function installModArchive(archivePath, gameFolder, pluginDir, modName) {
       for (const source of files.filter(file => file.startsWith(packageDir + path.sep))) {
         const relative = path.relative(packageDir, source);
         const destination = path.join(targetRoot, relative);
-        await copyFileSafe(source, destination, targetRoot, /\\.cfg$/i.test(source));
+        await copyFileSafe(source, destination, targetRoot, /\.cfg$/i.test(source));
         copiedFiles += 1;
-        if (/\\.dll$/i.test(source)) copiedDlls += 1;
-        if (/\\.cfg$/i.test(source)) copiedConfigs += 1;
+        if (/\.dll$/i.test(source)) copiedDlls += 1;
+        if (/\.cfg$/i.test(source)) copiedConfigs += 1;
       }
     } else {
       if (pluginRoots.length) {
@@ -111,11 +111,11 @@ async function installModArchive(archivePath, gameFolder, pluginDir, modName) {
             const relative = path.relative(pluginsRoot, source);
             await copyFileSafe(source, path.join(pluginDir, relative), pluginDir);
             copiedFiles += 1;
-            if (/\\.dll$/i.test(source)) copiedDlls += 1;
+            if (/\.dll$/i.test(source)) copiedDlls += 1;
           }
         }
       } else {
-        const dlls = files.filter(file => /\\.dll$/i.test(file) && !/[/\\]BepInEx[/\\](core|patchers)[/\\]/i.test(file));
+        const dlls = files.filter(file => /\.dll$/i.test(file) && !/[/\\]BepInEx[/\\](core|patchers)[/\\]/i.test(file));
         const used = new Set();
         for (const source of dlls) {
           const base = path.basename(source).replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -133,9 +133,9 @@ async function installModArchive(archivePath, gameFolder, pluginDir, modName) {
       for (const configs of configRoots) {
         for (const source of files.filter(file => file.startsWith(configs + path.sep))) {
           const relative = path.relative(configs, source);
-          await copyFileSafe(source, path.join(configRoot, relative), configRoot, /\\.cfg$/i.test(source));
+          await copyFileSafe(source, path.join(configRoot, relative), configRoot, /\.cfg$/i.test(source));
           copiedFiles += 1;
-          if (/\\.cfg$/i.test(source)) copiedConfigs += 1;
+          if (/\.cfg$/i.test(source)) copiedConfigs += 1;
         }
       }
     }
@@ -259,8 +259,8 @@ ipcMain.handle('mods:toggle-installed', async (_event, requestedName) => {
     const paths = [];
     if (matched.isDirectory()) {
       const nested = await fs.readdir(base,{withFileTypes:true});
-      for (const entry of nested) if (entry.isFile() && (/\\.dll$/i.test(entry.name)||/\.dll\.disabled$/i.test(entry.name))) paths.push(path.join(base,entry.name));
-    } else if (matched.isFile() && (/\\.dll$/i.test(matched.name)||/\.dll\.disabled$/i.test(matched.name))) paths.push(base);
+      for (const entry of nested) if (entry.isFile() && (/\.dll$/i.test(entry.name)||/\.dll\.disabled$/i.test(entry.name))) paths.push(path.join(base,entry.name));
+    } else if (matched.isFile() && (/\.dll$/i.test(matched.name)||/\.dll\.disabled$/i.test(matched.name))) paths.push(base);
     if (!paths.length) throw new Error('No DLL files found for this mod. This toggle supports DLL-based BepInEx mods.');
     const disable = paths.some(file=>file.toLowerCase().endsWith('.dll'));
     for (const file of paths) {
@@ -383,62 +383,10 @@ ipcMain.handle('mods:install-from-disk', async () => {
       const target = path.join(pluginRoot,base); await fs.mkdir(target,{recursive:true});
       if (ext === '.dll') { const destination = path.join(target,path.basename(source).replace(/[^a-zA-Z0-9._-]/g,'_')); await fs.copyFile(source,destination); paths.push(destination); }
       else {
-        // Recursively inspect nested archives and place every discovered DLL directly
-        // in the mod's BepInEx folder so deeply nested release ZIPs still work.
-        const tempRoot = await fs.mkdtemp(path.join(app.getPath('temp'), 'mmm-zip-'));
-        try {
-          let archiveCount = 0;
-          const unpackArchive = async (archivePath, destination, depth) => {
-            if (depth > 8) throw new Error('This ZIP contains too many nested archive levels (maximum 8).');
-            archiveCount += 1;
-            if (archiveCount > 100) throw new Error('This ZIP contains too many nested archives (maximum 100).');
-            await fs.mkdir(destination, { recursive: true });
-            await extractZip(archivePath, { dir: destination });
-            const walk = async (directory, currentDepth) => {
-              const entries = await fs.readdir(directory, { withFileTypes: true });
-              for (const entry of entries) {
-                const full = path.join(directory, entry.name);
-                if (entry.isDirectory()) {
-                  await walk(full, currentDepth);
-                } else if (entry.isFile() && path.extname(entry.name).toLowerCase() === '.zip') {
-                  if (currentDepth >= 8) throw new Error('This ZIP contains too many nested archive levels (maximum 8).');
-                  const nestedDir = path.join(path.dirname(full), path.basename(full, path.extname(full)) + '-extracted');
-                  await unpackArchive(full, nestedDir, currentDepth + 1);
-                }
-              }
-            };
-            await walk(destination, depth);
-          };
-          await unpackArchive(source, path.join(tempRoot, 'root'), 0);
-          const dlls = [];
-          const findDlls = async (directory) => {
-            for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
-              const full = path.join(directory, entry.name);
-              if (entry.isDirectory()) await findDlls(full);
-              else if (entry.isFile() && entry.name.toLowerCase().endsWith('.dll')) dlls.push(full);
-            }
-          };
-          await findDlls(path.join(tempRoot, 'root'));
-          if (!dlls.length) throw new Error('No .dll files were found inside this ZIP or its nested ZIP files. Check whether it contains a source code archive instead of a compiled mod.');
-          const usedNames = new Set();
-          for (const dll of dlls) {
-            let name = path.basename(dll).replace(/[^a-zA-Z0-9._-]/g, '_');
-            if (usedNames.has(name.toLowerCase())) {
-              const relative = path.relative(path.join(tempRoot, 'root'), dll).replace(/[^a-zA-Z0-9._-]/g, '_').replace(/_+/g, '_');
-              name = relative || name;
-            }
-            let candidate = name, suffix = 2;
-            while (usedNames.has(candidate.toLowerCase())) {
-              const parsed = path.parse(name);
-              candidate = parsed.name + '-' + suffix++ + parsed.ext;
-            }
-            usedNames.add(candidate.toLowerCase());
-            await fs.copyFile(dll, path.join(target, candidate));
-          }
-          paths.push(target);
-        } finally {
-          await fs.rm(tempRoot, { recursive: true, force: true });
-        }
+        await fs.rm(target, { recursive: true, force: true });
+        await fs.mkdir(target, { recursive: true });
+        await installModArchive(source, gameFolder, target, base);
+        paths.push(target);
       }
       installed['local:'+base] = 'local';
     }
