@@ -575,11 +575,23 @@ ipcMain.handle('mod:install', async (_event, mod) => {
     const finalExt = path.extname(finalUrl.pathname).toLowerCase();
     const requestedExt = path.extname(downloadUrl.pathname).toLowerCase();
     const responseType = String(response.headers.get('content-type') || '').toLowerCase();
-    // GitHub archive URLs often redirect to codeload URLs with no .zip suffix.
-    // Preserve the requested archive extension so those source ZIPs still install.
+    const contentDisposition = String(response.headers.get('content-disposition') || '').toLowerCase();
+    // GitHub's source/archive URLs may redirect to extensionless codeload URLs
+    // and may be served as application/octet-stream. Detect ZIP's PK signature
+    // as well as filename and HTTP metadata so these archives still unpack.
+    const isZipSignature = buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4b &&
+      ((buffer[2] === 0x03 && buffer[3] === 0x04) ||
+       (buffer[2] === 0x05 && buffer[3] === 0x06) ||
+       (buffer[2] === 0x07 && buffer[3] === 0x08));
     const ext = ['.dll', '.zip'].includes(finalExt) ? finalExt
       : ['.dll', '.zip'].includes(requestedExt) ? requestedExt
-      : responseType.includes('zip') ? '.zip' : '';
+      : (isZipSignature || responseType.includes('zip') || contentDisposition.includes('.zip')) ? '.zip' : '';
+    if (ext === '.dll' && isZipSignature) {
+      throw new Error('The download URL looks like a ZIP archive, not a DLL. Use a direct ZIP URL or the GitHub release asset link.');
+    }
+    if (ext === '.zip' && !isZipSignature) {
+      throw new Error('The downloaded file is not a valid ZIP archive. Use a direct download or GitHub release asset URL, not a webpage.');
+    }
     if (!ext) throw new Error('Only .dll and .zip mod files can be installed by the desktop app.');
     let safeName = path.basename(decodeURIComponent(finalUrl.pathname)).replace(/[^a-zA-Z0-9._-]/g, '_');
     if (!/\.(dll|zip)$/i.test(safeName)) {
@@ -591,9 +603,12 @@ ipcMain.handle('mod:install', async (_event, mod) => {
     try {
       const safeModName = String(mod.name).replace(/[^a-zA-Z0-9 _.-]/g, '').trim().slice(0, 80) || 'Mod';
       const pluginDir = path.join(gameFolder, 'BepInEx', 'plugins', safeModName);
-      await fs.rm(pluginDir, { recursive: true, force: true });
       await fs.mkdir(pluginDir, { recursive: true });
       if (ext === '.dll') {
+        // Replace this mod's own folder only for a single-DLL install. ZIP
+        // installs may contain nested files/configs, so merge those safely.
+        await fs.rm(pluginDir, { recursive: true, force: true });
+        await fs.mkdir(pluginDir, { recursive: true });
         const installedPath = path.join(pluginDir, safeName);
         await fs.copyFile(tempFile, installedPath);
         const latestSettings = await readSettings();
