@@ -267,17 +267,38 @@ ipcMain.handle('mods:toggle-installed', async (_event, requestedName) => {
     const base = path.resolve(plugins,matched.name); if (!base.startsWith(plugins + path.sep)) throw new Error('Invalid mod path.');
     const paths = [];
     if (matched.isDirectory()) {
-      const nested = await fs.readdir(base,{withFileTypes:true});
-      for (const entry of nested) if (entry.isFile() && (/\.dll$/i.test(entry.name)||/\.dll\.disabled$/i.test(entry.name))) paths.push(path.join(base,entry.name));
-    } else if (matched.isFile() && (/\.dll$/i.test(matched.name)||/\.dll\.disabled$/i.test(matched.name))) paths.push(base);
+      const collectDlls = async (directory, depth = 0) => {
+        if (depth > 8) return;
+        const nested = await fs.readdir(directory, { withFileTypes: true }).catch(() => []);
+        for (const entry of nested) {
+          const full = path.join(directory, entry.name);
+          if (entry.isDirectory()) await collectDlls(full, depth + 1);
+          else if (entry.isFile() && (/\.dll$/i.test(entry.name) || /\.dll\.disabled$/i.test(entry.name))) paths.push(full);
+        }
+      };
+      await collectDlls(base);
+    } else if (matched.isFile() && (/\.dll$/i.test(matched.name) || /\.dll\.disabled$/i.test(matched.name))) paths.push(base);
     if (!paths.length) throw new Error('No DLL files found for this mod. This toggle supports DLL-based BepInEx mods.');
-    const disable = paths.some(file=>file.toLowerCase().endsWith('.dll'));
-    for (const file of paths) {
-      if (disable && file.toLowerCase().endsWith('.dll')) await fs.rename(file,file+'.disabled');
-      else if (!disable && file.toLowerCase().endsWith('.dll.disabled')) await fs.rename(file,file.replace(/\.dll\.disabled$/i,'.dll'));
+    const hasEnabled = paths.some(file => file.toLowerCase().endsWith('.dll'));
+    const renamed = [];
+    try {
+      for (const file of paths) {
+        if (hasEnabled && file.toLowerCase().endsWith('.dll')) {
+          const target = file + '.disabled';
+          await fs.rename(file, target);
+          renamed.push([target, file]);
+        } else if (!hasEnabled && file.toLowerCase().endsWith('.dll.disabled')) {
+          const target = file.replace(/\.dll\.disabled$/i, '.dll');
+          await fs.rename(file, target);
+          renamed.push([target, file]);
+        }
+      }
+    } catch (error) {
+      for (const [current, previous] of renamed.reverse()) await fs.rename(current, previous).catch(() => {});
+      throw error;
     }
-    const label = matched.name.replace(/\.disabled$/i,'');
-    return {ok:true,enabled:!disable,message:label+(disable?' disabled.':' enabled.')};
+    const label = matched.name.replace(/\.disabled$/i, '');
+    return { ok: true, enabled: hasEnabled ? false : true, message: label + (hasEnabled ? ' disabled.' : ' enabled.') };
   } catch(error) { return {ok:false,message:error instanceof Error?error.message:'Could not toggle mod.'}; }
 });
 ipcMain.handle('config:list-files', async () => {
