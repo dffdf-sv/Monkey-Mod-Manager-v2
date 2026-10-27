@@ -647,12 +647,20 @@ export default function App() {
   };
   const toggleSaved = (mod: Mod) => {
     if (account && accountWriteInProgress.current) { notify('A cloud save is in progress. Please wait before changing your saved list again.'); return; }
+    if (account && accountDataLoadedFor !== account.id) {
+      notify('Your cloud library is still loading. Wait for it to finish, then save this mod again.');
+      return;
+    }
+    const previousSaved = saved;
     const adding = !saved.includes(mod.id);
     const nextSaved = adding ? [...saved, mod.id] : saved.filter((id) => id !== mod.id);
     setSaved(nextSaved);
-    if (account && accountDataLoadedFor === account.id) {
+    if (account) {
       const next = {...accountData, savedMods: nextSaved};
-      void saveAccountData(next, adding ? mod.name + ' saved to your library and account.' : mod.name + ' removed from your library and account.');
+      void saveAccountData(next, adding ? mod.name + ' saved to your library and account.' : mod.name + ' removed from your library and account.')
+        .then((ok) => {
+          if (!ok && activeAccountId.current === account.id) setSaved(previousSaved);
+        });
     } else {
       notify(adding ? mod.name + ' saved to your library' : mod.name + ' removed from your library');
     }
