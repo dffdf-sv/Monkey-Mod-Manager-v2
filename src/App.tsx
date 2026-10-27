@@ -86,6 +86,7 @@ export default function App() {
   const [accountLoadError, setAccountLoadError] = useState('');
   const [accountDataLoadedFor, setAccountDataLoadedFor] = useState<string | null>(null);
   const accountRefreshSequence = useRef(0);
+  const accountWriteInProgress = useRef(false);
   const activeAccountId = useRef<string | null>(null);
   const [accountData, setAccountData] = useState<{profiles:Array<{id:string;name:string;createdAt:string;installedMods:Record<string,string>;configs:Record<string,string>;savedMods:string[]}>;savedMods:string[];configs:Record<string,string>;installedMods:Record<string,string>}>({profiles:[],savedMods:[],configs:{},installedMods:{}});
   const [profileName, setProfileName] = useState('My Gorilla Tag setup');
@@ -115,6 +116,7 @@ export default function App() {
     return fetch(url, { ...init, headers, credentials: desktop ? 'omit' : 'same-origin' });
   };
   const refreshAccount = async () => {
+    if (accountWriteInProgress.current) return;
     const requestId = ++accountRefreshSequence.current;
     setAccountLoading(true);
     setAccountLoadError('');
@@ -430,6 +432,7 @@ export default function App() {
       return false;
     }
     // Invalidate any older cloud read that could finish after this write and overwrite the saved state.
+    accountWriteInProgress.current = true;
     accountRefreshSequence.current += 1;
     setAccountLoading(false);
     setAccountDataBusy(true);
@@ -458,6 +461,7 @@ export default function App() {
       }
       return false;
     } finally {
+      accountWriteInProgress.current = false;
       setAccountDataBusy(false);
     }
   };
@@ -537,7 +541,24 @@ export default function App() {
     event.preventDefault();
     const name = profileName.trim();
     if (!name) return;
-    const profile = {id:crypto.randomUUID(),name,createdAt:new Date().toISOString(),installedMods:{...installedMods},configs:{...accountData.configs,...(selectedConfig?{[selectedConfig]:configText}:{})},savedMods:[...saved]};
+    // A profile should contain the actual local CFG files too, not only CFGs
+    // that the user already uploaded to cloud storage.
+    const profileConfigs: Record<string,string> = {...accountData.configs,...(selectedConfig?{[selectedConfig]:configText}:{})};
+    if (desktop && window.monkeyModManager) {
+      try {
+        const listing = await window.monkeyModManager.listConfigFiles();
+        if (listing.ok) {
+          const localFiles = await Promise.all(listing.files.map(async file => {
+            try {
+              const result = await window.monkeyModManager!.readConfigFile(file.name);
+              return result.ok && typeof result.content === 'string' ? [file.name, result.content] as const : null;
+            } catch { return null; }
+          }));
+          for (const entry of localFiles) if (entry) profileConfigs[entry[0]] = entry[1];
+        }
+      } catch { /* Keep cloud/selected CFGs if the local game folder is unavailable. */ }
+    }
+    const profile = {id:crypto.randomUUID(),name,createdAt:new Date().toISOString(),installedMods:{...installedMods},configs:profileConfigs,savedMods:[...saved]};
     const next = {...accountData,profiles:[profile,...accountData.profiles].slice(0,50),savedMods:[...new Set([...accountData.savedMods,...saved])],installedMods:{...accountData.installedMods,...installedMods}};
     if (await saveAccountData(next, 'Profile "' + name + '" saved to your account.')) setProfileName('');
   };
