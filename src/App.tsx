@@ -729,7 +729,13 @@ export default function App() {
     if (!selectedConfig) { setConfigError('Select a .cfg file before saving.'); return; }
     setConfigBusy(true); setConfigError('');
     try {
-      const result = await window.monkeyModManager!.writeConfigFile({ name: selectedConfig, content: configText });
+      if (!desktop || !window.monkeyModManager) {
+        if (!account) throw new Error('Sign in with GitHub to save this CFG to your private cloud storage.');
+        const next = {...accountData, configs:{...accountData.configs,[selectedConfig]:configText}};
+        if (!await saveAccountData(next, selectedConfig + ' saved to your private cloud CFGs.')) throw new Error('Cloud CFG save failed. Check the cloud-save message and try again.');
+        return;
+      }
+      const result = await window.monkeyModManager.writeConfigFile({ name: selectedConfig, content: configText });
       if (!result.ok) throw new Error(result.message || 'Could not save config.');
       notify(result.message); setConfigError(''); await loadConfigFiles();
     } catch (error) { setConfigError(error instanceof Error ? error.message : 'Could not save config.'); }
@@ -1013,7 +1019,7 @@ export default function App() {
               {configFiles.map((file) => <button key={file.name} className={'cfg-file ' + (selectedConfig === file.name ? 'active' : '')} onClick={() => void openConfigFile(file.name)}><b>{file.name}</b><small>{(file.size / 1024).toFixed(1)} KB</small></button>)}
               {!configFiles.length && <p className="cfg-muted">{configBusy ? 'Loading files…' : 'No .cfg files found in BepInEx/config.'}</p>}
             </aside>
-            <div className="cfg-editor"><div className="cfg-editor-bar"><b>{selectedConfig || 'Select a configuration file'}</b><button className="secondary" disabled={!selectedConfig || !account || accountDataBusy} onClick={() => void saveCurrentConfigToAccount()}>{accountDataBusy ? 'Saving…' : 'Save to account'}</button><button className="primary" disabled={!selectedConfig || configBusy} onClick={() => void saveConfigFile()}>{configBusy ? 'Working…' : 'Save config'}</button></div>
+            <div className="cfg-editor"><div className="cfg-editor-bar"><b>{selectedConfig || 'Select a configuration file'}</b><button className="secondary" disabled={!selectedConfig || !account || accountDataBusy} onClick={() => void saveCurrentConfigToAccount()}>{accountDataBusy ? 'Saving…' : 'Save to account'}</button><button className="primary" disabled={!selectedConfig || configBusy || (!desktop && !account)} onClick={() => void saveConfigFile()}>{configBusy ? 'Working…' : desktop ? 'Save config to game' : 'Save CFG to cloud'}</button></div>
               <textarea className="cfg-textarea" spellCheck={false} value={configText} onChange={(event) => setConfigText(event.target.value)} placeholder="Choose a .cfg file from the list to view and edit its contents…" disabled={!selectedConfig} />
               <p className="cfg-muted">Changes are written to the local game folder. Use “Save to account” to store a private cloud copy; use Account + profiles to bundle configs and installed-mod snapshots.</p>
             </div>
