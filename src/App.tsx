@@ -878,7 +878,7 @@ export default function App() {
 
   return <div className={"shell page-" + page.toLowerCase() + (sidebarCollapsed ? " sidebar-collapsed" : "")}>
     <aside className="sidebar">
-      <div className="brand"><button type="button" className="brand-logo menu-logo-toggle" onClick={() => setSidebarCollapsed((collapsed) => !collapsed)} aria-label={sidebarCollapsed ? "Expand sidebar menu" : "Collapse sidebar menu"} title={sidebarCollapsed ? "Expand menu" : "Collapse menu"}><img src="/image.jpg" alt="ModHub" /><span className="menu-logo-glyph" aria-hidden="true">☰</span></button><div><b>MOD</b><small>HUB <i>V2</i></small></div></div>
+      <div className="brand"><button type="button" className="brand-logo menu-logo-toggle" onClick={() => setSidebarCollapsed((collapsed) => !collapsed)} aria-label={sidebarCollapsed ? "Expand sidebar menu" : "Collapse sidebar menu"} title={sidebarCollapsed ? "Expand menu" : "Collapse menu"}><img src="/image.jpg" alt="ModHub" /><span className="menu-logo-glyph" aria-hidden="true">☰</span></button><div><b>MOD</b><small>HUB</small></div></div>
       <label className="side-label">WORKSPACE</label>
       <button className={'nav ' + (page === 'Overview' ? 'chosen' : '')} onClick={() => goToPage('Overview')}>⌂ <span>Overview</span></button>
       <button className={'nav ' + (page === 'Discover' ? 'chosen' : '')} onClick={() => goToPage('Discover')}>▦ <span>Discover mods</span></button>
@@ -889,12 +889,10 @@ export default function App() {
       <button className={'nav ' + (page === 'Editor' ? 'chosen' : '')} onClick={() => { if (!account) { notify('Sign in with GitHub to add and manage your own mods.'); return; } setEditingId(null); setDraft(blankDraft); goToPage('Editor'); }}>{showAdmin ? '×' : '＋'} <span>Mod editor ↗</span></button>
       {!desktop && <a className="nav install-app-nav" href="https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/releases/latest" target="_blank" rel="noreferrer">↓ <span>Install app</span><b aria-hidden="true">↗</b></a>}
       {desktop && <button className={'nav ' + (page === 'Settings' ? 'chosen' : '')} onClick={() => goToPage('Settings')}>⚙ <span>Settings</span></button>}
-      <label className="side-label">CATEGORIES</label>
-      {categories.map((item) => <button key={item} className={'nav catnav ' + (category === item ? 'chosen' : '')} onClick={() => setCategory(item)}><i className={'dot ' + item.toLowerCase().replace(' ', '-')} /><span>{item}</span></button>)}
       <div className="sidebottom">
         <div className="status"><i /><span><b>Mod base</b><small>{loading ? 'Loading catalogue…' : mods.length + ' listed mods'}</small></span></div>
         <button className="themebtn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☼' : '☾'} <span>{theme === 'dark' ? 'Light appearance' : 'Dark appearance'}</span><b>↗</b></button>
-        <small className="version">MODHUB · V2.1</small>
+        <small className="version">MODHUB</small>
       </div>
     </aside>
 
