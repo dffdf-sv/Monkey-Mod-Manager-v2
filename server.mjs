@@ -435,7 +435,7 @@ const server = http.createServer(async (req, res) => {
         const category = /core|library|framework|dependency/.test(topicText) ? 'Core' : /map|level/.test(topicText) ? 'Maps' : /cosmetic|skin|appearance/.test(topicText) ? 'Cosmetic' : /gameplay|menu|cheat/.test(topicText) ? 'Gameplay' : /utility|tool|helper/.test(topicText) ? 'Utility' : '';
         const additionalLinks = [];
         if (repoData.html_url) additionalLinks.push({ label: 'GitHub repository', url: repoData.html_url });
-        if (repoData.releases_url) additionalLinks.push({ label: 'Releases', url: 'https://github.com/' + owner + '/' + repo + '/releases' });
+        additionalLinks.push({ label: 'Latest release', url: httpsUrl(release.html_url || ('https://github.com/' + owner + '/' + repo + '/releases/latest'), true) || ('https://github.com/' + owner + '/' + repo + '/releases/latest') });
         if (repoData.html_url && repoData.has_wiki) additionalLinks.push({ label: 'Wiki', url: 'https://github.com/' + owner + '/' + repo + '/wiki' });
         return reply(res, 200, {
           name: String(repoData.name || repo).slice(0,90), author: String(repoData.owner && repoData.owner.login || owner).slice(0,90), githubOwnerId: String(repoData.owner && repoData.owner.id || ''), githubOwnerLogin: String(repoData.owner && repoData.owner.login || owner),
