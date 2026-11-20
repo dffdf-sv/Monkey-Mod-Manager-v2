@@ -387,3 +387,48 @@ footer .footer-links a:hover{color:var(--accent)}
 .secondary:hover{border-color:color-mix(in srgb,var(--accent) 35%,var(--line))}
 .overview-tiles>button,.overview-mod-card,.settings-card,.profile-card,.cfg-workspace,.admin-panel{border-radius:14px}
 @media(max-width:800px){.content{padding:20px 15px}.sectionhead h2{font-size:22px}.mod-picture{height:145px}}
+
+
+/* ModHub layout refresh — Modrinth-inspired structure, existing theme colours preserved. */
+.shell{--layout-gap:22px}
+.sidebar{width:232px;padding:22px 14px 16px;gap:0}
+.brand{padding:0 8px 28px}
+.side-label{padding-left:10px;padding-bottom:9px}
+.nav{height:39px;margin-bottom:3px;padding:0 10px;border-radius:9px;gap:11px}
+.nav.chosen{font-weight:700}
+.side-label:not(:first-of-type){margin-top:22px}
+.main{margin-left:232px}
+.topbar{height:64px;padding:0 clamp(20px,3vw,40px);position:sticky;top:0;z-index:4;backdrop-filter:blur(14px);background:color-mix(in srgb,var(--bg) 90%,transparent)}
+.content{max-width:1500px;padding:28px clamp(20px,3vw,40px) 30px}
+.sectionhead{margin-bottom:16px}
+.sectionhead h2{font-size:24px;letter-spacing:-.65px}
+.toolbar{align-items:center;margin-bottom:16px}
+.search{height:46px;max-width:560px;border-radius:11px}
+.pills button{border-radius:9px;padding:8px 12px}
+.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.modcard{border-radius:14px;overflow:hidden}
+.mod-picture{height:126px}
+.mod-picture-img{object-fit:cover;object-position:center}
+.card-body{padding:16px 17px 14px}
+.card-title{align-items:flex-start;gap:10px}
+.card-title h3{font-size:17px;line-height:1.25;margin:0 0 4px}
+.card-title .author{font-size:11px}
+.desc{height:auto;min-height:38px;max-height:58px;margin:12px 0;font-size:12px;line-height:1.55}
+.cardfoot{padding-top:12px;margin-top:10px}
+.install{padding:9px 13px;border-radius:9px;font-size:11px}
+.card-links{margin-top:9px;padding-top:9px}
+.overview-dashboard{gap:26px;margin:10px 0 36px}
+.overview-heading h2{font-size:clamp(28px,3vw,40px);letter-spacing:-1.1px}
+.overview-tiles{gap:12px}
+.overview-tiles>button,.overview-mod-card{border-radius:14px;padding:17px;transition:transform .15s ease,border-color .15s ease}
+.overview-tiles>button:hover,.overview-mod-card:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--accent) 38%,var(--line))}
+.product-page-route .product-page-modal{max-width:1480px}
+.product-page-modal>.detail-picture{height:clamp(230px,32vh,360px)}
+.product-page-layout{gap:20px}
+.product-sidebar{border-radius:13px}
+.product-tabs{gap:20px}
+.product-info-section{border-radius:13px;padding:20px}
+.editor-page,.settings-card,.profile-card,.cfg-workspace,.admin-panel{border-radius:14px}
+@media(max-width:1100px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.content{padding-left:22px;padding-right:22px}}
+@media(max-width:800px){.sidebar{width:70px;padding:18px 8px}.main{margin-left:70px}.content{padding:18px 14px}.topbar{height:58px;padding:0 14px}.grid{grid-template-columns:1fr}.mod-picture{height:140px}.overview-tiles{grid-template-columns:1fr}.sectionhead h2{font-size:22px}}
+@media(max-width:520px){.mod-picture{height:120px}.card-body{padding:14px}.overview-heading{align-items:flex-start}.overview-heading h2{font-size:28px}}
