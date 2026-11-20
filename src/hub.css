@@ -353,3 +353,37 @@ footer .footer-links{display:flex;align-items:center;justify-content:flex-end;ga
 footer .footer-links a{color:var(--muted);text-decoration:none}
 footer .footer-links a:hover{color:var(--accent)}
 @media(max-width:800px){footer .footer-links{justify-content:flex-start;gap:8px}}
+/* ModHub catalogue refresh: Modrinth-inspired dense cards, dark surfaces and clear green accents. */
+:root{--bg:#101215;--side:#141619;--panel:#191c20;--panel2:#22262b;--line:#30353b;--text:#f1f3f4;--muted:#939ba4;--accent:#1bd96a;--accentink:#07150c;--shadow:0 18px 50px #0006}
+:root[data-theme=light]{--bg:#f4f6f5;--side:#fff;--panel:#fff;--panel2:#edf1ee;--line:#dce3df;--text:#202722;--muted:#6d7972;--accent:#15964d;--accentink:#fff;--shadow:0 18px 50px #18251a12}
+.sidebar{background:var(--side);border-right-color:var(--line)}
+.nav{height:40px;border-radius:8px;font-size:12px}
+.nav.chosen{background:color-mix(in srgb,var(--accent) 11%,var(--panel));border-color:color-mix(in srgb,var(--accent) 22%,var(--line));color:var(--text)}
+.nav.chosen:first-of-type{box-shadow:inset 3px 0 var(--accent)}
+.content{padding-top:30px}
+.sectionhead{margin-bottom:22px}
+.sectionhead h2{font-size:25px;letter-spacing:-.5px}
+.toolbar{gap:14px;margin-bottom:20px}
+.search{border-radius:10px;background:var(--panel);border-color:var(--line);min-height:44px}
+.search:focus-within{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 15%,transparent)}
+.pills{gap:7px}
+.pills button{border-radius:8px;border:1px solid transparent;padding:8px 11px;background:var(--panel2);color:var(--muted)}
+.pills button:hover{border-color:var(--line);color:var(--text)}
+.pills button.pillactive{background:color-mix(in srgb,var(--accent) 13%,var(--panel));border-color:color-mix(in srgb,var(--accent) 28%,var(--line));color:var(--accent)}
+.modcard{border:1px solid var(--line);border-radius:13px;background:var(--panel);transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+.modcard:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--accent) 40%,var(--line));box-shadow:0 10px 28px #0003}
+.mod-picture{height:170px;border:0;background:var(--panel2)}
+.mod-picture-img{object-fit:cover;background:var(--panel2)}
+.mod-picture:after{inset:35% 0 0;background:linear-gradient(0deg,#0b0e12b8,transparent)}
+.picture-tag,.featured-tag{border-radius:7px;font-size:10px}
+.card-body{padding:16px}
+.card-title h3{font-size:17px;letter-spacing:-.25px}
+.card-title .author{font-size:11px}
+.desc{font-size:12px;line-height:1.55}
+.card-links{border-top:1px solid var(--line);margin-top:12px;padding-top:12px}
+.primary{background:var(--accent);border-color:var(--accent);color:var(--accentink)}
+.primary,.secondary,.details{border-radius:8px}
+.secondary{background:var(--panel2);border-color:var(--line)}
+.secondary:hover{border-color:color-mix(in srgb,var(--accent) 35%,var(--line))}
+.overview-tiles>button,.overview-mod-card,.settings-card,.profile-card,.cfg-workspace,.admin-panel{border-radius:14px}
+@media(max-width:800px){.content{padding:20px 15px}.sectionhead h2{font-size:22px}.mod-picture{height:145px}}
