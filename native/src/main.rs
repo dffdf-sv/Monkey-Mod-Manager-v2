@@ -347,7 +347,7 @@ impl App for ModHub {
                     if self.catalogue.is_empty(){ui.label(egui::RichText::new("Refresh the catalogue to load available mods.").color(muted));}
                     egui::ScrollArea::vertical().show(ui,|ui|{
                         let query=self.search.to_lowercase();
-                        let filtered:Vec<_>=self.catalogue.clone().into_iter().filter(|m| (self.category=="All Mods" || self.category=="Your Mods" || m.category.eq_ignore_ascii_case(&self.category)) && (query.is_empty()||m.name.to_lowercase().contains(&query)||m.description.to_lowercase().contains(&query)||m.category.to_lowercase().contains(&query)).collect();
+                        let filtered:Vec<_>=self.catalogue.clone().into_iter().filter(|m| (self.category=="All Mods" || m.category.eq_ignore_ascii_case(&self.category)) && (query.is_empty()||m.name.to_lowercase().contains(&query)||m.description.to_lowercase().contains(&query)||m.category.to_lowercase().contains(&query))).collect();
                         for chunk in filtered.chunks(2){
                             ui.columns(chunk.len(),|cols|{
                                 for (col,entry) in cols.iter_mut().zip(chunk){
