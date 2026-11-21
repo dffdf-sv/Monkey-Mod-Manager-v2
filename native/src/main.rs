@@ -257,7 +257,7 @@ impl App for ModHub {
                 ui.add_space(28.0);
                 ui.label(egui::RichText::new("LIBRARY").size(10.0).strong().color(muted));
                 ui.add_space(8.0);
-                for (icon,label,page) in [("⌕","Discover",Page::Discover),("▣","Installed",Page::Installed),("▤","Profiles",Page::Profiles),("⚙","Configs",Page::Config)] {
+                for (icon,label,page) in [("⌂","Overview",Page::Overview),("⌕","Discover",Page::Discover),("♡","Library",Page::Library),("▣","Installed",Page::Installed),("▤","Profiles",Page::Profiles),("⚙","Configs",Page::Config)] {
                     let selected = self.page == page;
                     let text = format!("{}   {}",icon,label);
                     let response=ui.add_sized([ui.available_width(),38.0],egui::SelectableLabel::new(selected,text));
@@ -284,6 +284,49 @@ impl App for ModHub {
         });
         egui::CentralPanel::default().frame(egui::Frame::NONE.fill(bg).inner_margin(egui::Margin::same(32))).show(ctx, |ui| {
             match self.page {
+                Page::Overview => {
+                    egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(18).inner_margin(28.0).show(ui,|ui|{
+                        ui.label(egui::RichText::new("GORILLA TAG MOD MANAGER").size(10.0).strong().color(accent));
+                        ui.add_space(8.0);
+                        ui.heading(egui::RichText::new("Make Gorilla Tag yours.").size(34.0));
+                        ui.label(egui::RichText::new("Discover, manage and customise your mods from one place.").color(muted));
+                        ui.add_space(18.0);
+                        ui.horizontal(|ui|{
+                            if ui.button("Explore mods  →").clicked(){self.page=Page::Discover;}
+                            if ui.button("Install BepInEx").clicked(){self.status="BepInEx setup is coming in a later native update.".into();}
+                            if ui.button("Refresh catalogue").clicked(){self.load_catalogue();}
+                        });
+                    });
+                    ui.add_space(18.0);
+                    ui.columns(3,|cols|{
+                        for (i,(label,value,sub)) in [("IN CATALOG",format!("{:02} mods",self.catalogue.len()),"Community mod base"),("YOUR LIBRARY",format!("{:02} installed",self.settings.installed.len()),"Managed by ModHub"),("GAME LOCATION",if self.settings.game_path.is_empty(){"Not set".into()}else{"Configured".into()},"Set in Settings")].iter().enumerate(){
+                            egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(12).inner_margin(16.0).show(&mut cols[i],|ui|{
+                                ui.label(egui::RichText::new(label).size(10.0).strong().color(muted));
+                                ui.add_space(8.0);
+                                ui.heading(egui::RichText::new(value).size(21.0).strong().color(accent));
+                                ui.label(egui::RichText::new(sub).small().color(muted));
+                            });
+                        }
+                    });
+                    ui.add_space(18.0);
+                    ui.heading("Quick access");
+                    ui.horizontal(|ui|{
+                        for (label,page) in [("Discover mods",Page::Discover),("Installed mods",Page::Installed),("Profiles",Page::Profiles),("Configs",Page::Config)] {
+                            if ui.add_sized([ui.available_width()/4.0-8.0,48.0],egui::Button::new(label)).clicked(){self.page=page;}
+                        }
+                    });
+                }
+                Page::Library => {
+                    ui.heading("Your library");
+                    ui.label(egui::RichText::new("Mods you've installed through ModHub.").color(muted));
+                    ui.add_space(12.0);
+                    if self.settings.installed.is_empty(){ui.label("Your library is empty. Browse Discover to install mods.");}
+                    for mod_name in self.settings.installed.clone(){
+                        egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(10).inner_margin(12.0).show(ui,|ui|{
+                            ui.horizontal(|ui|{ui.label("▣");ui.label(egui::RichText::new(&mod_name).strong());ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{if ui.button("View installed").clicked(){self.page=Page::Installed;}});});
+                        });
+                    }
+                }
                 Page::Discover => {
                     egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(16).inner_margin(22.0).show(ui,|ui|{
                         ui.label(egui::RichText::new("COMMUNITY MOD LIBRARY").size(10.0).strong().color(accent));
