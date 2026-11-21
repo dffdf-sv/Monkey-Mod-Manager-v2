@@ -162,89 +162,209 @@ impl ModHub {
 
 impl App for ModHub {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::TopBottomPanel::top("top").show(ctx, |ui| {
+        let accent = egui::Color32::from_rgb(199, 243, 107);
+        let bg = egui::Color32::from_rgb(11, 14, 18);
+        let side = egui::Color32::from_rgb(16, 19, 25);
+        let panel = egui::Color32::from_rgb(20, 24, 32);
+        let panel2 = egui::Color32::from_rgb(25, 30, 40);
+        let line = egui::Color32::from_rgb(37, 43, 54);
+        let muted = egui::Color32::from_rgb(129, 138, 154);
+        let mut visuals = egui::Visuals::dark();
+        visuals.window_fill = panel;
+        visuals.panel_fill = bg;
+        visuals.extreme_bg_color = side;
+        visuals.faint_bg_color = panel2;
+        visuals.widgets.noninteractive.bg_fill = panel;
+        visuals.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0, line);
+        visuals.widgets.inactive.bg_fill = panel2;
+        visuals.widgets.inactive.bg_stroke = egui::Stroke::new(1.0, line);
+        visuals.widgets.inactive.fg_stroke = egui::Stroke::new(1.0, muted);
+        visuals.widgets.hovered.bg_fill = egui::Color32::from_rgb(35, 43, 51);
+        visuals.widgets.hovered.bg_stroke = egui::Stroke::new(1.0, accent);
+        visuals.widgets.hovered.fg_stroke = egui::Stroke::new(1.0, egui::Color32::WHITE);
+        visuals.widgets.active.bg_fill = accent;
+        visuals.widgets.active.fg_stroke = egui::Stroke::new(1.0, bg);
+        visuals.selection.bg_fill = accent;
+        visuals.selection.stroke = egui::Stroke::new(1.0, bg);
+        visuals.window_corner_radius = egui::CornerRadius::same(12);
+        visuals.widgets.noninteractive.corner_radius = egui::CornerRadius::same(9);
+        visuals.widgets.inactive.corner_radius = egui::CornerRadius::same(8);
+        visuals.widgets.hovered.corner_radius = egui::CornerRadius::same(8);
+        visuals.widgets.active.corner_radius = egui::CornerRadius::same(8);
+        ctx.set_visuals(visuals);
+        ctx.style_mut(|style| {
+            style.spacing.item_spacing = egui::vec2(10.0, 10.0);
+            style.spacing.button_padding = egui::vec2(12.0, 8.0);
+            style.text_styles.insert(egui::TextStyle::Heading, egui::FontId::proportional(25.0));
+            style.text_styles.insert(egui::TextStyle::Body, egui::FontId::proportional(14.0));
+        });
+
+        egui::TopBottomPanel::top("topbar").frame(egui::Frame::NONE.fill(bg).inner_margin(egui::Margin::symmetric(24, 15))).show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.heading("ModHub");
-                ui.separator();
-                ui.label("Native Rust edition");
+                ui.label(egui::RichText::new("MODHUB").strong().size(16.0).letter_spacing(2.0).color(accent));
+                ui.label(egui::RichText::new(" / ").color(muted));
+                ui.label(egui::RichText::new(match self.page { Page::Discover=>"Discover",Page::Installed=>"Installed",Page::Profiles=>"Profiles",Page::Config=>"Configs",Page::Settings=>"Settings" }).strong());
+                ui.add_space(20.0);
+                if self.page == Page::Discover {
+                    ui.add_sized([260.0, 34.0], egui::TextEdit::singleline(&mut self.search).hint_text("⌕  Search mods..."));
+                }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(&self.status);
+                    ui.label(egui::RichText::new(&self.status).color(muted).small());
+                    ui.label(egui::RichText::new("●").color(accent));
                 });
             });
         });
-        egui::SidePanel::left("nav").resizable(false).default_width(150.0).show(ctx, |ui| {
-            ui.add_space(8.0);
-            for (label, page) in [("Discover",Page::Discover),("Installed",Page::Installed),("Profiles",Page::Profiles),("Configs",Page::Config),("Settings",Page::Settings)] {
-                if ui.selectable_label(self.page==page,label).clicked() { self.page=page; }
-            }
+        egui::SidePanel::left("nav").resizable(false).exact_width(226.0).frame(egui::Frame::NONE.fill(side).inner_margin(egui::Margin { left: 16, right: 16, top: 18, bottom: 16 })).show(ctx, |ui| {
+            ui.vertical(|ui| {
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new("M").size(26.0).strong().color(egui::Color32::from_rgb(24, 32, 15)));
+                    ui.add_space(4.0);
+                    ui.label(egui::RichText::new("ModHub").size(19.0).strong());
+                });
+                ui.label(egui::RichText::new("GORILLA TAG MOD MANAGER").size(9.0).color(muted));
+                ui.add_space(28.0);
+                ui.label(egui::RichText::new("LIBRARY").size(10.0).strong().color(muted));
+                ui.add_space(8.0);
+                for (icon,label,page) in [("⌕","Discover",Page::Discover),("▣","Installed",Page::Installed),("▤","Profiles",Page::Profiles),("⚙","Configs",Page::Config)] {
+                    let selected = self.page == page;
+                    let text = format!("{}   {}",icon,label);
+                    let response=ui.add_sized([ui.available_width(),38.0],egui::SelectableLabel::new(selected,text));
+                    if selected { ui.painter().rect_filled(response.rect.shrink(1.0),8.0, panel2); ui.painter().rect_filled(egui::Rect::from_min_size(response.rect.min,egui::vec2(3.0,response.rect.height())),3.0,accent); }
+                    if response.clicked(){self.page=page;}
+                }
+                ui.add_space(18.0);
+                ui.label(egui::RichText::new("APP").size(10.0).strong().color(muted));
+                ui.add_space(8.0);
+                let settings_resp=ui.add_sized([ui.available_width(),38.0],egui::SelectableLabel::new(self.page==Page::Settings,"⚙   Settings"));
+                if settings_resp.clicked(){self.page=Page::Settings;}
+                ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
+                    ui.add_space(6.0);
+                    ui.label(egui::RichText::new("NATIVE RUST EDITION").size(9.0).color(muted));
+                    ui.label(egui::RichText::new("●  Ready").size(11.0).color(accent));
+                    ui.add_space(10.0);
+                    egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(10).inner_margin(12.0).show(ui,|ui|{
+                        ui.label(egui::RichText::new("GORILLA TAG").strong().size(11.0));
+                        ui.label(egui::RichText::new(if self.settings.game_path.is_empty() {"Game folder not set"} else {"Game folder configured"}).size(10.0).color(muted));
+                        if ui.small_button("Open settings →").clicked(){self.page=Page::Settings;}
+                    });
+                });
+            });
         });
-        egui::CentralPanel::default().show(ctx, |ui| match self.page {
-            Page::Discover => {
-                ui.heading("Mod catalogue");
-                ui.horizontal(|ui| {
-                    ui.add(egui::TextEdit::singleline(&mut self.search).hint_text("Search mods"));
-                    if ui.button("Refresh catalogue").clicked() { self.load_catalogue(); }
-                });
-                if self.catalogue.is_empty() { ui.label("Press Refresh catalogue to fetch mods from the community repository."); }
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    let query=self.search.to_lowercase();
-                    for entry in self.catalogue.clone().into_iter().filter(|m| query.is_empty() || m.name.to_lowercase().contains(&query) || m.description.to_lowercase().contains(&query)) {
-                        ui.group(|ui| {
-                            ui.strong(&entry.name);
-                            ui.label(format!("{}  •  {}  •  {}",entry.author,entry.category,entry.version));
-                            ui.label(&entry.description);
-                            if ui.button(format!("Install {}",entry.name)).clicked() { self.install_mod(&entry); }
+        egui::CentralPanel::default().frame(egui::Frame::NONE.fill(bg).inner_margin(egui::Margin::same(24))).show(ctx, |ui| {
+            match self.page {
+                Page::Discover => {
+                    egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(16).inner_margin(22.0).show(ui,|ui|{
+                        ui.label(egui::RichText::new("COMMUNITY MOD LIBRARY").size(10.0).strong().color(accent));
+                        ui.add_space(5.0);
+                        ui.heading(egui::RichText::new("Make Gorilla Tag yours.").size(28.0));
+                        ui.label(egui::RichText::new("Discover and install community mods, all from ModHub.").color(muted));
+                        ui.add_space(10.0);
+                        ui.horizontal(|ui|{
+                            if ui.button("↻  Refresh catalogue").clicked(){self.load_catalogue();}
+                            ui.label(egui::RichText::new(format!("{} mods",self.catalogue.len())).color(muted));
                         });
-                    }
-                });
-            }
-            Page::Installed => {
-                ui.heading("Installed mods / plugins");
-                ui.label(format!("Plugin folder: {}",self.mods_dir().display()));
-                let items=self.installed_files();
-                if items.is_empty(){ui.label("No plugin files found. Check your game path and BepInEx installation.");}
-                for p in items { ui.label(p.file_name().unwrap_or_default().to_string_lossy()); }
-            }
-            Page::Profiles => {
-                ui.heading("Profiles");
-                ui.horizontal(|ui| {
-                    ui.add(egui::TextEdit::singleline(&mut self.profile_name).hint_text("New profile name"));
-                    if ui.button("Create").clicked(){self.create_profile();}
-                });
-                let names:Vec<String>=self.settings.profiles.iter().map(|p|p.name.clone()).collect();
-                for name in names {
-                    ui.horizontal(|ui|{
-                        if ui.selectable_label(self.settings.selected_profile==name,&name).clicked(){self.settings.selected_profile=name.clone();self.save_settings();}
-                        if ui.button("Delete").clicked(){self.settings.profiles.retain(|p|p.name!=name);if self.settings.selected_profile==name{self.settings.selected_profile.clear();}self.save_settings();}
+                    });
+                    ui.add_space(16.0);
+                    if self.catalogue.is_empty(){ui.label(egui::RichText::new("Refresh the catalogue to load available mods.").color(muted));}
+                    egui::ScrollArea::vertical().show(ui,|ui|{
+                        let query=self.search.to_lowercase();
+                        let filtered:Vec<_>=self.catalogue.clone().into_iter().filter(|m|query.is_empty()||m.name.to_lowercase().contains(&query)||m.description.to_lowercase().contains(&query)||m.category.to_lowercase().contains(&query)).collect();
+                        for chunk in filtered.chunks(2){
+                            ui.columns(chunk.len(),|cols|{
+                                for (col,entry) in cols.iter_mut().zip(chunk){
+                                    egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(12).inner_margin(16.0).show(col,|ui|{
+                                        ui.set_min_height(160.0);
+                                        ui.horizontal(|ui|{
+                                            ui.label(egui::RichText::new(entry.name.chars().take(2).collect::<String>().to_uppercase()).size(18.0).strong().color(accent));
+                                            ui.vertical(|ui|{
+                                                ui.label(egui::RichText::new(&entry.name).strong().size(16.0));
+                                                ui.label(egui::RichText::new(format!("{}  ·  {}",entry.category,entry.version)).small().color(muted));
+                                            });
+                                        });
+                                        ui.add_space(8.0);
+                                        ui.label(egui::RichText::new(&entry.description).color(muted));
+                                        ui.add_space(8.0);
+                                        ui.horizontal(|ui|{
+                                            ui.label(egui::RichText::new(format!("by {}",entry.author)).small().color(muted));
+                                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{
+                                                if ui.button("＋ Install").clicked(){self.install_mod(entry);}
+                                            });
+                                        });
+                                    });
+                                }
+                            });
+                            ui.add_space(10.0);
+                        }
                     });
                 }
-            }
-            Page::Config => {
-                ui.heading("Configuration editor");
-                ui.label("Edit and save a profile's text config (JSON/TOML/CFG).");
-                ui.add(egui::TextEdit::multiline(&mut self.config_text).desired_rows(20).code_editor());
-                if ui.button("Save config to selected profile").clicked(){
-                    let key="default.cfg".to_string();
-                    let config_text = self.config_text.clone();
-                    let saved = if let Some(p)=self.current_profile_mut(){p.configs.insert(key,config_text);true}else{false};
-                    if saved { self.save_settings(); self.status="Config saved into profile.".into(); }
-                    else { self.status="Create/select a profile first.".into(); }
+                Page::Installed => {
+                    ui.heading("Installed mods");
+                    ui.label(egui::RichText::new("Your plugins currently installed in Gorilla Tag.").color(muted));
+                    ui.add_space(14.0);
+                    ui.label(egui::RichText::new(format!("Location  {}",self.mods_dir().display())).small().color(muted));
+                    for p in self.installed_files(){
+                        egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(10).inner_margin(12.0).show(ui,|ui|{
+                            ui.horizontal(|ui|{ui.label("▣");ui.label(p.file_name().unwrap_or_default().to_string_lossy());});
+                        });
+                    }
                 }
-                if let Some(p)=self.settings.profiles.iter().find(|p|p.name==self.settings.selected_profile) {
-                    if let Some(saved)=p.configs.get("default.cfg") { if self.config_text.is_empty(){self.config_text=saved.clone();} }
+                Page::Profiles => {
+                    ui.heading("Profiles");
+                    ui.label(egui::RichText::new("Separate mod setups for different ways you play.").color(muted));
+                    ui.add_space(12.0);
+                    ui.horizontal(|ui|{
+                        ui.add_sized([260.0,34.0],egui::TextEdit::singleline(&mut self.profile_name).hint_text("New profile name"));
+                        if ui.button("＋ Create profile").clicked(){self.create_profile();}
+                    });
+                    ui.add_space(8.0);
+                    let names:Vec<String>=self.settings.profiles.iter().map(|p|p.name.clone()).collect();
+                    for name in names{
+                        egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(10).inner_margin(12.0).show(ui,|ui|{
+                            ui.horizontal(|ui|{
+                                if ui.selectable_label(self.settings.selected_profile==name,format!("▤  {}",name)).clicked(){self.settings.selected_profile=name.clone();self.save_settings();}
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{
+                                    if ui.small_button("Delete").clicked(){self.settings.profiles.retain(|p|p.name!=name);if self.settings.selected_profile==name{self.settings.selected_profile.clear();}self.save_settings();}
+                                });
+                            });
+                        });
+                    }
                 }
-            }
-            Page::Settings => {
-                ui.heading("Settings");
-                ui.label("Gorilla Tag game directory");
-                ui.text_edit_singleline(&mut self.settings.game_path);
-                ui.horizontal(|ui|{
-                    if ui.button("Detect game").clicked(){self.discover_game();}
-                    if ui.button("Save path").clicked(){self.save_settings();self.status="Settings saved.".into();}
-                });
-                ui.label("Game path should contain the Gorilla Tag executable. Mods are installed into BepInEx/plugins.");
-                ui.separator();
-                ui.label("Native build: Rust + egui (no Electron or embedded browser).");
+                Page::Config => {
+                    ui.heading("Config editor");
+                    ui.label(egui::RichText::new("Edit configuration text and save it to the selected profile.").color(muted));
+                    ui.add_space(12.0);
+                    ui.add(egui::TextEdit::multiline(&mut self.config_text).desired_rows(24).code_editor().desired_width(f32::INFINITY));
+                    if ui.button("Save config to profile").clicked(){
+                        let config_text=self.config_text.clone();
+                        let saved=if let Some(p)=self.current_profile_mut(){p.configs.insert("default.cfg".to_string(),config_text);true}else{false};
+                        if saved{self.save_settings();self.status="Config saved into profile.".into();}else{self.status="Create/select a profile first.".into();}
+                    }
+                    if let Some(p)=self.settings.profiles.iter().find(|p|p.name==self.settings.selected_profile){
+                        if let Some(saved)=p.configs.get("default.cfg"){if self.config_text.is_empty(){self.config_text=saved.clone();}}
+                    }
+                }
+                Page::Settings => {
+                    ui.heading("Settings");
+                    ui.label(egui::RichText::new("Configure ModHub and your Gorilla Tag installation.").color(muted));
+                    ui.add_space(14.0);
+                    egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(12).inner_margin(18.0).show(ui,|ui|{
+                        ui.heading("Game location");
+                        ui.label(egui::RichText::new("Select the Gorilla Tag install directory.").color(muted));
+                        ui.add_sized([ui.available_width(),36.0],egui::TextEdit::singleline(&mut self.settings.game_path).hint_text("Path to Gorilla Tag folder"));
+                        ui.horizontal(|ui|{
+                            if ui.button("Detect game").clicked(){self.discover_game();}
+                            if ui.button("Save location").clicked(){self.save_settings();self.status="Settings saved.".into();}
+                        });
+                        ui.add_space(8.0);
+                        ui.label(egui::RichText::new("Mods are installed to BepInEx/plugins inside this folder.").small().color(muted));
+                    });
+                    ui.add_space(12.0);
+                    egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(12).inner_margin(18.0).show(ui,|ui|{
+                        ui.heading("About ModHub");
+                        ui.label("Native Rust UI · no Electron or embedded browser");
+                        ui.label(egui::RichText::new("Community mod catalogue · Profiles · Configs").color(muted));
+                    });
+                }
             }
         });
     }
