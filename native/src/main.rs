@@ -182,7 +182,7 @@ impl App for ModHub {
             Page::Discover => {
                 ui.heading("Mod catalogue");
                 ui.horizontal(|ui| {
-                    ui.text_edit_singleline(&mut self.search).hint_text("Search mods");
+                    ui.add(egui::TextEdit::singleline(&mut self.search).hint_text("Search mods"));
                     if ui.button("Refresh catalogue").clicked() { self.load_catalogue(); }
                 });
                 if self.catalogue.is_empty() { ui.label("Press Refresh catalogue to fetch mods from the community repository."); }
@@ -208,7 +208,7 @@ impl App for ModHub {
             Page::Profiles => {
                 ui.heading("Profiles");
                 ui.horizontal(|ui| {
-                    ui.text_edit_singleline(&mut self.profile_name).hint_text("New profile name");
+                    ui.add(egui::TextEdit::singleline(&mut self.profile_name).hint_text("New profile name"));
                     if ui.button("Create").clicked(){self.create_profile();}
                 });
                 let names:Vec<String>=self.settings.profiles.iter().map(|p|p.name.clone()).collect();
