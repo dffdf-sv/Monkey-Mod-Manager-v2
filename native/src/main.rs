@@ -2,7 +2,7 @@ use directories::{ProjectDirs, UserDirs};
 use eframe::{egui, App};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::{Path, PathBuf}, time::Duration};
+use std::{fs, path::PathBuf, time::Duration};
 
 const MOD_REPO: &str = "dffdf-sv/GORILA-TAG-MODBASE";
 const CATALOGUE_FILE: &str = "modinfo.Json";
@@ -225,8 +225,10 @@ impl App for ModHub {
                 ui.add(egui::TextEdit::multiline(&mut self.config_text).desired_rows(20).code_editor());
                 if ui.button("Save config to selected profile").clicked(){
                     let key="default.cfg".to_string();
-                    if let Some(p)=self.current_profile_mut(){p.configs.insert(key,self.config_text.clone());self.save_settings();self.status="Config saved into profile.".into();}
-                    else {self.status="Create/select a profile first.".into();}
+                    let config_text = self.config_text.clone();
+                    let saved = if let Some(p)=self.current_profile_mut(){p.configs.insert(key,config_text);true}else{false};
+                    if saved { self.save_settings(); self.status="Config saved into profile.".into(); }
+                    else { self.status="Create/select a profile first.".into(); }
                 }
                 if let Some(p)=self.settings.profiles.iter().find(|p|p.name==self.settings.selected_profile) {
                     if let Some(saved)=p.configs.get("default.cfg") { if self.config_text.is_empty(){self.config_text=saved.clone();} }
