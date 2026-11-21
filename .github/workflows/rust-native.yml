@@ -35,7 +35,7 @@ jobs:
         run: cargo build --release
       - name: Create AppDir structure
         run: |
-          mkdir -p AppDir/usr/bin AppDir/usr/share/icons/hicolor/256x256/apps
+          mkdir -p AppDir/usr/bin AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/256x256/apps
           cp native/target/release/modhub-native AppDir/usr/bin/modhub-native
           convert public/image.jpg -resize 256x256 AppDir/usr/share/icons/hicolor/256x256/apps/modhub.png
           cat > AppDir/modhub.desktop <<'EOF'
