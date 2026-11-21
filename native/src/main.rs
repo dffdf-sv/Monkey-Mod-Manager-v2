@@ -324,10 +324,10 @@ impl App for ModHub {
                     ui.columns(3,|cols|{
                         for (i,(label,value,sub)) in [("IN CATALOG",format!("{:02} mods",self.catalogue.len()),"Community mod base"),("YOUR LIBRARY",format!("{:02} installed",self.settings.installed.len()),"Managed by ModHub"),("GAME LOCATION",if self.settings.game_path.is_empty(){"Not set".into()}else{"Configured".into()},"Set in Settings")].iter().enumerate(){
                             egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(12).inner_margin(16.0).show(&mut cols[i],|ui|{
-                                ui.label(egui::RichText::new(label).size(10.0).strong().color(muted));
+                                ui.label(egui::RichText::new(*label).size(10.0).strong().color(muted));
                                 ui.add_space(8.0);
                                 ui.heading(egui::RichText::new(value).size(21.0).strong().color(accent));
-                                ui.label(egui::RichText::new(sub).small().color(muted));
+                                ui.label(egui::RichText::new(*sub).small().color(muted));
                             });
                         }
                     });
