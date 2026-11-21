@@ -187,10 +187,31 @@ impl ModHub {
     fn create_profile(&mut self) {
         let name = self.profile_name.trim().to_string();
         if name.is_empty() || self.settings.profiles.iter().any(|p| p.name.eq_ignore_ascii_case(&name)) { return; }
-        self.settings.profiles.push(Profile{name:name.clone(), ..Default::default()});
+        let enabled_mods = self.installed_files().into_iter().filter(|p| !p.file_name().unwrap_or_default().to_string_lossy().to_ascii_lowercase().ends_with(".dll.disabled")).map(|p|p.file_name().unwrap_or_default().to_string_lossy().to_string()).collect();
+        self.settings.profiles.push(Profile{name:name.clone(), enabled_mods, ..Default::default()});
         self.settings.selected_profile = name;
         self.profile_name.clear();
         self.save_settings();
+    }
+    fn apply_profile(&mut self, profile_name: &str) {
+        let Some(profile)=self.settings.profiles.iter().find(|p|p.name==profile_name).cloned() else { self.status="Profile not found.".into(); return; };
+        let desired:std::collections::HashSet<String>=profile.enabled_mods.into_iter().collect();
+        let files=self.installed_files();
+        let mut changed=0;
+        for path in files {
+            let file=path.file_name().unwrap_or_default().to_string_lossy().to_string();
+            let disabled=file.to_ascii_lowercase().ends_with(".dll.disabled");
+            let active_name=if disabled { file.trim_end_matches(".disabled").to_string() } else { file.clone() };
+            let should_enable=desired.contains(&active_name);
+            if should_enable==disabled {
+                let mut next=path.clone();
+                if disabled { next.set_extension("dll"); } else { next.set_extension("dll.disabled"); }
+                if fs::rename(&path,&next).is_ok(){changed+=1;}
+            }
+        }
+        self.settings.selected_profile=profile_name.to_string();
+        self.save_settings();
+        self.status=format!("Applied profile '{}' ({} plugin changes).",profile_name,changed);
     }
 }
 
@@ -421,6 +442,7 @@ impl App for ModHub {
                             ui.horizontal(|ui|{
                                 if ui.selectable_label(self.settings.selected_profile==name,format!("▤  {}",name)).clicked(){self.settings.selected_profile=name.clone();self.save_settings();}
                                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{
+                                    if ui.small_button("Apply").clicked(){self.apply_profile(&name);}
                                     if ui.small_button("Delete").clicked(){self.settings.profiles.retain(|p|p.name!=name);if self.settings.selected_profile==name{self.settings.selected_profile.clear();}self.save_settings();}
                                 });
                             });
