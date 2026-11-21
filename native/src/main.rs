@@ -286,7 +286,7 @@ impl App for ModHub {
                 });
                 
                 ui.add_space(28.0);
-                ui.label(egui::RichText::new("LIBRARY").size(10.0).strong().color(muted));
+                ui.label(egui::RichText::new("WORKSPACE").size(10.0).strong().color(muted));
                 ui.add_space(8.0);
                 for (icon,label,page) in [("⌂","Overview",Page::Overview),("▦","Discover mods",Page::Discover),("▣","Your mods",Page::Library),("♙","Account + profiles",Page::Profiles),("▣","Installed mods",Page::Installed),("⚙","CFG editor",Page::Config)] {
                     let selected = self.page == page;
@@ -298,21 +298,17 @@ impl App for ModHub {
                 let editor_response=ui.add_sized([ui.available_width(),36.0],egui::SelectableLabel::new(false,"＋   Mod editor ↗"));
                 if editor_response.clicked(){self.status="Sign in with GitHub to manage your own mods.".into();}
 
-                ui.add_space(18.0);
+                ui.add_space(14.0);
                 ui.label(egui::RichText::new("APP").size(10.0).strong().color(muted));
                 ui.add_space(8.0);
                 let settings_resp=ui.add_sized([ui.available_width(),38.0],egui::SelectableLabel::new(self.page==Page::Settings,"⚙   Settings"));
                 if settings_resp.clicked(){self.page=Page::Settings;}
                 ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
                     ui.add_space(6.0);
-                    ui.label(egui::RichText::new("MODHUB").size(9.0).color(muted));
-                    ui.label(egui::RichText::new("●  Mod base").size(11.0).color(accent));
-                    ui.label(egui::RichText::new(format!("{} listed mods",self.catalogue.len())).size(10.0).color(muted));
-                    ui.add_space(10.0);
+                    ui.label(egui::RichText::new("MODHUB").size(8.0).color(muted));
+                    ui.add_space(6.0);
                     egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(10).inner_margin(12.0).show(ui,|ui|{
-                        ui.label(egui::RichText::new("Mod base").strong().size(11.0));
-                        ui.label(egui::RichText::new(format!("{} listed mods",self.catalogue.len())).size(10.0).color(muted));
-                        if ui.small_button("Open settings →").clicked(){self.page=Page::Settings;}
+                        ui.horizontal(|ui|{ui.label(egui::RichText::new("●").color(accent));ui.vertical(|ui|{ui.label(egui::RichText::new("Mod base").strong().size(11.0));ui.label(egui::RichText::new(format!("{} listed mods",self.catalogue.len())).size(10.0).color(muted));});});
                     });
                 });
             });
