@@ -88,6 +88,8 @@ jobs:
         with:
           name: ModHub-Linux-AppImage
           path: release-assets
+      - name: Rename release files
+        run: mv release-assets/modhub-native.exe release-assets/ModHub-Windows.exe
       - name: Publish preview prerelease
         env:
           GH_TOKEN: ${{ github.token }}
