@@ -254,29 +254,37 @@ impl App for ModHub {
             style.text_styles.insert(egui::TextStyle::Body, egui::FontId::proportional(14.0));
         });
 
-        egui::TopBottomPanel::top("topbar").frame(egui::Frame::NONE.fill(bg).inner_margin(egui::Margin::symmetric(42, 18))).show(ctx, |ui| {
+        egui::TopBottomPanel::top("topbar").frame(egui::Frame::NONE.fill(bg).inner_margin(egui::Margin::symmetric(20, 12))).show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("MODHUB").strong().size(16.0).extra_letter_spacing(2.0).color(accent));
-                ui.label(egui::RichText::new(" / ").color(muted));
-                ui.label(egui::RichText::new(match self.page { Page::Overview=>"Overview",Page::Discover=>"Discover",Page::Library=>"Library",Page::Installed=>"Installed",Page::Profiles=>"Profiles",Page::Config=>"Configs",Page::Settings=>"Settings" }).strong());
-                ui.add_space(20.0);
+                if ui.selectable_label(false, egui::RichText::new("Workspace").color(muted)).clicked(){self.page=Page::Overview;}
+                if ui.selectable_label(self.page==Page::Profiles, "Profiles").clicked(){self.page=Page::Profiles;}
+                ui.add_space(8.0);
+                let game_chip=egui::Frame::new().fill(panel2).stroke(egui::Stroke::new(1.0,line)).corner_radius(16).inner_margin(egui::Margin::symmetric(10,6));
+                game_chip.show(ui,|ui|{ui.horizontal(|ui|{ui.label(egui::RichText::new("●").color(accent).small());ui.label(egui::RichText::new("Gorilla Tag").small());});});
+                ui.add_space(6.0);
+                if ui.button("▶  Launch game").clicked(){
+                    let exe=self.game_dir().join(if cfg!(windows){"Gorilla Tag.exe"}else{"Gorilla Tag"});
+                    if exe.exists(){if let Err(e)=std::process::Command::new(exe).spawn(){self.status=format!("Launch failed: {e}");}}else{self.status="Set your Gorilla Tag folder in Settings first.".into();}
+                }
                 if self.page == Page::Discover || self.page == Page::Library {
-                    ui.add_sized([260.0, 34.0], egui::TextEdit::singleline(&mut self.search).hint_text("⌕  Search mods..."));
+                    ui.add_sized([210.0, 32.0], egui::TextEdit::singleline(&mut self.search).hint_text("⌕  Search mods..."));
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(egui::RichText::new(&self.status).color(muted).small());
-                    ui.label(egui::RichText::new("●").color(accent));
+                    let avatar=ui.add_sized([28.0,28.0],egui::Button::new(egui::RichText::new("M").strong().color(bg)).fill(accent));
+                    if avatar.clicked(){self.status="GitHub sign-in is not connected in the native build yet.".into();}
+                    if ui.button("Sign in with GitHub").clicked(){let _=webbrowser::open("https://github.com/login");}
+                    if ui.button("⚙").clicked(){self.page=Page::Settings;}
                 });
             });
         });
-        egui::SidePanel::left("nav").resizable(false).exact_width(248.0).frame(egui::Frame::NONE.fill(side).inner_margin(egui::Margin { left: 16, right: 16, top: 18, bottom: 16 })).show(ctx, |ui| {
+        egui::SidePanel::left("nav").resizable(false).exact_width(214.0).frame(egui::Frame::NONE.fill(side).inner_margin(egui::Margin { left: 14, right: 14, top: 18, bottom: 14 })).show(ctx, |ui| {
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new("M").size(26.0).strong().color(egui::Color32::from_rgb(24, 32, 15)));
+                    ui.label(egui::RichText::new("🟩").size(26.0));
                     ui.add_space(4.0);
-                    ui.label(egui::RichText::new("MODHUB").size(15.0).strong().extra_letter_spacing(2.0));
+                    ui.vertical(|ui| {ui.label(egui::RichText::new("MOD").size(15.0).strong().extra_letter_spacing(2.0));ui.label(egui::RichText::new("HUB").size(9.0).extra_letter_spacing(2.0).color(muted));});
                 });
-                ui.label(egui::RichText::new("GORILLA TAG MOD MANAGER").size(10.0).strong().color(muted));
+                
                 ui.add_space(28.0);
                 ui.label(egui::RichText::new("LIBRARY").size(10.0).strong().color(muted));
                 ui.add_space(8.0);
@@ -305,7 +313,7 @@ impl App for ModHub {
                 });
             });
         });
-        egui::CentralPanel::default().frame(egui::Frame::NONE.fill(bg).inner_margin(egui::Margin::same(32))).show(ctx, |ui| {
+        egui::CentralPanel::default().frame(egui::Frame::NONE.fill(bg).inner_margin(egui::Margin::same(22))).show(ctx, |ui| {
             match self.page {
                 Page::Overview => {
                     egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(18).inner_margin(28.0).show(ui,|ui|{
