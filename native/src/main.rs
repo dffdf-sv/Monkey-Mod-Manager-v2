@@ -34,6 +34,7 @@ struct Settings {
     #[serde(default)] selected_profile: String,
     #[serde(default)] profiles: Vec<Profile>,
     #[serde(default)] installed: Vec<String>,
+    #[serde(default)] bookmarks: Vec<String>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -44,6 +45,7 @@ struct ModHub {
     page: Page,
     catalogue: Vec<ModEntry>,
     search: String,
+    category: String,
     status: String,
     config_text: String,
     profile_name: String,
@@ -53,7 +55,7 @@ impl ModHub {
     fn new() -> Self {
         let settings = Self::load_settings();
         Self {
-            settings, page: Page::Overview, catalogue: vec![], search: String::new(),
+            settings, page: Page::Overview, catalogue: vec![], search: String::new(), category: "All Mods".into(),
             status: "Ready. Choose your Gorilla Tag folder in Settings.".into(),
             config_text: String::new(), profile_name: String::new(),
         }
@@ -318,12 +320,12 @@ impl App for ModHub {
                 }
                 Page::Library => {
                     ui.heading("Your library");
-                    ui.label(egui::RichText::new("Mods you've installed through ModHub.").color(muted));
+                    ui.label(egui::RichText::new("Your bookmarked mods.").color(muted));
                     ui.add_space(12.0);
-                    if self.settings.installed.is_empty(){ui.label("Your library is empty. Browse Discover to install mods.");}
-                    for mod_name in self.settings.installed.clone(){
+                    if self.settings.bookmarks.is_empty(){ui.label("No bookmarks yet. Browse Discover and bookmark mods.");}
+                    for mod_name in self.settings.bookmarks.clone(){
                         egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(10).inner_margin(12.0).show(ui,|ui|{
-                            ui.horizontal(|ui|{ui.label("▣");ui.label(egui::RichText::new(&mod_name).strong());ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{if ui.button("View installed").clicked(){self.page=Page::Installed;}});});
+                            ui.horizontal(|ui|{ui.label("▣");ui.label(egui::RichText::new(&mod_name).strong());ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{if ui.button("Remove bookmark").clicked(){self.settings.bookmarks.retain(|n|n!=&mod_name);self.save_settings();}});});
                         });
                     }
                 }
@@ -339,11 +341,13 @@ impl App for ModHub {
                             ui.label(egui::RichText::new(format!("{} mods",self.catalogue.len())).color(muted));
                         });
                     });
-                    ui.add_space(16.0);
+                    ui.add_space(12.0);
+                    ui.horizontal_wrapped(|ui| { for category in ["All Mods","Core","Utility","Cosmetic","Maps","Gameplay","Your Mods"] { if ui.selectable_label(self.category==category,category).clicked(){self.category=category.to_string();} } });
+                    ui.add_space(12.0);
                     if self.catalogue.is_empty(){ui.label(egui::RichText::new("Refresh the catalogue to load available mods.").color(muted));}
                     egui::ScrollArea::vertical().show(ui,|ui|{
                         let query=self.search.to_lowercase();
-                        let filtered:Vec<_>=self.catalogue.clone().into_iter().filter(|m|query.is_empty()||m.name.to_lowercase().contains(&query)||m.description.to_lowercase().contains(&query)||m.category.to_lowercase().contains(&query)).collect();
+                        let filtered:Vec<_>=self.catalogue.clone().into_iter().filter(|m| (self.category=="All Mods" || self.category=="Your Mods" || m.category.eq_ignore_ascii_case(&self.category)) && (query.is_empty()||m.name.to_lowercase().contains(&query)||m.description.to_lowercase().contains(&query)||m.category.to_lowercase().contains(&query)).collect();
                         for chunk in filtered.chunks(2){
                             ui.columns(chunk.len(),|cols|{
                                 for (col,entry) in cols.iter_mut().zip(chunk){
@@ -354,12 +358,14 @@ impl App for ModHub {
                                             ui.vertical(|ui|{
                                                 ui.label(egui::RichText::new(&entry.name).strong().size(16.0));
                                                 ui.label(egui::RichText::new(format!("{}  ·  {}",entry.category,entry.version)).small().color(muted));
+                                            if self.settings.bookmarks.contains(&entry.name){ui.label(egui::RichText::new("★").color(accent));}
                                             });
                                         });
                                         ui.add_space(8.0);
                                         ui.label(egui::RichText::new(&entry.description).color(muted));
                                         ui.add_space(8.0);
                                         ui.horizontal(|ui|{
+                                            if ui.small_button(if self.settings.bookmarks.contains(&entry.name){"★ Saved"}else{"☆ Bookmark"}).clicked(){ if self.settings.bookmarks.contains(&entry.name){self.settings.bookmarks.retain(|n|n!=&entry.name);}else{self.settings.bookmarks.push(entry.name.clone());} self.save_settings(); }
                                             ui.label(egui::RichText::new(format!("by {}",entry.author)).small().color(muted));
                                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{
                                                 if ui.button("＋ Install").clicked(){self.install_mod(entry);}
