@@ -288,13 +288,16 @@ impl App for ModHub {
                 ui.add_space(28.0);
                 ui.label(egui::RichText::new("LIBRARY").size(10.0).strong().color(muted));
                 ui.add_space(8.0);
-                for (icon,label,page) in [("⌂","Overview",Page::Overview),("⌕","Discover",Page::Discover),("♡","Library",Page::Library),("▣","Installed",Page::Installed),("▤","Profiles",Page::Profiles),("⚙","Configs",Page::Config)] {
+                for (icon,label,page) in [("⌂","Overview",Page::Overview),("▦","Discover mods",Page::Discover),("▣","Your mods",Page::Library),("♙","Account + profiles",Page::Profiles),("▣","Installed mods",Page::Installed),("⚙","CFG editor",Page::Config)] {
                     let selected = self.page == page;
                     let text = format!("{}   {}",icon,label);
-                    let response=ui.add_sized([ui.available_width(),38.0],egui::SelectableLabel::new(selected,text));
-                    if selected { ui.painter().rect_filled(response.rect.shrink(1.0),8.0, panel2); ui.painter().rect_filled(egui::Rect::from_min_size(response.rect.min,egui::vec2(3.0,response.rect.height())),3.0,accent); }
+                    let response=ui.add_sized([ui.available_width(),36.0],egui::SelectableLabel::new(selected,text));
+                    if selected { ui.painter().rect_filled(response.rect.shrink(1.0),8.0,panel2); ui.painter().rect_filled(egui::Rect::from_min_size(response.rect.min,egui::vec2(3.0,response.rect.height())),3.0,accent); }
                     if response.clicked(){self.page=page;}
                 }
+                let editor_response=ui.add_sized([ui.available_width(),36.0],egui::SelectableLabel::new(false,"＋   Mod editor ↗"));
+                if editor_response.clicked(){self.status="Sign in with GitHub to manage your own mods.".into();}
+
                 ui.add_space(18.0);
                 ui.label(egui::RichText::new("APP").size(10.0).strong().color(muted));
                 ui.add_space(8.0);
@@ -302,12 +305,13 @@ impl App for ModHub {
                 if settings_resp.clicked(){self.page=Page::Settings;}
                 ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
                     ui.add_space(6.0);
-                    ui.label(egui::RichText::new("NATIVE RUST EDITION").size(9.0).color(muted));
-                    ui.label(egui::RichText::new("●  Ready").size(11.0).color(accent));
+                    ui.label(egui::RichText::new("MODHUB").size(9.0).color(muted));
+                    ui.label(egui::RichText::new("●  Mod base").size(11.0).color(accent));
+                    ui.label(egui::RichText::new(format!("{} listed mods",self.catalogue.len())).size(10.0).color(muted));
                     ui.add_space(10.0);
                     egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(10).inner_margin(12.0).show(ui,|ui|{
-                        ui.label(egui::RichText::new("GORILLA TAG").strong().size(11.0));
-                        ui.label(egui::RichText::new(if self.settings.game_path.is_empty() {"Game folder not set"} else {"Game folder configured"}).size(10.0).color(muted));
+                        ui.label(egui::RichText::new("Mod base").strong().size(11.0));
+                        ui.label(egui::RichText::new(format!("{} listed mods",self.catalogue.len())).size(10.0).color(muted));
                         if ui.small_button("Open settings →").clicked(){self.page=Page::Settings;}
                     });
                 });
@@ -436,24 +440,52 @@ impl App for ModHub {
                     }
                 }
                 Page::Profiles => {
-                    ui.heading("Profiles");
-                    ui.label(egui::RichText::new("Separate mod setups for different ways you play.").color(muted));
-                    ui.add_space(12.0);
-                    ui.horizontal(|ui|{
-                        ui.add_sized([260.0,34.0],egui::TextEdit::singleline(&mut self.profile_name).hint_text("New profile name"));
-                        if ui.button("＋ Create profile").clicked(){self.create_profile();}
+                    egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(16).inner_margin(20.0).show(ui,|ui|{
+                        ui.horizontal(|ui|{
+                            ui.vertical(|ui|{
+                                ui.label(egui::RichText::new("YOUR ACCOUNT").size(10.0).strong().color(accent));
+                                ui.add_space(5.0);
+                                ui.heading(egui::RichText::new("Account & profiles").size(25.0));
+                                ui.label(egui::RichText::new("Keep saved mods, installed-mod snapshots, and CFG files synced to ModHub's private cloud storage, linked to your GitHub identity.").color(muted));
+                            });
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Min),|ui|{
+                                if ui.add_sized([90.0,48.0],egui::Button::new("↻ Refresh\\naccount")).clicked(){self.status="Account refresh requires GitHub sign-in.".into();}
+                            });
+                        });
+                        ui.add_space(14.0);
+                        ui.horizontal(|ui|{
+                            ui.label(egui::RichText::new("Sign in with GitHub to save profiles, configs, and installed-mod lists to your account.").color(muted));
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{
+                                if ui.button("Sign in with GitHub").clicked(){let _=webbrowser::open("https://github.com/login");}
+                            });
+                        });
                     });
-                    ui.add_space(8.0);
-                    let names:Vec<String>=self.settings.profiles.iter().map(|p|p.name.clone()).collect();
-                    for name in names{
-                        egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(10).inner_margin(12.0).show(ui,|ui|{
-                            ui.horizontal(|ui|{
-                                if ui.selectable_label(self.settings.selected_profile==name,format!("▤  {}",name)).clicked(){self.settings.selected_profile=name.clone();self.save_settings();}
-                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{
-                                    if ui.small_button("Apply").clicked(){self.apply_profile(&name);}
-                                    if ui.small_button("Delete").clicked(){self.settings.profiles.retain(|p|p.name!=name);if self.settings.selected_profile==name{self.settings.selected_profile.clear();}self.save_settings();}
+                    if !self.settings.profiles.is_empty(){
+                        ui.add_space(16.0);
+                        ui.heading("Local profiles");
+                        ui.horizontal(|ui|{
+                            ui.add_sized([260.0,34.0],egui::TextEdit::singleline(&mut self.profile_name).hint_text("New profile name"));
+                            if ui.button("＋ Create profile").clicked(){self.create_profile();}
+                        });
+                        ui.add_space(8.0);
+                        let names:Vec<String>=self.settings.profiles.iter().map(|p|p.name.clone()).collect();
+                        for name in names{
+                            egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(10).inner_margin(12.0).show(ui,|ui|{
+                                ui.horizontal(|ui|{
+                                    if ui.selectable_label(self.settings.selected_profile==name,format!("▤  {}",name)).clicked(){self.settings.selected_profile=name.clone();self.save_settings();}
+                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{
+                                        if ui.small_button("Apply").clicked(){self.apply_profile(&name);}
+                                        if ui.small_button("Delete").clicked(){self.settings.profiles.retain(|p|p.name!=name);if self.settings.selected_profile==name{self.settings.selected_profile.clear();}self.save_settings();}
+                                    });
                                 });
                             });
+                        }
+                    } else {
+                        ui.add_space(14.0);
+                        ui.label(egui::RichText::new("No local profiles yet. Sign in to sync profiles to your account, or create a local profile below.").color(muted));
+                        ui.horizontal(|ui|{
+                            ui.add_sized([260.0,34.0],egui::TextEdit::singleline(&mut self.profile_name).hint_text("New profile name"));
+                            if ui.button("＋ Create profile").clicked(){self.create_profile();}
                         });
                     }
                 }
