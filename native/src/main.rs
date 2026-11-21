@@ -201,7 +201,7 @@ impl App for ModHub {
 
         egui::TopBottomPanel::top("topbar").frame(egui::Frame::NONE.fill(bg).inner_margin(egui::Margin::symmetric(24, 15))).show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("MODHUB").strong().size(16.0).letter_spacing(2.0).color(accent));
+                ui.label(egui::RichText::new("MODHUB").strong().size(16.0).extra_letter_spacing(2.0).color(accent));
                 ui.label(egui::RichText::new(" / ").color(muted));
                 ui.label(egui::RichText::new(match self.page { Page::Discover=>"Discover",Page::Installed=>"Installed",Page::Profiles=>"Profiles",Page::Config=>"Configs",Page::Settings=>"Settings" }).strong());
                 ui.add_space(20.0);
