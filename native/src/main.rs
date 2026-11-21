@@ -441,18 +441,21 @@ impl App for ModHub {
                             ui.vertical(|ui|{
                                 ui.label(egui::RichText::new("YOUR ACCOUNT").size(10.0).strong().color(accent));
                                 ui.add_space(5.0);
-                                ui.heading(egui::RichText::new("Account & profiles").size(25.0));
-                                ui.label(egui::RichText::new("Keep saved mods, installed-mod snapshots, and CFG files synced to ModHub's private cloud storage, linked to your GitHub identity.").color(muted));
+                                ui.heading(egui::RichText::new("Account & profiles").size(24.0));
+                                ui.add_space(4.0);
+                                ui.label(egui::RichText::new("Keep saved mods, installed-mod snapshots, and CFG files synced to ModHub's private cloud storage, linked to your GitHub identity.").color(muted).size(12.0));
                             });
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min),|ui|{
-                                if ui.add_sized([90.0,48.0],egui::Button::new("↻ Refresh\\naccount")).clicked(){self.status="Account refresh requires GitHub sign-in.".into();}
+                                if ui.add_sized([96.0,46.0],egui::Button::new(egui::RichText::new("↻ Refresh\\naccount").small())).clicked(){self.status="Account refresh requires GitHub sign-in.".into();}
                             });
                         });
                         ui.add_space(14.0);
-                        ui.horizontal(|ui|{
-                            ui.label(egui::RichText::new("Sign in with GitHub to save profiles, configs, and installed-mod lists to your account.").color(muted));
-                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{
-                                if ui.button("Sign in with GitHub").clicked(){let _=webbrowser::open("https://github.com/login");}
+                        egui::Frame::new().fill(panel2).stroke(egui::Stroke::new(1.0,egui::Color32::from_rgb(105,76,43))).corner_radius(8).inner_margin(10.0).show(ui,|ui|{
+                            ui.horizontal(|ui|{
+                                ui.label(egui::RichText::new("Sign in with GitHub to save profiles, configs, and installed-mod lists to your account.").color(muted).size(12.0));
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{
+                                    if ui.button("Sign in with GitHub").clicked(){let _=webbrowser::open("https://github.com/login");}
+                                });
                             });
                         });
                     });
