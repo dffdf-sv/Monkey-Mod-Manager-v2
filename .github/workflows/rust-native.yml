@@ -1,0 +1,33 @@
+name: Build ModHub Native (Rust)
+on:
+  push:
+    branches: [rust-native]
+    paths: ["native/**", ".github/workflows/rust-native.yml"]
+  pull_request:
+    paths: ["native/**", ".github/workflows/rust-native.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libxkbcommon-dev libwayland-dev libx11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-xkb-dev libxkbcommon-x11-dev
+      - name: Build release
+        working-directory: native
+        run: cargo build --release
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: modhub-native-${{ matrix.os }}
+          path: |
+            native/target/release/modhub-native*
+            native/target/release/ModHub*
