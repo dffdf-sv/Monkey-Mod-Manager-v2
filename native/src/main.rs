@@ -145,7 +145,39 @@ impl ModHub {
         }
     }
     fn installed_files(&self) -> Vec<PathBuf> {
-        fs::read_dir(self.mods_dir()).ok().into_iter().flatten().filter_map(|e| e.ok().map(|e|e.path())).collect()
+        fn collect(dir: &PathBuf, output: &mut Vec<PathBuf>) {
+            let Ok(entries) = fs::read_dir(dir) else { return };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    collect(&path, output);
+                } else if path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("dll"))
+                    || path.to_string_lossy().to_ascii_lowercase().ends_with(".dll.disabled") {
+                    output.push(path);
+                }
+            }
+        }
+        let mut files = Vec::new();
+        collect(&self.mods_dir(), &mut files);
+        files.sort();
+        files
+    }
+    fn toggle_plugin(&mut self, path: &PathBuf) {
+        let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+        let disabled = name.to_ascii_lowercase().ends_with(".dll.disabled");
+        let mut new_path = path.clone();
+        if disabled {
+            new_path.set_extension("dll");
+        } else {
+            new_path.set_extension("dll.disabled");
+        }
+        match fs::rename(path, &new_path) {
+            Ok(()) => {
+                self.status = format!("{} {}", if disabled { "Enabled" } else { "Disabled" }, name);
+                self.save_settings();
+            }
+            Err(e) => self.status = format!("Couldn't toggle {name}: {e}"),
+        }
     }
     fn current_profile_mut(&mut self) -> Option<&mut Profile> {
         self.settings.profiles.iter_mut().find(|p| p.name == self.settings.selected_profile)
@@ -302,9 +334,26 @@ impl App for ModHub {
                     ui.label(egui::RichText::new("Your plugins currently installed in Gorilla Tag.").color(muted));
                     ui.add_space(14.0);
                     ui.label(egui::RichText::new(format!("Location  {}",self.mods_dir().display())).small().color(muted));
-                    for p in self.installed_files(){
+                    let plugin_files = self.installed_files();
+                    if plugin_files.is_empty() {
+                        ui.label(egui::RichText::new("No plugin DLLs found. Install a mod from Discover, or check the folder above.").color(muted));
+                    }
+                    for path in plugin_files {
+                        let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                        let is_disabled = file_name.to_ascii_lowercase().ends_with(".dll.disabled");
                         egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(10).inner_margin(12.0).show(ui,|ui|{
-                            ui.horizontal(|ui|{ui.label("▣");ui.label(p.file_name().unwrap_or_default().to_string_lossy());});
+                            ui.horizontal(|ui|{
+                                ui.label("▣");
+                                ui.vertical(|ui|{
+                                    ui.label(egui::RichText::new(&file_name).strong());
+                                    ui.label(egui::RichText::new(path.parent().unwrap_or(&path).display().to_string()).small().color(muted));
+                                });
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{
+                                    let action = if is_disabled { "Enable" } else { "Disable" };
+                                    if ui.button(action).clicked() { self.toggle_plugin(&path); }
+                                    ui.label(egui::RichText::new(if is_disabled { "OFF" } else { "ON" }).color(if is_disabled { muted } else { accent }));
+                                });
+                            });
                         });
                     }
                 }
