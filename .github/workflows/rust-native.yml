@@ -1,4 +1,6 @@
 name: Build ModHub Native (Rust)
+permissions:
+  contents: write
 on:
   push:
     branches: [rust-native]
@@ -70,3 +72,31 @@ jobs:
         with:
           name: ModHub-Linux-AppImage
           path: ModHub-Linux-x86_64.AppImage
+
+  prerelease:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/rust-native'
+    needs: [windows, linux-appimage]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Windows build
+        uses: actions/download-artifact@v4
+        with:
+          name: ModHub-Windows
+          path: release-assets
+      - name: Download Linux AppImage
+        uses: actions/download-artifact@v4
+        with:
+          name: ModHub-Linux-AppImage
+          path: release-assets
+      - name: Publish preview prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: native-preview-${{ github.run_number }}
+          SHA: ${{ github.sha }}
+        run: |
+          gh release create "$TAG" release-assets/* \
+            --repo "${{ github.repository }}" \
+            --target "$SHA" \
+            --prerelease \
+            --title "ModHub Native Preview #${{ github.run_number }}" \
+            --notes "Automated preview build from rust-native. Commit: $SHA. Not a stable release."
