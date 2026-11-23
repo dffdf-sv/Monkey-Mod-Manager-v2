@@ -76,19 +76,73 @@ impl ModHub {
     fn game_dir(&self) -> PathBuf { PathBuf::from(&self.settings.game_path) }
     fn mods_dir(&self) -> PathBuf { self.game_dir().join("BepInEx").join("plugins") }
     fn discover_game(&mut self) {
-        let mut candidates = vec![];
+        // Check known Meta PCVR libraries first, scanning only these bounded roots.
         if let Some(user) = UserDirs::new() {
-            candidates.push(user.home_dir().join("AppData/LocalLow/"));
-            candidates.push(user.home_dir().join(".steam/steam/steamapps/common/Gorilla Tag"));
-            candidates.push(user.home_dir().join(".local/share/Steam/steamapps/common/Gorilla Tag"));
+            let home = user.home_dir();
+            for root in [
+                PathBuf::from("C:/Program Files/Oculus"),
+                PathBuf::from("C:/Oculus"),
+                home.join("AppData/Local/Programs/Oculus"),
+            ] {
+                for relative in ["Software/Software", "Software/Downloads", "Software", "Downloads"] {
+                    if let Some(found) = find_game_dir_limited(&root.join(relative), 4) {
+                        self.settings.game_path = found.display().to_string();
+                        self.save_settings();
+                        self.status = format!("Detected Gorilla Tag at {}.", found.display());
+                        return;
+                    }
+                }
+            }
         }
-        if let Some(program_files) = std::env::var_os("ProgramFiles(x86)") {
-            candidates.push(PathBuf::from(program_files).join("Steam/steamapps/common/Gorilla Tag"));
+
+        let mut steam_roots = Vec::<PathBuf>::new();
+        if let Some(user) = UserDirs::new() {
+            let home = user.home_dir();
+            steam_roots.extend([
+                home.join(".steam/steam"), home.join(".steam/root"),
+                home.join(".local/share/Steam"), home.join("Steam"),
+                home.join("Library/Application Support/Steam"),
+            ]);
         }
-        let found = candidates.into_iter().find(|p| p.join("Gorilla Tag.exe").exists() || p.join("Gorilla Tag").exists());
-        if let Some(path) = found { self.settings.game_path = path.display().to_string(); self.save_settings(); self.status = "Detected game directory.".into(); }
-        else { self.status = "Couldn't auto-detect. Enter the game folder path below.".into(); }
+        for env in ["STEAM_DIR", "STEAM_PATH", "SteamPath", "ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA"] {
+            if let Some(value) = std::env::var_os(env) {
+                let path = PathBuf::from(value);
+                steam_roots.push(path.clone());
+                steam_roots.push(path.join("Steam"));
+                steam_roots.push(path.join("Programs/Steam"));
+            }
+        }
+        steam_roots.sort();
+        steam_roots.dedup();
+
+        // Discover additional Steam libraries from libraryfolders.vdf.
+        let mut libraries = steam_roots.clone();
+        for root in &steam_roots {
+            if let Ok(vdf) = fs::read_to_string(root.join("steamapps/libraryfolders.vdf")) {
+                libraries.extend(parse_steam_library_paths(&vdf));
+            }
+        }
+        libraries.sort();
+        libraries.dedup();
+
+        for library in libraries {
+            let steamapps = library.join("steamapps");
+            let mut candidates = vec![steamapps.join("common/Gorilla Tag")];
+            if let Ok(manifest) = fs::read_to_string(steamapps.join("appmanifest_1533390.acf")) {
+                if let Some(install_dir) = parse_steam_install_dir(&manifest) {
+                    candidates.push(steamapps.join("common").join(install_dir));
+                }
+            }
+            if let Some(found) = candidates.into_iter().find(|p| is_gorilla_tag_install(p)) {
+                self.settings.game_path = found.display().to_string();
+                self.save_settings();
+                self.status = format!("Detected Gorilla Tag at {}.", found.display());
+                return;
+            }
+        }
+        self.status = "Couldn't auto-detect Gorilla Tag. Select its install folder in Settings.".into();
     }
+    fn game_path_valid(&self) -> bool { is_gorilla_tag_install(&self.game_dir()) }
     fn load_catalogue(&mut self) {
         self.status = "Fetching catalogue…".into();
         let client = Client::builder().timeout(Duration::from_secs(20)).user_agent("ModHub-Rust").build();
@@ -512,10 +566,24 @@ impl App for ModHub {
                         ui.add_sized([ui.available_width(),36.0],egui::TextEdit::singleline(&mut self.settings.game_path).hint_text("Path to Gorilla Tag folder"));
                         ui.horizontal(|ui|{
                             if ui.button("Detect game").clicked(){self.discover_game();}
-                            if ui.button("Save location").clicked(){self.save_settings();self.status="Settings saved.".into();}
+                            if ui.button("Save location").clicked(){
+                                if self.game_path_valid(){
+                                    self.save_settings();
+                                    self.status="Valid Gorilla Tag folder saved.".into();
+                                }else{
+                                    self.status="Folder validation failed: expected the Gorilla Tag executable and _Data folder.".into();
+                                }
+                            }
                         });
                         ui.add_space(8.0);
                         ui.label(egui::RichText::new("Mods are installed to BepInEx/plugins inside this folder.").small().color(muted));
+                        if self.settings.game_path.is_empty(){
+                            ui.label(egui::RichText::new("No game folder selected.").small().color(muted));
+                        }else if self.game_path_valid(){
+                            ui.label(egui::RichText::new("✓ Game executable and data folder detected.").small().color(accent));
+                        }else{
+                            ui.label(egui::RichText::new("⚠ Folder not validated — check the selected path.").small().color(egui::Color32::from_rgb(240,170,90)));
+                        }
                     });
                     ui.add_space(12.0);
                     egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(12).inner_margin(18.0).show(ui,|ui|{
@@ -527,6 +595,68 @@ impl App for ModHub {
             }
         });
     }
+}
+
+
+// Validate actual Unity game folders, not just a parent directory that happens to
+// contain an executable named Gorilla Tag.
+fn is_gorilla_tag_install(path: &PathBuf) -> bool {
+    let executable = path.join("Gorilla Tag.exe").exists()
+        || path.join("Gorilla Tag").exists()
+        || path.join("GorillaTag.exe").exists();
+    let data = path.join("Gorilla Tag_Data").is_dir()
+        || path.join("GorillaTag_Data").is_dir();
+    executable && data
+}
+
+fn parse_steam_library_paths(vdf: &str) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    for line in vdf.lines() {
+        let trimmed = line.trim();
+        if !trimmed.starts_with("\"path\"") { continue; }
+        let Some(key_quote) = trimmed.find('"') else { continue };
+        let after_key = &trimmed[key_quote + 1..];
+        let Some(key_end) = after_key.find('"') else { continue };
+        let after_key_value = &after_key[key_end + 1..];
+        let Some(value_quote) = after_key_value.find('"') else { continue };
+        let value = &after_key_value[value_quote + 1..];
+        let Some(value_end) = value.find('"') else { continue };
+        let decoded = value[..value_end].replace("\\\\", "\\");
+        if !decoded.is_empty() { paths.push(PathBuf::from(decoded)); }
+    }
+    paths
+}
+
+fn parse_steam_install_dir(manifest: &str) -> Option<String> {
+    for line in manifest.lines() {
+        let trimmed = line.trim();
+        if !trimmed.starts_with("\"installdir\"") { continue; }
+        let key_quote = trimmed.find('"')?;
+        let after_key = &trimmed[key_quote + 1..];
+        let key_end = after_key.find('"')?;
+        let after_key_value = &after_key[key_end + 1..];
+        let value_quote = after_key_value.find('"')?;
+        let value = &after_key_value[value_quote + 1..];
+        let value_end = value.find('"')?;
+        let dir = value[..value_end].trim();
+        if !dir.is_empty() { return Some(dir.to_string()); }
+    }
+    None
+}
+
+// Scan only explicitly known Meta/Oculus libraries, with a maximum depth.
+fn find_game_dir_limited(root: &PathBuf, depth: usize) -> Option<PathBuf> {
+    if is_gorilla_tag_install(root) { return Some(root.clone()); }
+    if depth == 0 { return None; }
+    let entries = fs::read_dir(root).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            if is_gorilla_tag_install(&path) { return Some(path); }
+            if let Some(found) = find_game_dir_limited(&path, depth - 1) { return Some(found); }
+        }
+    }
+    None
 }
 
 fn clean_name(input: &str) -> String {
