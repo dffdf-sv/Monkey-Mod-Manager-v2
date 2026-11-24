@@ -947,7 +947,7 @@ export default function App() {
 
   return <div className={"shell page-" + page.toLowerCase() + (sidebarCollapsed ? " sidebar-collapsed" : "")}>
     <aside className="sidebar">
-      <div className="brand"><button type="button" className="brand-logo menu-logo-toggle" onClick={() => setSidebarCollapsed((collapsed) => !collapsed)} aria-label={sidebarCollapsed ? "Expand sidebar menu" : "Collapse sidebar menu"} title={sidebarCollapsed ? "Expand menu" : "Collapse menu"}><img src="/image.jpg" alt="ModHub" /><span className="menu-logo-glyph" aria-hidden="true">☰</span></button><div><b>MOD</b><small>HUB</small></div></div>
+      <div className="brand"><button type="button" className="brand-logo menu-logo-toggle" onClick={() => setSidebarCollapsed((collapsed) => !collapsed)} aria-label={sidebarCollapsed ? "Expand sidebar menu" : "Collapse sidebar menu"} title={sidebarCollapsed ? "Expand menu" : "Collapse menu"}><img src="/image.jpg" alt="ModHub" /></button><div><b>MOD</b><small>HUB</small></div></div>
       <label className="side-label">WORKSPACE</label>
       <button className={'nav ' + (page === 'Overview' ? 'chosen' : '')} onClick={() => goToPage('Overview')}>⌂ <span>Overview</span></button>
       <button className={'nav ' + (page === 'Discover' ? 'chosen' : '')} onClick={() => goToPage('Discover')}>▦ <span>Discover mods</span></button>
