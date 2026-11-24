@@ -34,6 +34,19 @@ const extractZip = require('extract-zip');
 const { spawn } = require('node:child_process');
 const os = require('node:os');
 
+function safeUserError(error, fallback='Something went wrong. Please try again.') {
+ const message=String(error&&error.message||error||'').toLowerCase();
+ if(/network|fetch|econn|enotfound|timeout|timed out/.test(message))return 'Connection problem. Check your internet and try again.';
+ if(/401|403|permission|access denied/.test(message))return 'Access was denied. Check your account permissions and try again.';
+ if(/404|not found/.test(message))return 'The requested file or item could not be found.';
+ if(/429|rate limit|too many/.test(message))return 'Too many requests. Wait a minute, then try again.';
+ if(/game folder|gorilla tag/.test(message))return 'Gorilla Tag folder not found. Choose the game folder in Settings.';
+ if(/bepinex/.test(message))return 'BepInEx could not be installed. Check your game folder and try again.';
+ if(/zip|archive|dll|mod file/.test(message))return 'The mod file is not valid. Check that it is a .DLL or .ZIP and try again.';
+ if(/config|\\.cfg/.test(message))return 'The config could not be saved. Check the file and try again.';
+ if(/update|release|github/.test(message))return 'The update service is unavailable. Check your connection and try again.';
+ return fallback;
+}
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
 async function readSettings() { try { return JSON.parse(await fs.readFile(settingsFile(), 'utf8')); } catch { return {}; } }
 async function writeSettings(settings) {
@@ -252,7 +265,7 @@ ipcMain.handle('game:launch', async () => {
     if (executable.toLowerCase().endsWith('.app')) { const child=spawn('open',[executable],{detached:true,stdio:'ignore'}); child.unref(); }
     else { const child=spawn(executable,[],{cwd:folder,detached:true,stdio:'ignore'}); child.unref(); }
     return { ok:true, message:'Launching Gorilla Tag…' };
-  } catch (error) { return { ok:false, message:error instanceof Error ? error.message : 'Could not launch Gorilla Tag.' }; }
+  } catch (error) { return { ok:false, message:safeUserError(error, 'Could not launch Gorilla Tag. Check the game folder and try again.') }; }
 });
 ipcMain.handle('mods:delete-installed', async (_event, requestedName) => {
   try {
@@ -277,7 +290,7 @@ ipcMain.handle('mods:delete-installed', async (_event, requestedName) => {
     await writeSettings({ ...settings, installedMods });
     return { ok: true, message: matched.name.replace(/\.disabled$/i, '') + ' deleted from BepInEx/plugins.' };
   } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : 'Could not delete mod.' };
+    return { ok: false, message: safeUserError(error, 'Could not remove that mod. Refresh the installed list and try again.') };
   }
 });
 ipcMain.handle('mods:toggle-installed', async (_event, requestedName) => {
@@ -340,7 +353,7 @@ ipcMain.handle('config:list-files', async () => {
       if (info && info.size <= 2 * 1024 * 1024) files.push({ name: entry.name, size: info.size, modified: info.mtime.toISOString() });
     }
     return { ok: true, files: files.sort((a,b) => a.name.localeCompare(b.name)) };
-  } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Could not list config files.', files: [] }; }
+  } catch (error) { return { ok: false, message: safeUserError(error, 'Could not load config files. Check your game folder and try again.'), files: [] }; }
 });
 ipcMain.handle('config:read-file', async (_event, name) => {
   try {
@@ -353,7 +366,7 @@ ipcMain.handle('config:read-file', async (_event, name) => {
     const info = await fs.stat(file);
     if (!info.isFile() || info.size > 2 * 1024 * 1024) throw new Error('Config file is too large or not a regular file.');
     return { ok: true, name, content: await fs.readFile(file, 'utf8') };
-  } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Could not read config file.' }; }
+  } catch (error) { return { ok: false, message: safeUserError(error, 'Could not open that config. Check the file and try again.') }; }
 });
 const backupCleanupTimers = new Map();
 const scheduleBackupCleanup = (backupPath) => {
@@ -384,7 +397,7 @@ ipcMain.handle('config:write-file', async (_event, payload) => {
     const savedContent = await fs.readFile(file, 'utf8');
     if (savedContent !== content) throw new Error('The config file could not be verified after saving.');
     return { ok: true, message: 'Saved ' + name + (await fs.stat(file + '.bak').then(() => ' (backup created)').catch(() => '')), path: file };
-  } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Could not save config.' }; }
+  } catch (error) { return { ok: false, message: safeUserError(error, 'Could not save that config. Check the file and try again.') }; }
 });
 ipcMain.handle('app:get-version', () => app.getVersion());
 autoUpdater.autoDownload = false;
@@ -397,21 +410,21 @@ autoUpdater.on('update-available', (info) => sendAppUpdateStatus({ status: 'avai
 autoUpdater.on('update-not-available', (info) => sendAppUpdateStatus({ status: 'not-available', version: info.version }));
 autoUpdater.on('download-progress', (progress) => sendAppUpdateStatus({ status: 'downloading', percent: Math.round(progress.percent), transferred: progress.transferred, total: progress.total }));
 autoUpdater.on('update-downloaded', (info) => sendAppUpdateStatus({ status: 'downloaded', version: info.version }));
-autoUpdater.on('error', (error) => sendAppUpdateStatus({ status: 'error', message: error && error.message ? error.message : 'App update failed.' }));
+autoUpdater.on('error', (error) => sendAppUpdateStatus({ status: 'error', message: safeUserError(error, 'Update failed. Check your connection and try again.') }));
 ipcMain.handle('app:check-update', async (_event, prerelease = false) => {
   try {
     if (!app.isPackaged) return { ok: false, message: 'Built-in updates are available in the installed desktop app, not development mode.' };
     autoUpdater.allowPrerelease = Boolean(prerelease);
     const result = await autoUpdater.checkForUpdates();
     return { ok: true, version: result && result.updateInfo ? result.updateInfo.version : null };
-  } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Could not check for app updates.' }; }
+  } catch (error) { return { ok: false, message: safeUserError(error, 'Could not check for updates. Check your connection and try again.') }; }
 });
 ipcMain.handle('app:download-update', async () => {
   try {
     if (!app.isPackaged) throw new Error('Built-in updates are available in the installed desktop app, not development mode.');
     await autoUpdater.downloadUpdate();
     return { ok: true, message: 'Downloading update…' };
-  } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Could not download app update.' }; }
+  } catch (error) { return { ok: false, message: safeUserError(error, 'Could not download the update. Check your connection and try again.') }; }
 });
 ipcMain.handle('app:install-update', () => {
   if (!app.isPackaged) return { ok: false, message: 'Install the packaged desktop app to use the updater.' };
@@ -449,7 +462,7 @@ ipcMain.handle('mods:install-from-disk', async () => {
     }
     await writeSettings({ ...settings, installedMods:installed });
     return { ok:true, paths, message: paths.length + ' mod file(s) installed into ' + pluginRoot + '. Check each mod’s README for required dependencies.' };
-  } catch (error) { return { ok:false, message:error instanceof Error ? error.message : 'Could not install local mod files.' }; }
+  } catch (error) { return { ok:false, message:safeUserError(error, 'Could not install those files. Check the files and game folder.') }; }
 });
 ipcMain.handle('config:save', async (_event, payload) => {
   try {
@@ -467,7 +480,7 @@ ipcMain.handle('config:save', async (_event, payload) => {
     const configPath = path.join(configDir, 'MonkeyModHub.' + safeName.replace(/\s+/g, '_') + '.cfg');
     await fs.writeFile(configPath, '# Generated by ModHub. Some mods require their own documented config format.\n' + lines.join('\n') + '\n', 'utf8');
     return { ok: true, path: configPath, message: 'Settings saved to ' + configPath };
-  } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Could not save settings.' }; }
+  } catch (error) { return { ok: false, message: safeUserError(error, 'Could not save settings. Please try again.') }; }
 });
 ipcMain.handle('mods:get-detected', async () => {
   const settings = await readSettings(); if (!settings.gameFolder) return [];
@@ -546,7 +559,7 @@ ipcMain.handle('bepinex:install', async () => {
     await extractZip(tempFile, { dir: gameFolder });
     return { ok: true, path: gameFolder, message: 'BepInEx 5.4.23.5 installed into ' + gameFolder };
   } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : 'Could not install BepInEx.' };
+    return { ok: false, message: safeUserError(error, 'BepInEx could not be installed. Check your game folder and try again.') };
   } finally {
     if (tempFile) await fs.rm(tempFile, { force: true }).catch(() => {});
   }
@@ -622,7 +635,7 @@ ipcMain.handle('mod:install', async (_event, mod) => {
       const configNote = archiveResult.copiedConfigs ? ' and merged ' + archiveResult.copiedConfigs + ' CFG file(s) into BepInEx/config' : '';
       return { ok: true, path: pluginDir, message: mod.name + ' ZIP inspected through nested folders, installed ' + archiveResult.copiedDlls + ' DLL file(s)' + configNote + '.' };
     } finally { await fs.rm(tempFile, { force: true }).catch(() => {}); }
-  } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Could not install this mod.' }; }
+  } catch (error) { return { ok: false, message: safeUserError(error, 'Could not install this mod. Check the mod file and game folder.') }; }
 });
 ipcMain.handle('auth:github-sign-in', async () => { await shell.openExternal('https://modhub.duckdns.org/auth/github?desktop=1'); return { ok: true }; });
 
