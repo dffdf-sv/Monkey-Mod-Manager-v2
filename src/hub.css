@@ -359,3 +359,27 @@ button:disabled{opacity:.55;cursor:wait}
 .platform-onboarding-eyebrow{margin:0 0 8px;color:var(--accent);font-size:10px;font-weight:900;letter-spacing:.18em}.platform-onboarding h2{margin:0;font-size:clamp(25px,4vw,36px);letter-spacing:-1.2px}.platform-onboarding-description{max-width:540px;margin:12px 0 24px;color:var(--muted);font-size:13px;line-height:1.7}
 .platform-onboarding-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.platform-choice{display:grid;justify-items:start;gap:10px;min-height:190px;padding:18px;border:1px solid var(--line);border-radius:15px;background:var(--panel2);color:var(--text);text-align:left;cursor:pointer;transition:border-color .16s,transform .16s,background .16s}.platform-choice:hover,.platform-choice:focus-visible{border-color:var(--accent);transform:translateY(-2px);outline:none}.platform-choice.selected{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--panel2))}.platform-choice-art{display:grid;place-items:center;width:48px;height:48px;border-radius:13px;font-size:27px;font-weight:900}.steam-art{background:#18344a;color:#c5e5f5}.meta-art{background:#173d72;color:#d8e9ff}.platform-choice strong{font-size:20px}.platform-choice small{color:var(--muted);font-size:11px}.platform-choice-action{align-self:end;margin-top:8px;color:var(--accent);font-size:9px;font-weight:900;letter-spacing:.13em}.platform-onboarding-footnote{margin:18px 0 0;color:var(--muted);font-size:10px}
 @media(max-width:520px){.platform-onboarding-choices{grid-template-columns:1fr}.platform-choice{min-height:150px}}
+
+
+/* ModHub creator studio — card-based ownership and quiz-style publishing */
+.editor-welcome{padding:30px 32px;border:1px solid var(--line);border-radius:20px;background:radial-gradient(circle at 92% 8%,rgba(184,235,94,.13),transparent 36%),var(--panel)}
+.editor-kicker{display:block;margin-bottom:9px;color:var(--accent);font-size:10px;font-weight:900;letter-spacing:.17em}
+.editor-welcome h2{margin:0;font-size:clamp(26px,4vw,38px);letter-spacing:-1.1px}
+.editor-welcome p,.creator-toolbar p{margin:8px 0 0;color:var(--muted);font-size:13px;line-height:1.6}
+.creator-toolbar{display:flex;align-items:center;justify-content:space-between;gap:20px;margin:26px 0 16px;padding:18px 20px;border:1px solid var(--line);border-radius:16px;background:var(--panel)}
+.creator-toolbar h3{margin:0;font-size:18px}.creator-toolbar .editor-kicker{margin:0 0 5px}
+.creator-owned-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin:0 0 24px}
+.creator-owned-card{overflow:hidden;border:1px solid var(--line);border-radius:16px;background:var(--panel);transition:transform .18s,border-color .18s}
+.creator-owned-card:hover{transform:translateY(-2px);border-color:var(--accent)}
+.creator-owned-image{height:118px;display:grid;place-items:center;overflow:hidden;background:var(--panel2);color:var(--accent);font-size:32px;font-weight:900}
+.creator-owned-image img{width:100%;height:100%;object-fit:cover}
+.creator-owned-copy{padding:15px}.creator-owned-copy h4{margin:5px 0;font-size:17px}.creator-owned-copy p{margin:0;color:var(--muted);font-size:11px}
+.creator-owned-actions{display:flex;gap:8px;margin-top:14px}.creator-owned-actions button{flex:1}
+.creator-empty{grid-column:1/-1;padding:28px;text-align:center;border:1px dashed var(--line);border-radius:16px;background:var(--panel)}
+.creator-empty>span{font-size:28px;color:var(--accent)}.creator-empty h3{margin:8px 0}.creator-empty p{color:var(--muted);font-size:12px}
+.creator-step-heading{grid-column:1/-1;padding:8px 0 5px}.creator-step-heading>span{color:var(--accent);font-size:10px;font-weight:900;letter-spacing:.16em}.creator-step-heading h3{margin:8px 0 5px;font-size:22px;letter-spacing:-.5px}.creator-step-heading p{margin:0;color:var(--muted);font-size:12px;line-height:1.6}
+.creator-review-summary{display:grid;gap:7px;margin-top:16px;padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}.creator-review-summary>b{font-size:19px}.creator-review-summary>span,.creator-review-summary small{color:var(--muted);font-size:11px}.creator-review-summary p{margin:3px 0;font-size:13px;color:var(--text)}
+.creator-wizard-controls{display:flex;justify-content:flex-end;gap:10px;padding-top:16px;border-top:1px solid var(--line)}
+.creator-wizard-controls button{min-width:112px}
+.add-mod-only-form{padding:22px;border:1px solid var(--line);border-radius:18px;background:var(--panel)}
+@media(max-width:650px){.creator-toolbar{align-items:flex-start;flex-direction:column}.creator-toolbar .admin-toolbar-actions{width:100%;flex-wrap:wrap}.creator-wizard-controls{flex-wrap:wrap}.creator-wizard-controls button{flex:1}}
