@@ -398,9 +398,10 @@ autoUpdater.on('update-not-available', (info) => sendAppUpdateStatus({ status: '
 autoUpdater.on('download-progress', (progress) => sendAppUpdateStatus({ status: 'downloading', percent: Math.round(progress.percent), transferred: progress.transferred, total: progress.total }));
 autoUpdater.on('update-downloaded', (info) => sendAppUpdateStatus({ status: 'downloaded', version: info.version }));
 autoUpdater.on('error', (error) => sendAppUpdateStatus({ status: 'error', message: error && error.message ? error.message : 'App update failed.' }));
-ipcMain.handle('app:check-update', async () => {
+ipcMain.handle('app:check-update', async (_event, prerelease = false) => {
   try {
     if (!app.isPackaged) return { ok: false, message: 'Built-in updates are available in the installed desktop app, not development mode.' };
+    autoUpdater.allowPrerelease = Boolean(prerelease);
     const result = await autoUpdater.checkForUpdates();
     return { ok: true, version: result && result.updateInfo ? result.updateInfo.version : null };
   } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Could not check for app updates.' }; }
