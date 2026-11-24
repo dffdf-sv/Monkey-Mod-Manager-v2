@@ -344,3 +344,6 @@ button:disabled{opacity:.55;cursor:wait}
 .product-readme-preview .markdown-body{font-size:12px}
 
 .markdown-table-wrap{max-width:100%;overflow:auto;margin:.8em 0}.markdown-table{border-collapse:collapse;width:100%;font-size:.92em}.markdown-table th,.markdown-table td{padding:8px 10px;border:1px solid var(--line);text-align:left;vertical-align:top}.markdown-table th{background:var(--panel);font-weight:700}
+
+/* Pre-release controls and updater ready state */
+.hero-prerelease-toggle{display:inline-flex;align-items:center;gap:7px;padding:0 10px;color:var(--muted);font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer}.hero-prerelease-toggle input{accent-color:var(--accent);width:14px;height:14px}.hero-actions-link,.settings-actions-link{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}.update-install-ready{background:#36c66a!important;border-color:#36c66a!important;color:#07190d!important;box-shadow:0 0 0 1px #36c66a44,0 5px 18px #36c66a24!important}.update-install-ready:hover{background:#55dc83!important;border-color:#55dc83!important}.settings-actions-link{margin-top:10px;padding:10px 13px;border:1px solid var(--line);border-radius:9px;color:var(--text)}
