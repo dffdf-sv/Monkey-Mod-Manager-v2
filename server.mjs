@@ -14,7 +14,20 @@ const MOD_API = 'https://api.github.com/repos/' + MOD_REPO + '/contents/' + MOD_
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.json': 'application/json; charset=utf-8' };
 const rateMap = new Map();
 
+function publicErrorMessage(value) {
+ const message=String(value||'').toLowerCase();
+ if(/request body|invalid json|malformed/.test(message))return 'Some information could not be read. Refresh the page and try again.';
+ if(/too many|rate limit/.test(message))return 'Too many requests. Please wait a minute and try again.';
+ if(/unauthori[sz]ed|sign in|session|oauth|account login/.test(message))return 'Please sign in again and retry.';
+ if(/permission|forbidden|access|token|secret|password|environment|gist|github_token|render_api_key/.test(message))return 'This service is temporarily unavailable. Please try again later.';
+ if(/too large|upload exceeds|900 kb|size limit/.test(message))return 'That file or save is too large. Choose a smaller file and try again.';
+ if(/https|url|repository/.test(message))return 'Check the link and use a valid HTTPS URL, then try again.';
+ if(/not found/.test(message))return 'We could not find that item. Refresh and try again.';
+ if(/github|api|storage|cloud save|mod base|render/.test(message))return 'The ModHub service is temporarily unavailable. Please try again shortly.';
+ return 'We could not complete that request. Please try again.';
+}
 function reply(res, status, payload) {
+ if(payload&&typeof payload.error==='string'){console.error('[ModHub API]',status,payload.error);payload={...payload,error:publicErrorMessage(payload.error)};}
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
   res.end(JSON.stringify(payload));
 }
