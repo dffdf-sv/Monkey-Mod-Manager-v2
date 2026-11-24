@@ -392,3 +392,6 @@ button:disabled{opacity:.55;cursor:wait}
 .creator-stepper button.active span,.creator-stepper button.complete span{background:var(--accent);color:#17200d}
 .creator-stepper button.complete{color:var(--text)}
 @media(max-width:520px){.creator-stepper{gap:3px;padding:5px}.creator-stepper button{justify-content:center;padding:7px 3px}.creator-stepper button small{font-size:9px}}
+
+/* Actual platform brand marks inside first-run platform choices */
+.platform-choice-art svg{display:block;width:34px;height:34px;overflow:visible}.meta-art svg{width:42px;height:30px}
