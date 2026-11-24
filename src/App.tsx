@@ -97,6 +97,7 @@ export default function App() {
   const [draft, setDraft] = useState<Draft>(blankDraft);
   const [gameFolder, setGameFolder] = useState<string | null>(null);
   const [gamePlatform, setGamePlatform] = useState<'Steam'|'Meta'>(() => localStorage.getItem('mmm-game-platform') === 'Meta' ? 'Meta' : 'Steam');
+  const [showPlatformPicker, setShowPlatformPicker] = useState(() => Boolean(window.monkeyModManager?.isDesktop) && localStorage.getItem('mmm-platform-onboarding-complete') !== 'true');
   const [hideInstallNotice, setHideInstallNotice] = useState(() => localStorage.getItem('mmm-hide-install-notice') === 'true');
   const [installedMods, setInstalledMods] = useState<Record<string, string>>({});
   const [checkingUpdates, setCheckingUpdates] = useState(false);
@@ -757,11 +758,16 @@ export default function App() {
   };
 
   const changeGamePlatform = async (platform:'Steam'|'Meta') => {
-    if (!desktop) { setGamePlatform(platform); localStorage.setItem('mmm-game-platform',platform); return; }
-    const result = await window.monkeyModManager!.setGamePlatform(platform);
-    setGamePlatform(result.platform); setGameFolder(result.gameFolder);
-    if (result.gameFolder) setDetectedMods(await window.monkeyModManager!.getDetectedMods());
-    notify(result.gameFolder ? platform + ' game folder selected.' : 'Selected ' + platform + '. Choose its Gorilla Tag folder below if it was not detected.');
+    if (!desktop) { setGamePlatform(platform); localStorage.setItem('mmm-game-platform',platform); localStorage.setItem('mmm-platform-onboarding-complete','true'); setShowPlatformPicker(false); return; }
+    try {
+      const result = await window.monkeyModManager!.setGamePlatform(platform);
+      setGamePlatform(result.platform); setGameFolder(result.gameFolder);
+      localStorage.setItem('mmm-game-platform', result.platform);
+      localStorage.setItem('mmm-platform-onboarding-complete','true');
+      setShowPlatformPicker(false);
+      if (result.gameFolder) setDetectedMods(await window.monkeyModManager!.getDetectedMods());
+      notify(result.gameFolder ? platform + ' selected. Gorilla Tag is ready.' : platform + ' selected. Choose your Gorilla Tag folder in Settings if it was not detected.');
+    } catch (error) { notify(friendlyError(error, 'Could not save your platform. Please try again.')); }
   };
 
   const installBepInEx = async () => {
@@ -1044,7 +1050,7 @@ export default function App() {
           {adminError && <div className="admin-error" role="alert">{adminError}</div>}
         </section>}
 
-        {page === 'Settings' ? <section className="cfg-workspace settings-workspace"><div className="cfg-heading"><div><label>LOCAL INSTALLATION</label><h2>Game settings</h2><p>Choose which Gorilla Tag edition to manage and verify the install folder used by the desktop installer.</p></div></div><div className="settings-card"><label>Game installation / PCVR platform<select value={gamePlatform} onChange={event => void changeGamePlatform(event.target.value as 'Steam'|'Meta')}><option value="Steam">SteamVR (Steam)</option><option value="Meta">Meta Quest Link / Oculus PCVR</option></select></label><div className="settings-path"><small>ACTIVE GORILLA TAG FOLDER</small><code>{gameFolder || 'No folder selected'}</code></div>{desktop && <button className="primary" onClick={async()=>{const folder=await window.monkeyModManager!.chooseGameFolder();setGameFolder(folder);if(folder){setDetectedMods(await window.monkeyModManager!.getDetectedMods());notify('Game folder saved.');}}}>Choose folder…</button>}<label className="settings-check"><input type="checkbox" checked={hideInstallNotice} onChange={event=>{setHideInstallNotice(event.target.checked);localStorage.setItem('mmm-hide-install-notice',String(event.target.checked));}} /> Hide install-complete prompts</label><p className="form-help">Choose the edition where Gorilla Tag is installed. You can switch between SteamVR and Meta PCVR here any time; changing the platform searches for that install, and you can use Choose folder if it is not detected automatically.</p><div className="settings-path"><small>MODHUB DESKTOP APP</small><code>Installed version: v{appVersion}</code>{appUpdate ? <p className="form-help">Update available: v{appUpdate.version}</p> : <p className="form-help">Use Check updates to check for the latest app release and tracked mod updates.</p>}{appUpdateStatus && <p className="form-help">{appUpdateStatus}</p>}{appUpdateStatus.startsWith('Update downloaded.') && <button className="primary update-install-ready" onClick={()=>void window.monkeyModManager?.installAppUpdate().then(result=>notify(result.message))}>✓ Restart and install update</button>}<button className="secondary" disabled={checkingUpdates} onClick={()=>void checkForUpdates()}>{checkingUpdates ? 'Checking…' : 'Check app + mod updates'}</button><label className="settings-check"><input type="checkbox" checked={autoInstallUpdates} onChange={event=>{setAutoInstallUpdates(event.target.checked);localStorage.setItem('mmm-auto-install-updates',String(event.target.checked));}} /> Automatically download and install app updates</label><label className="settings-toggle"><input type="checkbox" role="switch" checked={preReleaseUpdates} onChange={event=>{setPreReleaseUpdates(event.target.checked);localStorage.setItem('mmm-pre-release-updates',String(event.target.checked));}} /><span className="settings-toggle-track" aria-hidden="true"></span><span>Include pre-release versions in app update checks</span></label><a className="secondary settings-actions-link" href="https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/actions/workflows/desktop-build.yml" target="_blank" rel="noreferrer">↗ Open release / pre-release workflow</a><p className="form-help">Uses the built-in updater to download release updates in-app, show progress, and restart to install. Available in the installed desktop build.</p></div></div></section> : page === 'Profiles' ? <section className="cfg-workspace">
+        {page === 'Settings' ? <section className="cfg-workspace settings-workspace"><div className="cfg-heading"><div><label>LOCAL INSTALLATION</label><h2>Game settings</h2><p>Choose which Gorilla Tag edition to manage and verify the install folder used by the desktop installer.</p></div></div><div className="settings-card"><label>Game installation / PCVR platform<select value={gamePlatform} onChange={event => void changeGamePlatform(event.target.value as 'Steam'|'Meta')}><option value="Steam">SteamVR (Steam)</option><option value="Meta">Meta Quest Link / Oculus PCVR</option></select></label><div className="settings-path"><small>ACTIVE GORILLA TAG FOLDER</small><code>{gameFolder || 'No folder selected'}</code></div>{desktop && <button className="primary" onClick={async()=>{const folder=await window.monkeyModManager!.chooseGameFolder();setGameFolder(folder);if(folder){setDetectedMods(await window.monkeyModManager!.getDetectedMods());notify('Game folder saved.');}}}>Choose folder…</button>}<label className="settings-check"><input type="checkbox" checked={hideInstallNotice} onChange={event=>{setHideInstallNotice(event.target.checked);localStorage.setItem('mmm-hide-install-notice',String(event.target.checked));}} /> Hide install-complete prompts</label><p className="form-help">Choose the edition where Gorilla Tag is installed. You can switch between SteamVR and Meta PCVR here any time; changing the platform searches for that install, and you can use Choose folder if it is not detected automatically.</p><div className="settings-path"><small>MODHUB DESKTOP APP</small><code>Installed version: v{appVersion}</code>{appUpdate ? <p className="form-help">Update available: v{appUpdate.version}</p> : <p className="form-help">Use Check updates to check for the latest app release and tracked mod updates.</p>}{appUpdateStatus && <p className="form-help">{appUpdateStatus}</p>}{appUpdateStatus.startsWith('Update downloaded.') && <button className="primary update-install-ready" onClick={()=>void window.monkeyModManager?.installAppUpdate().then(result=>notify(result.message))}>✓ Restart and install update</button>}<button className="secondary" disabled={checkingUpdates} onClick={()=>void checkForUpdates()}>{checkingUpdates ? 'Checking…' : 'Check app + mod updates'}</button><label className="settings-check"><input type="checkbox" checked={autoInstallUpdates} onChange={event=>{setAutoInstallUpdates(event.target.checked);localStorage.setItem('mmm-auto-install-updates',String(event.target.checked));}} /> Automatically download and install app updates</label><label className="settings-toggle"><input type="checkbox" role="switch" checked={preReleaseUpdates} onChange={event=>{setPreReleaseUpdates(event.target.checked);localStorage.setItem('mmm-pre-release-updates',String(event.target.checked));}} /><span className="settings-toggle-track" aria-hidden="true"></span><span>Include pre-release versions in app update checks</span></label><a className="secondary settings-actions-link" href="https://github.com/dffdf-sv/Monkey-Mod-Manager-v2" target="_blank" rel="noreferrer">↗ Open GitHub</a><p className="form-help">Uses the built-in updater to download release updates in-app, show progress, and restart to install. Available in the installed desktop build.</p></div></div></section> : page === 'Profiles' ? <section className="cfg-workspace">
           <div className="cfg-heading"><div><label>YOUR ACCOUNT</label><h2>Account & profiles</h2><p>Keep saved mods, installed-mod snapshots, and CFG files synced to ModHub's private cloud storage, linked to your GitHub identity.</p></div><button className="secondary" disabled={!account || accountLoading || accountDataBusy} onClick={() => void refreshAccount()}>{accountLoading ? '↻ Loading…' : '↻ Refresh account'}</button></div>
           {accountLoading && <p className="cfg-muted">Loading your private cloud save…</p>}
            {accountLoadError && <div className="admin-error" role="alert">Cloud save problem: {accountLoadError} Check the Render GITHUB_TOKEN has private Gist access, then refresh.</div>}
@@ -1166,6 +1172,23 @@ export default function App() {
       </div>
             {!desktop && <p className="web-install-note">In a browser this downloads the file only. The desktop app can install it into your selected Gorilla Tag folder.</p>}
     </section></div>}
+    {showPlatformPicker && desktop && <div className="platform-onboarding-backdrop" role="presentation">
+      <section className="platform-onboarding" role="dialog" aria-modal="true" aria-labelledby="platform-onboarding-title">
+        <div className="platform-onboarding-brand"><img src="/image.jpg" alt="ModHub" /><span>MODHUB · FIRST-TIME SETUP</span></div>
+        <p className="platform-onboarding-eyebrow">LET'S GET YOU SET UP</p>
+        <h2 id="platform-onboarding-title">Where do you play Gorilla Tag?</h2>
+        <p className="platform-onboarding-description">Choose the PC version you use. ModHub will save this as your platform and look for the right game folder. You can change it later in Settings.</p>
+        <div className="platform-onboarding-choices">
+          <button type="button" className={'platform-choice '+(gamePlatform==='Steam'?'selected':'')} onClick={()=>void changeGamePlatform('Steam')}>
+            <span className="platform-choice-art steam-art" aria-hidden="true">S</span><strong>Steam</strong><small>SteamVR · Steam on PC</small><span className="platform-choice-action">SELECT STEAM</span>
+          </button>
+          <button type="button" className={'platform-choice '+(gamePlatform==='Meta'?'selected':'')} onClick={()=>void changeGamePlatform('Meta')}>
+            <span className="platform-choice-art meta-art" aria-hidden="true">∞</span><strong>Meta</strong><small>Quest Link · Oculus PC app</small><span className="platform-choice-action">SELECT META</span>
+          </button>
+        </div>
+        <p className="platform-onboarding-footnote">Not sure? Choose the store you installed Gorilla Tag from.</p>
+      </section>
+    </div>}
     {notice && <div className="toast">✓ &nbsp; {notice}</div>}
   </div>;
 }
