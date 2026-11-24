@@ -383,3 +383,12 @@ button:disabled{opacity:.55;cursor:wait}
 .creator-wizard-controls button{min-width:112px}
 .add-mod-only-form{padding:22px;border:1px solid var(--line);border-radius:18px;background:var(--panel)}
 @media(max-width:650px){.creator-toolbar{align-items:flex-start;flex-direction:column}.creator-toolbar .admin-toolbar-actions{width:100%;flex-wrap:wrap}.creator-wizard-controls{flex-wrap:wrap}.creator-wizard-controls button{flex:1}}
+
+.creator-stepper{display:flex;gap:8px;margin:14px 0;padding:10px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+.creator-stepper button{display:flex;align-items:center;gap:8px;flex:1;min-width:0;padding:9px 12px;border:1px solid transparent;border-radius:10px;background:transparent;color:var(--muted);cursor:pointer;text-align:left}
+.creator-stepper button span{display:grid;place-items:center;width:24px;height:24px;flex:0 0 24px;border-radius:50%;background:var(--panel2);font-size:10px;font-weight:900}
+.creator-stepper button small{font-size:11px;font-weight:800}
+.creator-stepper button.active{border-color:color-mix(in srgb,var(--accent) 55%,var(--line));background:color-mix(in srgb,var(--accent) 8%,var(--panel));color:var(--text)}
+.creator-stepper button.active span,.creator-stepper button.complete span{background:var(--accent);color:#17200d}
+.creator-stepper button.complete{color:var(--text)}
+@media(max-width:520px){.creator-stepper{gap:3px;padding:5px}.creator-stepper button{justify-content:center;padding:7px 3px}.creator-stepper button small{font-size:9px}}
