@@ -42,7 +42,7 @@ declare global {
     };
   }
 }
-const jungleArt = 'https://clan.akamai.steamstatic.com/images/39711486/dc62f773bc346540e86ab45a360ad777843a9bc3.png';
+const jungleArt = 'https://cdn.prod.website-files.com/634dcd98720fb26a457ae36f/69c68aeef4c29190d13d94dd_Autumn_YouTube_Thumbnail.avif';
 const categories = ['All Mods', 'Core', 'Utility', 'Cosmetic', 'Maps', 'Gameplay', 'Your Mods'];
 const blankDraft: Draft = { name: '', author: '', category: 'Utility', description: '', version: '1.0.0', downloadUrl: '', imageUrl: '', sourceUrl: '', websiteUrl: '', embedUrl: '', requirements: '', supportedOS: ['Windows'], readme: '', changelog: '', additionalLinks: [], dependencies: [], galleryUrls: [], videoUrl: '', configSettings: [] };
 
