@@ -19,7 +19,7 @@ declare global {
       onOpenMod: (callback:(modId:string)=>void) => () => void;
       getGameFolder: () => Promise<string | null>;
       getAppVersion: () => Promise<string>;
-      checkAppUpdate: () => Promise<{ok:boolean;message?:string;version?:string|null}>;
+      checkAppUpdate: (prerelease?:boolean) => Promise<{ok:boolean;message?:string;version?:string|null}>;
       downloadAppUpdate: () => Promise<{ok:boolean;message:string}>;
       installAppUpdate: () => Promise<{ok:boolean;message:string}>;
       onAppUpdateStatus: (callback:(status:{status:string;version?:string;percent?:number;message?:string})=>void) => () => void;
@@ -84,6 +84,7 @@ export default function App() {
   const [appVersion, setAppVersion] = useState('2.0.0');
   const [appUpdateStatus, setAppUpdateStatus] = useState('');
   const [autoInstallUpdates, setAutoInstallUpdates] = useState(() => localStorage.getItem('mmm-auto-install-updates') === 'true');
+  const [preReleaseUpdates, setPreReleaseUpdates] = useState(() => localStorage.getItem('mmm-pre-release-updates') === 'true');
   const [account, setAccount] = useState<{id:string;login:string;avatar:string}|null>(null);
   const [accountConfigured, setAccountConfigured] = useState(false);
   const [accountLoading, setAccountLoading] = useState(false);
@@ -240,12 +241,12 @@ export default function App() {
   useEffect(() => {
     if (!desktop || !window.monkeyModManager?.onAppUpdateStatus) return;
     const stop = window.monkeyModManager.onAppUpdateStatus((status) => {
-      if (status.status === 'checking') setAppUpdateStatus('Checking for app updates…');
+      if (status.status === 'checking') setAppUpdateStatus('Checking for app updates…' + (preReleaseUpdates ? ' (including pre-releases)' : ''));
       else if (status.status === 'available') {
         const version = status.version || 'new version';
         setAppUpdate({ version, url: 'https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/releases/latest' });
-        setAppUpdateStatus('Update v' + version + ' is available.');
-        notify('ModHub update available: v' + version);
+        setAppUpdateStatus((preReleaseUpdates ? 'Pre-release ' : 'Update ') + 'v' + version + ' is available.');
+        notify('ModHub ' + (preReleaseUpdates ? 'pre-release ' : '') + 'update available: v' + version);
         if (autoInstallUpdates) {
           void window.monkeyModManager!.downloadAppUpdate().then(result => { if (!result.ok) notify(result.message); });
         } else if (window.confirm('ModHub v' + version + ' is available. Download it now?')) {
@@ -265,7 +266,7 @@ export default function App() {
       }
     });
     return stop;
-  }, [desktop, autoInstallUpdates]);
+  }, [desktop, autoInstallUpdates, preReleaseUpdates]);
   useEffect(() => {
     if (account && accountDataLoadedFor === account.id) {
       localStorage.setItem('mmm-saved:' + account.id, JSON.stringify(saved));
@@ -699,7 +700,7 @@ export default function App() {
         updates = catalog.filter((mod) => installed[mod.id] && installed[mod.id] !== mod.version);
       }
       if (desktop) {
-        const result = await window.monkeyModManager!.checkAppUpdate();
+        const result = await window.monkeyModManager!.checkAppUpdate(preReleaseUpdates);
         if (!result.ok) throw new Error(result.message || 'Could not check for app updates.');
         setAppUpdateStatus('Checking for app updates…');
       }
@@ -715,7 +716,7 @@ export default function App() {
     if (!desktop || !autoInstallUpdates) return;
     const timer = window.setTimeout(() => void checkForUpdates(), 1800);
     return () => window.clearTimeout(timer);
-  }, [desktop, autoInstallUpdates]);
+  }, [desktop, autoInstallUpdates, preReleaseUpdates]);
 
   const installModFromDisk = async () => {
     if (!desktop) { notify('Install from disk is available in the desktop app.'); return; }
@@ -955,7 +956,9 @@ export default function App() {
           <div className="heroactions">
             <button className="primary" onClick={() => { goToPage('Discover'); document.getElementById('modsearch')?.focus(); }}>⌕ &nbsp; Explore mods ↗</button>
             <button className="secondary" onClick={() => goToPage('Library')}>▣ &nbsp; My library <b>{saved.length}</b></button>
-            <button className="secondary update-check" onClick={() => void checkForUpdates()} disabled={checkingUpdates}>↻ &nbsp; {checkingUpdates ? 'Checking…' : 'Check updates'}</button>
+            <button className={'secondary update-check ' + (appUpdateStatus.startsWith('Update downloaded.') ? 'update-install-ready' : '')} onClick={() => appUpdateStatus.startsWith('Update downloaded.') ? void window.monkeyModManager?.installAppUpdate().then(result=>notify(result.message)) : void checkForUpdates()} disabled={checkingUpdates}>{appUpdateStatus.startsWith('Update downloaded.') ? '✓ Install update' : '↻  Check updates'}</button>
+            <label className="hero-prerelease-toggle" title="Include GitHub pre-releases in app update checks"><input type="checkbox" checked={preReleaseUpdates} onChange={event=>{setPreReleaseUpdates(event.target.checked);localStorage.setItem('mmm-pre-release-updates',String(event.target.checked));}} /><span>Pre-release</span></label>
+            <a className="secondary hero-actions-link" href="https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/actions" target="_blank" rel="noreferrer">↗ &nbsp; GitHub Actions</a>
             <button className="secondary bepinex-button" onClick={() => void installBepInEx()}>⬇ &nbsp; Install BepInEx <small>{desktop ? 'Auto setup' : 'Official download'}</small></button>
           </div>
           <div className="hero-art hero-art-photo"><img src={jungleArt} alt="Gorilla Tag autumn seasonal artwork" /><div className="hero-shade" /></div>
@@ -1023,7 +1026,7 @@ export default function App() {
           {adminError && <div className="admin-error" role="alert">{adminError}</div>}
         </section>}
 
-        {page === 'Settings' ? <section className="cfg-workspace settings-workspace"><div className="cfg-heading"><div><label>LOCAL INSTALLATION</label><h2>Game settings</h2><p>Choose which Gorilla Tag edition to manage and verify the install folder used by the desktop installer.</p></div></div><div className="settings-card"><label>Game installation / PCVR platform<select value={gamePlatform} onChange={event => void changeGamePlatform(event.target.value as 'Steam'|'Meta')}><option value="Steam">SteamVR (Steam)</option><option value="Meta">Meta Quest Link / Oculus PCVR</option></select></label><div className="settings-path"><small>ACTIVE GORILLA TAG FOLDER</small><code>{gameFolder || 'No folder selected'}</code></div>{desktop && <button className="primary" onClick={async()=>{const folder=await window.monkeyModManager!.chooseGameFolder();setGameFolder(folder);if(folder){setDetectedMods(await window.monkeyModManager!.getDetectedMods());notify('Game folder saved.');}}}>Choose folder…</button>}<label className="settings-check"><input type="checkbox" checked={hideInstallNotice} onChange={event=>{setHideInstallNotice(event.target.checked);localStorage.setItem('mmm-hide-install-notice',String(event.target.checked));}} /> Hide install-complete prompts</label><p className="form-help">Choose the edition where Gorilla Tag is installed. You can switch between SteamVR and Meta PCVR here any time; changing the platform searches for that install, and you can use Choose folder if it is not detected automatically.</p><div className="settings-path"><small>MODHUB DESKTOP APP</small><code>Installed version: v{appVersion}</code>{appUpdate ? <p className="form-help">Update available: v{appUpdate.version}</p> : <p className="form-help">Use Check updates to check for the latest app release and tracked mod updates.</p>}{appUpdateStatus && <p className="form-help">{appUpdateStatus}</p>}{appUpdateStatus.startsWith('Update downloaded.') && <button className="primary" onClick={()=>void window.monkeyModManager?.installAppUpdate().then(result=>notify(result.message))}>Restart and install update</button>}<button className="secondary" disabled={checkingUpdates} onClick={()=>void checkForUpdates()}>{checkingUpdates ? 'Checking…' : 'Check app + mod updates'}</button><label className="settings-check"><input type="checkbox" checked={autoInstallUpdates} onChange={event=>{setAutoInstallUpdates(event.target.checked);localStorage.setItem('mmm-auto-install-updates',String(event.target.checked));}} /> Automatically download and install app updates</label><p className="form-help">Uses the built-in updater to download release updates in-app, show progress, and restart to install. Available in the installed desktop build.</p></div></div></section> : page === 'Profiles' ? <section className="cfg-workspace">
+        {page === 'Settings' ? <section className="cfg-workspace settings-workspace"><div className="cfg-heading"><div><label>LOCAL INSTALLATION</label><h2>Game settings</h2><p>Choose which Gorilla Tag edition to manage and verify the install folder used by the desktop installer.</p></div></div><div className="settings-card"><label>Game installation / PCVR platform<select value={gamePlatform} onChange={event => void changeGamePlatform(event.target.value as 'Steam'|'Meta')}><option value="Steam">SteamVR (Steam)</option><option value="Meta">Meta Quest Link / Oculus PCVR</option></select></label><div className="settings-path"><small>ACTIVE GORILLA TAG FOLDER</small><code>{gameFolder || 'No folder selected'}</code></div>{desktop && <button className="primary" onClick={async()=>{const folder=await window.monkeyModManager!.chooseGameFolder();setGameFolder(folder);if(folder){setDetectedMods(await window.monkeyModManager!.getDetectedMods());notify('Game folder saved.');}}}>Choose folder…</button>}<label className="settings-check"><input type="checkbox" checked={hideInstallNotice} onChange={event=>{setHideInstallNotice(event.target.checked);localStorage.setItem('mmm-hide-install-notice',String(event.target.checked));}} /> Hide install-complete prompts</label><p className="form-help">Choose the edition where Gorilla Tag is installed. You can switch between SteamVR and Meta PCVR here any time; changing the platform searches for that install, and you can use Choose folder if it is not detected automatically.</p><div className="settings-path"><small>MODHUB DESKTOP APP</small><code>Installed version: v{appVersion}</code>{appUpdate ? <p className="form-help">Update available: v{appUpdate.version}</p> : <p className="form-help">Use Check updates to check for the latest app release and tracked mod updates.</p>}{appUpdateStatus && <p className="form-help">{appUpdateStatus}</p>}{appUpdateStatus.startsWith('Update downloaded.') && <button className="primary update-install-ready" onClick={()=>void window.monkeyModManager?.installAppUpdate().then(result=>notify(result.message))}>✓ Restart and install update</button>}<button className="secondary" disabled={checkingUpdates} onClick={()=>void checkForUpdates()}>{checkingUpdates ? 'Checking…' : 'Check app + mod updates'}</button><label className="settings-check"><input type="checkbox" checked={autoInstallUpdates} onChange={event=>{setAutoInstallUpdates(event.target.checked);localStorage.setItem('mmm-auto-install-updates',String(event.target.checked));}} /> Automatically download and install app updates</label><label className="settings-check"><input type="checkbox" checked={preReleaseUpdates} onChange={event=>{setPreReleaseUpdates(event.target.checked);localStorage.setItem('mmm-pre-release-updates',String(event.target.checked));}} /> Include pre-release versions in app update checks</label><a className="secondary settings-actions-link" href="https://github.com/dffdf-sv/Monkey-Mod-Manager-v2/actions" target="_blank" rel="noreferrer">↗ Open GitHub Actions / pre-release builds</a><p className="form-help">Uses the built-in updater to download release updates in-app, show progress, and restart to install. Available in the installed desktop build.</p></div></div></section> : page === 'Profiles' ? <section className="cfg-workspace">
           <div className="cfg-heading"><div><label>YOUR ACCOUNT</label><h2>Account & profiles</h2><p>Keep saved mods, installed-mod snapshots, and CFG files synced to ModHub's private cloud storage, linked to your GitHub identity.</p></div><button className="secondary" disabled={!account || accountLoading || accountDataBusy} onClick={() => void refreshAccount()}>{accountLoading ? '↻ Loading…' : '↻ Refresh account'}</button></div>
           {accountLoading && <p className="cfg-muted">Loading your private cloud save…</p>}
            {accountLoadError && <div className="admin-error" role="alert">Cloud save problem: {accountLoadError} Check the Render GITHUB_TOKEN has private Gist access, then refresh.</div>}
