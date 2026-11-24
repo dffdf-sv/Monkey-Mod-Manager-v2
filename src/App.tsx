@@ -46,6 +46,26 @@ const jungleArt = 'https://cdn.prod.website-files.com/634dcd98720fb26a457ae36f/6
 const categories = ['All Mods', 'Core', 'Utility', 'Cosmetic', 'Maps', 'Gameplay', 'Your Mods'];
 const blankDraft: Draft = { name: '', author: '', category: 'Utility', description: '', version: '1.0.0', downloadUrl: '', imageUrl: '', sourceUrl: '', websiteUrl: '', embedUrl: '', requirements: '', supportedOS: ['Windows'], readme: '', changelog: '', additionalLinks: [], dependencies: [], galleryUrls: [], videoUrl: '', configSettings: [] };
 
+
+/** Short, actionable errors for end users. Raw exception text is never displayed. */
+function friendlyError(error: unknown, fallback = 'Something went wrong. Please try again.') {
+ const raw=error instanceof Error?error.message:String(error||''); const value=raw.toLowerCase();
+ if(/network|fetch failed|failed to fetch|econn|enotfound|timeout|timed out|offline/.test(value))return 'Connection problem. Check your internet and try again.';
+ if(/401|unauthori[sz]ed|sign in|session expired|authentication/.test(value))return 'Your sign-in may have expired. Sign in again and retry.';
+ if(/403|forbidden|permission|access denied|not allowed/.test(value))return 'You do not have permission to do that. Check your account access.';
+ if(/404|not found|missing.*(file|mod|release)/.test(value))return 'We could not find that item. Refresh and try again.';
+ if(/429|rate limit|too many/.test(value))return 'Too many requests right now. Wait a minute, then try again.';
+ if(/413|too large|exceed.*limit|size limit/.test(value))return 'That file is too large. Choose a smaller file and try again.';
+ if(/invalid.*(url|link)|https/.test(value))return 'That link is not valid. Use a direct HTTPS download link.';
+ if(/game folder|gorilla tag.*folder|selected folder/.test(value))return 'Gorilla Tag folder not found. Choose the game folder in Settings.';
+ if(/bepinex/.test(value))return 'BepInEx could not be installed. Check your game folder and try again.';
+ if(/zip|archive|dll|mod file/.test(value))return 'The mod file could not be installed. Check that it is a valid .DLL or .ZIP.';
+ if(/config|\\.cfg/.test(value))return 'The config could not be saved. Check the file and try again.';
+ if(/cloud save|gist|account storage/.test(value))return 'Cloud save is unavailable. Check your connection and try again.';
+ if(/github|repository|release|api/.test(value))return 'The ModHub service is temporarily unavailable. Please try again shortly.';
+ return fallback;
+}
+
 export default function App() {
   const [mods, setMods] = useState<Mod[]>([]);
   const [loading, setLoading] = useState(true);
@@ -205,7 +225,7 @@ export default function App() {
       setCatalogError('');
       return data.mods;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not connect to the mod base API.';
+      const message = friendlyError(error, 'Could not load mods. Refresh the catalogue and try again.');
       setMods([]);
       setCatalogError(message + ' Check the ModHub service and GORILA-TAG-MODBASE.');
       return [];
@@ -248,7 +268,7 @@ export default function App() {
         setAppUpdateStatus((preReleaseUpdates ? 'Pre-release ' : 'Update ') + 'v' + version + ' is available.');
         notify('ModHub ' + (preReleaseUpdates ? 'pre-release ' : '') + 'update available: v' + version);
         if (autoInstallUpdates) {
-          void window.monkeyModManager!.downloadAppUpdate().then(result => { if (!result.ok) notify(result.message); });
+          void window.monkeyModManager!.downloadAppUpdate().then(result => { if (!result.ok) notify(friendlyError(new Error(result.message), 'The action could not be completed. Please try again.')); });
         } else if (window.confirm('ModHub v' + version + ' is available. Download it now?')) {
           void window.monkeyModManager!.downloadAppUpdate().then(result => notify(result.message));
         }
@@ -262,7 +282,7 @@ export default function App() {
         setAppUpdate(null);
         setAppUpdateStatus('You have the latest app version.');
       } else if (status.status === 'error') {
-        setAppUpdateStatus(status.message || 'App update failed.');
+        setAppUpdateStatus(friendlyError(new Error(status.message || ''), 'Update failed. Check your connection and try again.'));
       }
     });
     return stop;
@@ -310,7 +330,7 @@ export default function App() {
       const data = await response.json().catch(()=>({}));
       if (!response.ok) throw new Error(data.error || 'Could not save vote.');
       setModFeedback(current=>({...current,upvotes:Number(data.upvotes||0),downvotes:Number(data.downvotes||0),myVote:Number(data.myVote||0)}));
-    } catch (error) { notify(error instanceof Error ? error.message : 'Could not save vote.'); }
+    } catch (error) { notify(friendlyError(error, 'Could not save your vote. Please try again.')); }
     finally { setFeedbackBusy(false); }
   };
   const rateMod = async (rating:number) => {
@@ -322,7 +342,7 @@ export default function App() {
       const data = await response.json().catch(()=>({}));
       if (!response.ok) throw new Error(data.error || 'Could not save rating.');
       setModFeedback(current=>({...current,ratingAverage:Number(data.ratingAverage||0),ratingCount:Number(data.ratingCount||0),myRating:Number(data.myRating||0)}));
-    } catch (error) { notify(error instanceof Error ? error.message : 'Could not save rating.'); }
+    } catch (error) { notify(friendlyError(error, 'Could not save your rating. Please try again.')); }
     finally { setFeedbackBusy(false); }
   };
 
@@ -337,7 +357,7 @@ export default function App() {
       const data = await response.json().catch(()=>({}));
       if (!response.ok) throw new Error(data.error || 'Could not save review vote.');
       if (data.comment) setModFeedback(current=>({...current,comments:current.comments.map(comment=>comment.id===commentId?data.comment:comment)}));
-    } catch (error) { notify(error instanceof Error ? error.message : 'Could not save review vote.'); }
+    } catch (error) { notify(friendlyError(error, 'Could not save your review vote. Please try again.')); }
     finally { setFeedbackBusy(false); }
   };
   const rateReview = async (commentId:string, rating:number) => {
@@ -351,7 +371,7 @@ export default function App() {
       const data = await response.json().catch(()=>({}));
       if (!response.ok) throw new Error(data.error || 'Could not save review rating.');
       if (data.comment) setModFeedback(current=>({...current,comments:current.comments.map(comment=>comment.id===commentId?data.comment:comment)}));
-    } catch (error) { notify(error instanceof Error ? error.message : 'Could not save review rating.'); }
+    } catch (error) { notify(friendlyError(error, 'Could not save your review rating. Please try again.')); }
     finally { setFeedbackBusy(false); }
   };
 
@@ -368,7 +388,7 @@ export default function App() {
       setModFeedback(current=>({...current,comments:Array.isArray(data.comments)?data.comments:current.comments}));
       setCommentDraft('');
       notify('Comment posted.');
-    } catch (error) { notify(error instanceof Error ? error.message : 'Could not post comment.'); }
+    } catch (error) { notify(friendlyError(error, 'Could not post your comment. Please try again.')); }
     finally { setFeedbackBusy(false); }
   };
 
@@ -463,7 +483,7 @@ export default function App() {
       return true;
     } catch (error) {
       if (activeAccountId.current === userId) {
-        const message = error instanceof Error ? error.message : 'Cloud save failed. Check account storage setup.';
+        const message = friendlyError(error, 'Cloud save failed. Check your connection and try again.');
         setAccountLoadError(message);
         notify(message);
       }
@@ -508,7 +528,7 @@ export default function App() {
       const next = {...accountData, configs:{...accountData.configs,[file.name]:content}};
       await saveAccountData(next, file.name + ' imported to your private cloud configs.');
     } catch (error) {
-      notify(error instanceof Error ? error.message : 'Could not import CFG file.');
+      notify(friendlyError(error, 'Could not import that config file.'));
     }
   };
   const loadCloudConfig = (name: string, content: string) => {
@@ -539,8 +559,8 @@ export default function App() {
       setConfigText(content);
       notify('Installed ' + name + ' to Gorilla Tag. ' + result.message);
     } catch (error) {
-      setConfigError(error instanceof Error ? error.message : 'Could not install this CFG.');
-      notify(error instanceof Error ? error.message : 'Could not install this CFG.');
+      setConfigError(friendlyError(error, 'Could not install that config.'));
+      notify(friendlyError(error, 'Could not install that config.'));
     } finally {
       setConfigBusy(false);
     }
@@ -686,7 +706,7 @@ export default function App() {
         const extra = [...new Set(installedThisRun)];
         notify(mod.name + ' installed successfully' + (extra.length ? '. Dependencies installed: ' + extra.join(', ') : '') + (missing.length ? '. Check: ' + [...new Set(missing)].join(', ') : ''));
       } else notify(result.message);
-    } catch (error) { notify(error instanceof Error ? error.message : 'Install failed. Check the download link and selected Gorilla Tag folder.'); }
+    } catch (error) { notify(friendlyError(error, 'Install failed. Check the mod link and game folder, then try again.')); }
   };
 
   const checkForUpdates = async () => {
@@ -733,7 +753,7 @@ export default function App() {
         setDetectedMods(await window.monkeyModManager!.getDetectedMods());
       }
       if (!result.ok || !hideInstallNotice) notify(result.message);
-    } catch (error) { notify(error instanceof Error ? error.message : 'Could not install mod files from disk.'); }
+    } catch (error) { notify(friendlyError(error, 'Could not install those files. Check the files and game folder.')); }
   };
 
   const changeGamePlatform = async (platform:'Steam'|'Meta') => {
@@ -753,7 +773,7 @@ export default function App() {
     try {
       notify('Downloading official BepInEx 5.4.23.5…');
       const result = await window.monkeyModManager!.installBepInEx();
-      notify(result.ok ? 'BepInEx installed. Launch Gorilla Tag once to finish setup.' : result.message);
+      notify(result.ok ? 'BepInEx installed. Launch Gorilla Tag once to finish setup.' : friendlyError(new Error(result.message), 'BepInEx could not be installed. Check your game folder and try again.'));
     } catch { notify('BepInEx installation failed. Check your game folder and internet connection.'); }
   };
 
