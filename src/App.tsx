@@ -958,7 +958,7 @@ export default function App() {
             <button className="secondary update-check" onClick={() => void checkForUpdates()} disabled={checkingUpdates}>↻ &nbsp; {checkingUpdates ? 'Checking…' : 'Check updates'}</button>
             <button className="secondary bepinex-button" onClick={() => void installBepInEx()}>⬇ &nbsp; Install BepInEx <small>{desktop ? 'Auto setup' : 'Official download'}</small></button>
           </div>
-          <div className="hero-art hero-art-photo"><img src={jungleArt} alt="Gorilla Tag Halloween update artwork" /><div className="hero-shade" /></div>
+          <div className="hero-art hero-art-photo"><img src={jungleArt} alt="Gorilla Tag autumn seasonal artwork" /><div className="hero-shade" /></div>
         </section>
 
         <div className="stats">
