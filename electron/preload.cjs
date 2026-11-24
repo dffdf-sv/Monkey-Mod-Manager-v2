@@ -3,7 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('monkeyModManager', {
   isDesktop: true,
   getAppVersion: () => ipcRenderer.invoke('app:get-version'),
-  checkAppUpdate: () => ipcRenderer.invoke('app:check-update'),
+  checkAppUpdate: (prerelease) => ipcRenderer.invoke('app:check-update', prerelease),
   downloadAppUpdate: () => ipcRenderer.invoke('app:download-update'),
   installAppUpdate: () => ipcRenderer.invoke('app:install-update'),
   onAppUpdateStatus: (callback) => { const listener = (_event, status) => callback(status); ipcRenderer.on('app:update-status', listener); return () => ipcRenderer.removeListener('app:update-status', listener); },
