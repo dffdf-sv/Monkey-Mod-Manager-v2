@@ -1190,10 +1190,10 @@ export default function App() {
         <p className="platform-onboarding-description">Choose the PC version you use. ModHub will save this as your platform and look for the right game folder. You can change it later in Settings.</p>
         <div className="platform-onboarding-choices">
           <button type="button" className={'platform-choice '+(gamePlatform==='Steam'?'selected':'')} onClick={()=>void changeGamePlatform('Steam')}>
-            <span className="platform-choice-art steam-art" aria-hidden="true">S</span><strong>Steam</strong><small>SteamVR · Steam on PC</small><span className="platform-choice-action">SELECT STEAM</span>
+            <span className="platform-choice-art steam-art" aria-hidden="true"><svg viewBox="0 0 64 64" role="img" aria-label="Steam logo"><circle cx="32" cy="32" r="29" fill="none" stroke="currentColor" strokeWidth="5"/><circle cx="43" cy="20" r="9" fill="none" stroke="currentColor" strokeWidth="5"/><circle cx="43" cy="20" r="3" fill="currentColor"/><path d="M17 29l12 6 8-9M18 30a8 8 0 1 0 5-7" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/><circle cx="19" cy="39" r="5" fill="none" stroke="currentColor" strokeWidth="4"/></svg></span><strong>Steam</strong><small>SteamVR · Steam on PC</small><span className="platform-choice-action">SELECT STEAM</span>
           </button>
           <button type="button" className={'platform-choice '+(gamePlatform==='Meta'?'selected':'')} onClick={()=>void changeGamePlatform('Meta')}>
-            <span className="platform-choice-art meta-art" aria-hidden="true">∞</span><strong>Meta</strong><small>Quest Link · Oculus PC app</small><span className="platform-choice-action">SELECT META</span>
+            <span className="platform-choice-art meta-art" aria-hidden="true"><svg viewBox="0 0 64 40" role="img" aria-label="Meta logo"><path d="M5 29C12 7 19 5 26 19l8 14c5 9 13 5 19-7 4-8 5-15 2-18-4-4-11 1-17 10L26 33C19 43 9 39 5 29Z" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"/></svg></span><strong>Meta</strong><small>Quest Link · Oculus PC app</small><span className="platform-choice-action">SELECT META</span>
           </button>
         </div>
         <p className="platform-onboarding-footnote">Not sure? Choose the store you installed Gorilla Tag from.</p>
