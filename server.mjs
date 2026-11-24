@@ -667,7 +667,35 @@ const server = http.createServer(async (req, res) => {
       if (next.length === current.list.length) return reply(res, 404, { error: 'Mod was not found.' });
       try { await saveGithubList(next, current.sha, 'Remove ' + id + ' from mod hub'); }
       catch (error) { return reply(res, 502, { error: error instanceof Error ? error.message : 'Could not remove mod from GitHub.' }); }
-      return reply(res, 200, { ok: true });
+      // Remove every uploaded asset belonging to this mod (images, videos and DLL/ZIP files).
+      // The catalogue entry is removed first so a cleanup issue cannot leave a deleted mod visible.
+      let assetsRemoved = 0;
+      try {
+        const token = process.env.GITHUB_TOKEN;
+        const treeResponse = await fetch('https://api.github.com/repos/' + MOD_REPO + '/git/trees/main?recursive=1', {
+          headers: { authorization: 'Bearer ' + token, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'ModHub' },
+          signal: AbortSignal.timeout(15000)
+        });
+        const treeData = await treeResponse.json().catch(() => ({}));
+        if (!treeResponse.ok || !Array.isArray(treeData.tree)) throw new Error('Could not list uploaded mod files.');
+        const prefix = 'mods/' + id + '/';
+        const files = treeData.tree.filter(item => item.type === 'blob' && String(item.path || '').startsWith(prefix) && /^[0-9a-f]{40}$/.test(String(item.sha || '')));
+        for (const file of files) {
+          const deleteResponse = await fetch('https://api.github.com/repos/' + MOD_REPO + '/contents/' + file.path.split('/').map(encodeURIComponent).join('/'), {
+            method: 'DELETE',
+            headers: { authorization: 'Bearer ' + token, accept: 'application/vnd.github+json', 'content-type': 'application/json', 'x-github-api-version': '2022-11-28', 'user-agent': 'ModHub' },
+            body: JSON.stringify({ message: 'Remove uploaded assets for deleted mod ' + id, sha: file.sha, branch: 'main' }),
+            signal: AbortSignal.timeout(15000)
+          });
+          if (!deleteResponse.ok) throw new Error('Could not remove all uploaded mod files.');
+          assetsRemoved += 1;
+        }
+      } catch (cleanupError) {
+        console.error('[ModHub] Mod asset cleanup incomplete for ' + id + ':', cleanupError);
+      }
+      // Author attribution lives on each mod entry; there is no separate author
+      // registry to delete. The creator's GitHub account is never deleted.
+      return reply(res, 200, { ok: true, assetsRemoved });
     }
     if (url.pathname.startsWith('/api/')) return reply(res, 404, { error: 'API route not found.' });
     if (API_ONLY) return reply(res, 404, { error: 'API-only development server.' });
