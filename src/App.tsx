@@ -1190,10 +1190,10 @@ export default function App() {
         <p className="platform-onboarding-description">Choose the PC version you use. ModHub will save this as your platform and look for the right game folder. You can change it later in Settings.</p>
         <div className="platform-onboarding-choices">
           <button type="button" className={'platform-choice '+(gamePlatform==='Steam'?'selected':'')} onClick={()=>void changeGamePlatform('Steam')}>
-            <span className="platform-choice-art steam-art"><img src="https://yt3.googleusercontent.com/ytc/AIdro_mf-6XIwzf6tkQKRggITGdD2Ql0RSNIU1zoPvdAN9i86zI=s900-c-k-c0x00ffffff-no-rj" alt="Steam" /><strong>Steam</strong><small>SteamVR · Steam on PC</small><span className="platform-choice-action">SELECT STEAM</span>
+            <span className="platform-choice-art steam-art"><img src="https://yt3.googleusercontent.com/ytc/AIdro_mf-6XIwzf6tkQKRggITGdD2Ql0RSNIU1zoPvdAN9i86zI=s900-c-k-c0x00ffffff-no-rj" alt="Steam" /></span><strong>Steam</strong><small>SteamVR · Steam on PC</small><span className="platform-choice-action">SELECT STEAM</span>
           </button>
           <button type="button" className={'platform-choice '+(gamePlatform==='Meta'?'selected':'')} onClick={()=>void changeGamePlatform('Meta')}>
-            <span className="platform-choice-art meta-art"><img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ7HWYbM-y9Li-n-FimCyZ0rqg125sMEq4E3WYUq5B5pbZ1EKDS-5Efrk0i&s=10" alt="Meta" /><strong>Meta</strong><small>Quest Link · Oculus PC app</small><span className="platform-choice-action">SELECT META</span>
+            <span className="platform-choice-art meta-art"><img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ7HWYbM-y9Li-n-FimCyZ0rqg125sMEq4E3WYUq5B5pbZ1EKDS-5Efrk0i&s=10" alt="Meta" /></span><strong>Meta</strong><small>Quest Link · Oculus PC app</small><span className="platform-choice-action">SELECT META</span>
           </button>
         </div>
         <p className="platform-onboarding-footnote">Not sure? Choose the store you installed Gorilla Tag from.</p>
